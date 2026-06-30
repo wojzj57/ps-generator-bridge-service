@@ -174,4 +174,46 @@ describe("public Connection", () => {
     respond(transport, { id: 7, index: 1, name: "Layer", type: 1, visible: true });
     await expect(layer).resolves.toMatchObject({ id: 7 });
   });
+
+  it("exposes image module wrappers", async () => {
+    const { conn, transports } = harness();
+    const transport = transports[0]!;
+    await connect(conn, transport);
+
+    const bounds = { left: 0, top: 0, right: 10, bottom: 10 };
+
+    const exportedLayer = conn.modules.image.exportLayer({
+      documentId: 1,
+      layerSpec: 7,
+      settings: { scaleX: 0.5 },
+    });
+    await flush();
+    expect(lastRequest(transport)).toMatchObject({
+      method: ProtocolMethod.ImageExportLayer,
+      params: { documentId: 1, layerSpec: 7, settings: { scaleX: 0.5 } },
+    });
+    respond(transport, { data: "data:image/png;base64,abc", bounds, width: 10, height: 10 });
+    await expect(exportedLayer).resolves.toMatchObject({ data: "data:image/png;base64,abc" });
+
+    const preview = conn.modules.image.getPreview({ layerSpec: 7 });
+    await flush();
+    expect(lastRequest(transport)).toMatchObject({
+      method: ProtocolMethod.ImageGetPreview,
+      params: { layerSpec: 7 },
+    });
+    respond(transport, { data: "data:image/png;base64,thumb", bounds, width: 10, height: 10 });
+    await expect(preview).resolves.toMatchObject({ width: 10, height: 10 });
+
+    const exportedDocument = conn.modules.image.exportDocument({
+      documentId: 1,
+      settings: { scaleY: 0.25 },
+    });
+    await flush();
+    expect(lastRequest(transport)).toMatchObject({
+      method: ProtocolMethod.ImageExportDocument,
+      params: { documentId: 1, settings: { scaleY: 0.25 } },
+    });
+    respond(transport, { data: "https://cos/doc.png", bounds, width: 10, height: 10 });
+    await expect(exportedDocument).resolves.toMatchObject({ data: "https://cos/doc.png" });
+  });
 });

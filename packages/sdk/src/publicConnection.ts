@@ -161,6 +161,16 @@ class PublicModules {
     removeBackground: () => this.invoke(ProtocolMethod.ActionRemoveBackground, {}),
   };
 
+  readonly image = {
+    exportLayer: (params: ProtocolMethods[typeof ProtocolMethod.ImageExportLayer]["params"]) =>
+      this.invoke(ProtocolMethod.ImageExportLayer, params),
+    getPreview: (params: ProtocolMethods[typeof ProtocolMethod.ImageGetPreview]["params"]) =>
+      this.invoke(ProtocolMethod.ImageGetPreview, params),
+    exportDocument: (
+      params: ProtocolMethods[typeof ProtocolMethod.ImageExportDocument]["params"]
+    ) => this.invoke(ProtocolMethod.ImageExportDocument, params),
+  };
+
   constructor(private readonly invoke: Invoker) {}
 }
 
