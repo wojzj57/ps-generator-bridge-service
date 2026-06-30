@@ -1,0 +1,166 @@
+import { describe, it, expect } from "vitest";
+import {
+  BasePlugin,
+  ws,
+  api,
+  bootstrap,
+  type AssemblyTarget,
+  type PluginClientBus,
+  type PluginHost,
+  type MethodHandler,
+  type ApiRouteSpec,
+} from "../src/plugin";
+
+// A minimal PluginHost stand-in: the devkit tests exercise BasePlugin and
+// the decorators, neither of which reaches the host, so a bare cast suffices.
+const fakeHost = {
+  jsx: {
+    run: () => Promise.resolve(),
+    execute: () => Promise.resolve(),
+    executeBuiltin: () => Promise.resolve(),
+  },
+  modules: { layer: {}, document: {}, action: {} },
+} as unknown as PluginHost;
+
+class TestPlugin extends BasePlugin {
+  static readonly id = "test";
+
+  @ws("test:echo")
+  echo(params: unknown): unknown {
+    return params;
+  }
+
+  @api("/thing")
+  async thing(): Promise<{ ok: true }> {
+    return { ok: true };
+  }
+}
+
+describe("BasePlugin", () => {
+  it("stores the id passed to the constructor", () => {
+    const s = new TestPlugin("test", fakeHost);
+    expect(s.id).toBe("test");
+  });
+
+  it("broadcast/send delegate to the attached bus", () => {
+    const s = new TestPlugin("test", fakeHost);
+    const calls: string[] = [];
+    const bus: PluginClientBus = {
+      broadcast: (type) => calls.push(`b:${type}`),
+      send: (clientId, type) => calls.push(`s:${clientId}:${type}`),
+    };
+    s._attachBus(bus);
+    s.broadcast("paint_changed", { x: 1 });
+    s.send("c1", "hey", {});
+    expect(calls).toEqual(["b:paint_changed", "s:c1:hey"]);
+  });
+
+  it("broadcast/send are no-ops before the bus is attached", () => {
+    const s = new TestPlugin("test", fakeHost);
+    expect(() => s.broadcast("x", 1)).not.toThrow();
+    expect(() => s.send("c", "x", 1)).not.toThrow();
+  });
+
+  it("onConnect/onDisconnect default to no-ops and are overridable", () => {
+    class Bare extends BasePlugin {
+      static readonly id = "bare";
+    }
+    const bare = new Bare("bare", fakeHost);
+    expect(() => bare.onConnect("c")).not.toThrow();
+    expect(() => bare.onDisconnect("c")).not.toThrow();
+
+    class WithHooks extends BasePlugin {
+      static readonly id = "with-hooks";
+      seen: string[] = [];
+      override onConnect(clientId: string): void {
+        this.seen.push(`+${clientId}`);
+      }
+      override onDisconnect(clientId: string): void {
+        this.seen.push(`-${clientId}`);
+      }
+    }
+    const s = new WithHooks("with-hooks", fakeHost);
+    s.onConnect("a");
+    s.onDisconnect("a");
+    expect(s.seen).toEqual(["+a", "-a"]);
+  });
+});
+
+describe("decorators + bootstrap", () => {
+  function mockTarget(): {
+    target: AssemblyTarget;
+    methods: Map<string, MethodHandler>;
+    apis: ApiRouteSpec[];
+  } {
+    const methods = new Map<string, MethodHandler>();
+    const apis: ApiRouteSpec[] = [];
+    return {
+      target: {
+        registerMethod: (n, h) => methods.set(n, h),
+        registerApi: (r) => apis.push(r),
+      },
+      methods,
+      apis,
+    };
+  }
+
+  it("collects @ws/@api metadata and registers bound handlers with the target", () => {
+    const { target, methods, apis } = mockTarget();
+    const s = new TestPlugin("test", fakeHost);
+    bootstrap(s, target);
+
+    expect(methods.has("test:echo")).toBe(true);
+    expect(apis).toEqual([expect.objectContaining({ method: "GET", url: "/thing" })]);
+
+    // Handler is bound to the instance.
+    expect(methods.get("test:echo")!({ hi: 1 }, undefined)).toEqual({ hi: 1 });
+  });
+
+  it("supports @api({ method, url }) for selecting the verb", () => {
+    class PostPlugin extends BasePlugin {
+      static readonly id = "post";
+      @api({ method: "POST", url: "/create" })
+      create(): unknown {
+        return {};
+      }
+    }
+    const { target, apis } = mockTarget();
+    bootstrap(new PostPlugin("post", fakeHost), target);
+    expect(apis[0]).toMatchObject({ method: "POST", url: "/create" });
+  });
+
+  it("does not leak handlers between unrelated classes", () => {
+    class Other extends BasePlugin {
+      static readonly id = "other";
+      @ws("other:run")
+      run(): string {
+        return "ok";
+      }
+    }
+    const { target, methods } = mockTarget();
+    bootstrap(new Other("other", fakeHost), target);
+    expect(methods.has("test:echo")).toBe(false);
+    expect(methods.has("other:run")).toBe(true);
+    expect(methods.get("other:run")!({}, undefined)).toBe("ok");
+  });
+
+  it("includes inherited handlers via the metadata prototype chain", () => {
+    class Parent extends BasePlugin {
+      static readonly id: string = "parent";
+      @ws("parent:p")
+      p(): number {
+        return 1;
+      }
+    }
+    class Child extends Parent {
+      @ws("child:c")
+      c(): number {
+        return 2;
+      }
+    }
+    const { target, methods } = mockTarget();
+    bootstrap(new Child("child", fakeHost), target);
+    expect(methods.has("parent:p")).toBe(true); // inherited
+    expect(methods.has("child:c")).toBe(true); // own
+  });
+});

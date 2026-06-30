@@ -1,0 +1,34 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Run Server in Photoshop",
+      "program": "${workspaceFolder}/generator-core/app.js",
+      "args": ["-f", "${workspaceFolder}/packages/generator"],
+      "cwd": "${workspaceFolder}/generator-core",
+      "console": "integratedTerminal",
+      "preLaunchTask": "build-server",
+      "outFiles": ["${workspaceFolder}/packages/generator/dist/**/*.js"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Run Standalone Dev Server (Fake PS)",
+      "runtimeArgs": ["--import", "tsx"],
+      "program": "${workspaceFolder}/packages/generator/test/devServer.ts",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Run SDK Smoke",
+      "runtimeArgs": ["--import", "tsx"],
+      "program": "${workspaceFolder}/packages/sdk/examples/smoke.ts",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    }
+  ]
+}

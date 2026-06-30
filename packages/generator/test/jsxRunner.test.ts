@@ -1,0 +1,298 @@
+import { join } from "node:path";
+import { rm, mkdir, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { describe, it, expect, afterEach } from "vitest";
+import { JsxRunner } from "../src/utilis/jsxRunner";
+import type { Logger } from "../src/utilis/logger";
+import { fakeGenerator } from "./fakeGenerator";
+
+const silentLogger: Logger = { debug() {}, info() {}, warn() {}, error() {} };
+
+// Real source polyfills tree (packages/generator/jsx/polyfills). The bundled
+// dist copy lives under dist/jsx/polyfills, but vitest runs the source file
+// directly, so __dirname-based resolution can't reach it — point at source.
+const SOURCE_POLYFILLS = join(__dirname, "..", "jsx", "polyfills");
+
+// Per-test scratch dir for init() edge-case tests (missing/empty/corrupt).
+const SCRATCH = join(tmpdir(), "jsxrunner-init");
+let scratchCounter = 0;
+const nextScratch = () => join(SCRATCH, String(++scratchCounter));
+
+afterEach(async () => {
+  await rm(SCRATCH, { recursive: true, force: true });
+});
+
+describe("JsxRunner.run", () => {
+  it("returns the jsx value verbatim without JSON.parse", async () => {
+    const generator = fakeGenerator();
+    const json = '{"id":1,"name":"layer"}';
+    generator.onEvaluateJSXFile = () => json;
+    const runner = new JsxRunner(generator, silentLogger);
+
+    const result = await runner.execute("Document/getDocumentInfo");
+    // Still a string — the seam never parses for the caller.
+    expect(result).toBe(json);
+  });
+
+  it("passes through non-Error objects unchanged", async () => {
+    const generator = fakeGenerator();
+    const value = { bounds: [0, 0, 10, 10] };
+    generator.onEvaluateJSXFile = () => value;
+    const runner = new JsxRunner(generator, silentLogger);
+
+    expect(await runner.execute("Document/getDocumentInfo")).toBe(value);
+  });
+
+  it("throws with the message after the Error: prefix", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXFile = () => "Error:boom";
+    const runner = new JsxRunner(generator, silentLogger);
+
+    await expect(runner.execute("Document/getDocumentInfo")).rejects.toThrow("boom");
+  });
+
+  it("does not treat a value merely containing 'Error:' as a failure", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXFile = () => "note: Error:not-a-prefix";
+    const runner = new JsxRunner(generator, silentLogger);
+
+    expect(await runner.execute("Document/getDocumentInfo")).toBe("note: Error:not-a-prefix");
+  });
+
+  it("resolves the path by domain and forwards params + sharedEngineSafe", async () => {
+    const generator = fakeGenerator();
+    const runner = new JsxRunner(generator, silentLogger);
+
+    await runner.execute("Document/getDocumentInfo", { id: 1 }, true);
+
+    expect(generator.jsxCalls).toHaveLength(1);
+    const call = generator.jsxCalls[0]!;
+    expect(call.path.endsWith(join("jsx", "Document", "getDocumentInfo.jsx"))).toBe(true);
+    expect(call.params).toEqual({ id: 1 });
+    expect(call.sharedEngineSafe).toBe(true);
+  });
+
+  it("resolves to undefined when the hook is absent", async () => {
+    const generator = fakeGenerator();
+    const runner = new JsxRunner(generator, silentLogger);
+
+    expect(await runner.execute("Action/noop")).toBeUndefined();
+    expect(generator.jsxCalls[0]?.params).toBeUndefined();
+    expect(generator.jsxCalls[0]?.sharedEngineSafe).toBeUndefined();
+  });
+});
+
+describe("JsxRunner.forPlugin (scoped jsx)", () => {
+  const PLUGIN_DIR = join(tmpdir(), "plugin-jsx");
+
+  it("execute resolves '<name>' under the plugin dir and forwards params + sharedEngineSafe", async () => {
+    const generator = fakeGenerator();
+    const scoped = new JsxRunner(generator, silentLogger).forPlugin(PLUGIN_DIR);
+
+    await scoped.execute("landSingle", { id: 1 }, true);
+
+    const call = generator.jsxCalls[0]!;
+    expect(call.path).toBe(join(PLUGIN_DIR, "landSingle.jsx"));
+    expect(call.params).toEqual({ id: 1 });
+    expect(call.sharedEngineSafe).toBe(true);
+  });
+
+  it("execute resolves nested names under the plugin dir", async () => {
+    const generator = fakeGenerator();
+    const scoped = new JsxRunner(generator, silentLogger).forPlugin(PLUGIN_DIR);
+
+    await scoped.execute("sub/deep");
+
+    expect(generator.jsxCalls[0]!.path).toBe(join(PLUGIN_DIR, "sub", "deep.jsx"));
+  });
+
+  it("executeBuiltin resolves under the built-in jsx tree, not the plugin dir", async () => {
+    const generator = fakeGenerator();
+    const scoped = new JsxRunner(generator, silentLogger).forPlugin(PLUGIN_DIR);
+
+    await scoped.executeBuiltin("Document/getDocumentInfo", { id: 2 });
+
+    const call = generator.jsxCalls[0]!;
+    expect(call.path.endsWith(join("jsx", "Document", "getDocumentInfo.jsx"))).toBe(true);
+    expect(call.path.startsWith(PLUGIN_DIR)).toBe(false);
+    expect(call.params).toEqual({ id: 2 });
+  });
+
+  it("run delegates to the root (raw script in the default engine)", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = () => 7;
+    const scoped = new JsxRunner(generator, silentLogger).forPlugin(PLUGIN_DIR);
+
+    expect(await scoped.run("3 + 4")).toBe(7);
+    expect(generator.jsxStringCalls[0]?.script).toBe("3 + 4");
+  });
+
+  it("normalizes 'Error:'-prefixed results like the root execute", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXFile = () => "Error:scoped boom";
+    const scoped = new JsxRunner(generator, silentLogger).forPlugin(PLUGIN_DIR);
+
+    await expect(scoped.execute("x")).rejects.toThrow("scoped boom");
+  });
+});
+
+describe("JsxRunner.executeBuiltin (root)", () => {
+  it("coincides with execute on the root runner (built-in tree)", async () => {
+    const generator = fakeGenerator();
+    const runner = new JsxRunner(generator, silentLogger);
+
+    await runner.executeBuiltin("Layer/getLayerInfo", { id: 3 }, true);
+
+    const call = generator.jsxCalls[0]!;
+    expect(call.path.endsWith(join("jsx", "Layer", "getLayerInfo.jsx"))).toBe(true);
+    expect(call.params).toEqual({ id: 3 });
+    expect(call.sharedEngineSafe).toBe(true);
+  });
+});
+
+describe("JsxRunner.execute", () => {
+  it("evaluates a jsx string via evaluateJSXString in the default engine", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = () => 42;
+    const runner = new JsxRunner(generator, silentLogger);
+
+    expect(await runner.run("1 + 41")).toBe(42);
+    expect(generator.jsxStringCalls).toHaveLength(1);
+    expect(generator.jsxStringCalls[0]?.script).toBe("1 + 41");
+    // Default engine only — sharedEngineSafe is never forwarded.
+    expect(generator.jsxStringCalls[0]?.sharedEngineSafe).toBeUndefined();
+  });
+
+  it("returns the jsx value verbatim without JSON.parse", async () => {
+    const generator = fakeGenerator();
+    const json = '{"id":1,"name":"layer"}';
+    generator.onEvaluateJSXString = () => json;
+    const runner = new JsxRunner(generator, silentLogger);
+
+    expect(await runner.run("JSON.stringify(...)")).toBe(json);
+  });
+
+  it("passes through non-Error objects unchanged", async () => {
+    const generator = fakeGenerator();
+    const value = { ok: true };
+    generator.onEvaluateJSXString = () => value;
+    const runner = new JsxRunner(generator, silentLogger);
+
+    expect(await runner.run("({ok:true})")).toBe(value);
+  });
+
+  it("throws with the message after the Error: prefix", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = () => "Error:boom";
+    const runner = new JsxRunner(generator, silentLogger);
+
+    await expect(runner.run("bad()")).rejects.toThrow("boom");
+  });
+
+  it("does not treat a value merely containing 'Error:' as a failure", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = () => "note: Error:not-a-prefix";
+    const runner = new JsxRunner(generator, silentLogger);
+
+    expect(await runner.run("'note: Error:not-a-prefix'")).toBe("note: Error:not-a-prefix");
+  });
+});
+
+describe("JsxRunner.init", () => {
+  it("reads, concatenates (sorted), and injects the polyfill bundle once", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = () => undefined;
+    const runner = new JsxRunner(generator, silentLogger, SOURCE_POLYFILLS);
+
+    await runner.init();
+
+    // Exactly one evaluateJSXString call carrying the concatenated bundle.
+    expect(generator.jsxStringCalls).toHaveLength(1);
+    const script = generator.jsxStringCalls[0]?.script ?? "";
+    // Sorted order means Array.js precedes Function.js precedes JSON.js …
+    const arrayIdx = script.indexOf("Array Polyfills");
+    const functionIdx = script.indexOf("Function Polyfills");
+    expect(arrayIdx).toBeGreaterThan(-1);
+    expect(functionIdx).toBeGreaterThan(-1);
+    expect(arrayIdx).toBeLessThan(functionIdx);
+    // All six polyfill files are present.
+    for (const marker of ["Array", "Function", "JSON", "Number", "Object", "String"]) {
+      expect(script).toContain(marker);
+    }
+  });
+
+  it("throws when the polyfills dir is missing", async () => {
+    const generator = fakeGenerator();
+    const runner = new JsxRunner(generator, silentLogger, join(nextScratch(), "missing"));
+
+    await expect(runner.init()).rejects.toThrow(/polyfills dir not found/);
+    expect(generator.jsxStringCalls).toHaveLength(0);
+  });
+
+  it("skips injection when the polyfills dir is empty (no-op)", async () => {
+    const dir = nextScratch();
+    await mkdir(dir, { recursive: true });
+    const generator = fakeGenerator();
+    const runner = new JsxRunner(generator, silentLogger, dir);
+
+    await runner.init();
+
+    expect(generator.jsxStringCalls).toHaveLength(0);
+  });
+
+  it("throws when injection returns an Error: prefix", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = () => "Error:syntax boom";
+    const runner = new JsxRunner(generator, silentLogger, SOURCE_POLYFILLS);
+
+    await expect(runner.init()).rejects.toThrow("syntax boom");
+  });
+
+  it("walks nested subdirectories and keeps order stable", async () => {
+    const dir = nextScratch();
+    await mkdir(join(dir, "z"), { recursive: true });
+    await mkdir(join(dir, "a"), { recursive: true });
+    await writeFile(join(dir, "z", "z.js"), "// z\n", "utf8");
+    await writeFile(join(dir, "a", "a.js"), "// a\n", "utf8");
+    await writeFile(join(dir, "root.js"), "// root\n", "utf8");
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = () => undefined;
+    const runner = new JsxRunner(generator, silentLogger, dir);
+
+    await runner.init();
+
+    const script = generator.jsxStringCalls[0]?.script ?? "";
+    // a/a.js < root.js < z/z.js by relative POSIX path.
+    expect(script.indexOf("// a")).toBeLessThan(script.indexOf("// root"));
+    expect(script.indexOf("// root")).toBeLessThan(script.indexOf("// z"));
+  });
+});
+
+describe("JsxRunner engine persistence", () => {
+  it("a global set during one execute() is visible to a later execute() call", async () => {
+    // Simulates ExtendScript keeping globals across evaluateJSXString calls:
+    // the fake engine holds a global map shared by every call, so a value
+    // stored in one execute() is observable in the next — the assumption that
+    // lets `init()` inject polyfills once instead of per-call.
+    const engineGlobals = new Map<string, unknown>();
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = (script) => {
+      if (script.includes("__lbPolyfilled = true")) {
+        engineGlobals.set("__lbPolyfilled", true);
+        return undefined;
+      }
+      if (script.includes("__lbPolyfilled")) {
+        return engineGlobals.get("__lbPolyfilled");
+      }
+      return undefined;
+    };
+    const runner = new JsxRunner(generator, silentLogger, SOURCE_POLYFILLS);
+
+    // init() primes the engine with the real polyfill bundle (returns fine).
+    await runner.init();
+    // A later execute() stores a marker global in the same engine.
+    await runner.run("globalThis.__lbPolyfilled = true");
+    // A still-later execute() observes it — the engine persisted the global.
+    expect(await runner.run("globalThis.__lbPolyfilled")).toBe(true);
+  });
+});

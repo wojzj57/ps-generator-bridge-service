@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2021"],
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@ps-generator-bridge/sdk": ["../sdk/src/index.ts"],
+      "@ps-generator-bridge/sdk/plugin": ["../sdk/src/plugin/index.ts"],
+      // Self-alias: when generator typechecks the cross-imported SDK source, that
+      // source references the contract barrel by package path; resolve it back to
+      // our own source so the type-only sdk<->generator cycle checks cleanly.
+      "@ps-generator-bridge/generator/contract": ["./src/contract.ts"]
+    }
+  },
+  "include": ["src", "test", "jsx/polyfills"]
+}

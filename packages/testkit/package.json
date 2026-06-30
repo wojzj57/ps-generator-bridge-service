@@ -1,0 +1,54 @@
+{
+  "name": "@ps-generator-bridge/testkit",
+  "version": "0.1.0",
+  "description": "Windows Photoshop + generator-core smoke harness for PS Generator Bridge plugins",
+  "license": "MIT",
+  "author": "wojzj57",
+  "homepage": "https://github.com/wojzj57/ps-generator-bridge-service#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wojzj57/ps-generator-bridge-service.git",
+    "directory": "packages/testkit"
+  },
+  "bugs": {
+    "url": "https://github.com/wojzj57/ps-generator-bridge-service/issues"
+  },
+  "keywords": [
+    "photoshop",
+    "generator",
+    "testing",
+    "cli"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "bin": {
+    "ps-bridge-test": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "pnpm typecheck",
+    "clean": "rimraf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@ps-generator-bridge/generator": "workspace:*",
+    "@ps-generator-bridge/sdk": "workspace:*",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.5",
+    "@types/ws": "^8.5.12",
+    "rimraf": "^6.0.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

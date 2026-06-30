@@ -1,0 +1,33 @@
+{
+  "name": "ps-generator-bridge-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PS Generator Bridge Service — Photoshop Generator plugin (runs in PS) + isomorphic SDK",
+  "license": "MIT",
+  "author": "wojzj57",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wojzj57/ps-generator-bridge-service.git"
+  },
+  "homepage": "https://github.com/wojzj57/ps-generator-bridge-service#readme",
+  "bugs": {
+    "url": "https://github.com/wojzj57/ps-generator-bridge-service/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "pnpm@11.5.0",
+  "scripts": {
+    "setup": "tsx scripts/setup.ts",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3"
+  }
+}

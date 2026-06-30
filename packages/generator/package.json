@@ -1,0 +1,76 @@
+{
+  "name": "@ps-generator-bridge/generator",
+  "version": "0.1.0",
+  "description": "PS Generator Bridge — Photoshop Generator plugin + WebSocket service (runs in PS's bundled Node)",
+  "license": "MIT",
+  "author": "wojzj57",
+  "homepage": "https://github.com/wojzj57/ps-generator-bridge-service#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wojzj57/ps-generator-bridge-service.git",
+    "directory": "packages/generator"
+  },
+  "bugs": {
+    "url": "https://github.com/wojzj57/ps-generator-bridge-service/issues"
+  },
+  "keywords": [
+    "photoshop",
+    "generator",
+    "websocket",
+    "plugin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "main.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./main.js",
+      "default": "./main.js"
+    },
+    "./contract": {
+      "types": "./dist/contract.d.ts",
+      "require": "./dist/contract.js",
+      "default": "./dist/contract.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "main.js",
+    "dist",
+    "jsx",
+    "plugins",
+    "README.md"
+  ],
+  "generator-core-version": ">=1.0.0",
+  "scripts": {
+    "prepare": "tsup",
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "dev": "tsx test/devServer.ts",
+    "clean": "rimraf dist logs coverage *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@fastify/websocket": "^10.0.1",
+    "cos-nodejs-sdk-v5": "^2.15.4",
+    "fastify": "^4.29.1",
+    "sharp": "^0.35.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@ps-generator-bridge/sdk": "workspace:*",
+    "@types/node": "^22.13.5",
+    "@types/ws": "^8.5.12",
+    "@vitest/coverage-v8": "^2.1.9",
+    "rimraf": "^6.0.1",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  }
+}

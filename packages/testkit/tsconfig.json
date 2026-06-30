@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2021", "DOM"],
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@ps-generator-bridge/generator/contract": ["../generator/src/contract.ts"],
+      "@ps-generator-bridge/sdk": ["../sdk/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

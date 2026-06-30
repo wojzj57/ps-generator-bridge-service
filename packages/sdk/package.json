@@ -1,0 +1,65 @@
+{
+  "name": "@ps-generator-bridge/sdk",
+  "version": "0.1.0",
+  "description": "Isomorphic (browser + Node >=18) client SDK for the PS Generator Bridge server",
+  "license": "MIT",
+  "author": "wojzj57",
+  "homepage": "https://github.com/wojzj57/ps-generator-bridge-service#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wojzj57/ps-generator-bridge-service.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/wojzj57/ps-generator-bridge-service/issues"
+  },
+  "keywords": [
+    "photoshop",
+    "generator",
+    "websocket",
+    "sdk",
+    "isomorphic"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js",
+      "require": "./dist/plugin.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "prepare": "tsup",
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "clean": "rimraf dist coverage *.tsbuildinfo"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.9",
+    "rimraf": "^6.0.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  }
+}
