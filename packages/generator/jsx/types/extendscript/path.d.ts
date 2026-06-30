@@ -129,7 +129,15 @@ declare class PathItem {
    * @param antiAlias 是否消除锯齿（可选）
    * @param wholePath 是否填充整个路径（可选）
    */
-  fillPath(fillColor?: SolidColor, mode?: BlendMode, opacity?: number, preserveTransparency?: boolean, feather?: number, antiAlias?: boolean, wholePath?: boolean): void;
+  fillPath(
+    fillColor?: SolidColor,
+    mode?: BlendMode,
+    opacity?: number,
+    preserveTransparency?: boolean,
+    feather?: number,
+    antiAlias?: boolean,
+    wholePath?: boolean
+  ): void;
 
   /**
    * 将此路径项设为此文档的剪切路径。

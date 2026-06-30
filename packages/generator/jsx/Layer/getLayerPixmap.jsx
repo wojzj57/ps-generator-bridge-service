@@ -97,11 +97,7 @@ if (params.inputRect && params.outputRect) {
   // Absolute scaling may not keep the aspect ratio intact, in which case effects
   // cannot be scaled. To be consistent, turn it off for all of absolute scaling
   // transform.putBoolean(stringIDToTypeID("scaleStyles"), false);
-} else if (
-  params.scaleX &&
-  params.scaleY &&
-  (params.scaleX !== 1 || params.scaleY !== 1)
-) {
+} else if (params.scaleX && params.scaleY && (params.scaleX !== 1 || params.scaleY !== 1)) {
   transform = new ActionDescriptor();
 
   if (!params.useSmartScaling) {
@@ -162,18 +158,9 @@ actionDescriptor.putInteger(
 actionDescriptor.putInteger(stringIDToTypeID("format"), 2);
 
 if (typeof params.layerSpec === "object") {
-  actionDescriptor.putInteger(
-    stringIDToTypeID("firstLayer"),
-    params.layerSpec.firstLayerIndex
-  );
-  actionDescriptor.putInteger(
-    stringIDToTypeID("lastLayer"),
-    params.layerSpec.lastLayerIndex
-  );
-  if (
-    params.layerSpec.hasOwnProperty("hidden") &&
-    params.layerSpec.hidden.length > 0
-  ) {
+  actionDescriptor.putInteger(stringIDToTypeID("firstLayer"), params.layerSpec.firstLayerIndex);
+  actionDescriptor.putInteger(stringIDToTypeID("lastLayer"), params.layerSpec.lastLayerIndex);
+  if (params.layerSpec.hasOwnProperty("hidden") && params.layerSpec.hidden.length > 0) {
     var i,
       hiddenIndiciesMap = {},
       settingsList = new ActionList(),
@@ -193,11 +180,7 @@ if (typeof params.layerSpec === "object") {
 
     // Loop over every layer, and add either a hidden or visible descriptor
     // based on the map we built.
-    for (
-      i = params.layerSpec.firstLayerIndex;
-      i <= params.layerSpec.lastLayerIndex;
-      ++i
-    ) {
+    for (i = params.layerSpec.firstLayerIndex; i <= params.layerSpec.lastLayerIndex; ++i) {
       if (hiddenIndiciesMap[i]) {
         settingsList.putObject(lsID, hiddenLayerDesc);
       } else {
@@ -292,27 +275,18 @@ if (params.hasOwnProperty("convertToWorkingRGBProfile")) {
 }
 
 if (params.hasOwnProperty("useICCProfile")) {
-  actionDescriptor.putString(
-    stringIDToTypeID("useICCProfile"),
-    String(params.useICCProfile)
-  );
+  actionDescriptor.putString(stringIDToTypeID("useICCProfile"), String(params.useICCProfile));
 }
 
 if (params.hasOwnProperty("getICCProfileData")) {
-  actionDescriptor.putBoolean(
-    stringIDToTypeID("sendThumbnailProfile"),
-    !!params.getICCProfileData
-  );
+  actionDescriptor.putBoolean(stringIDToTypeID("sendThumbnailProfile"), !!params.getICCProfileData);
 }
 
 // NOTE: on the PS side, allowDither and useColorSettingsDither default to "true" if they are
 // not set at all. However, in Generator, the common case will be that we do NOT want to dither,
 // regardless of the settings in PS. So, on the Generator side, we default to false (hence the !! on
 // the params properties).
-actionDescriptor.putBoolean(
-  stringIDToTypeID("allowDither"),
-  !!params.allowDither
-);
+actionDescriptor.putBoolean(stringIDToTypeID("allowDither"), !!params.allowDither);
 actionDescriptor.putBoolean(
   stringIDToTypeID("useColorSettingsDither"),
   !!params.useColorSettingsDither
@@ -330,27 +304,11 @@ if (params.clipBounds) {
   var clipBounds = params.clipBounds,
     psClipRect = new ActionDescriptor();
 
-  psClipRect.putUnitDouble(
-    stringIDToTypeID("left"),
-    charIDToTypeID("#Pxl"),
-    clipBounds.left
-  );
-  psClipRect.putUnitDouble(
-    stringIDToTypeID("top"),
-    charIDToTypeID("#Pxl"),
-    clipBounds.top
-  );
+  psClipRect.putUnitDouble(stringIDToTypeID("left"), charIDToTypeID("#Pxl"), clipBounds.left);
+  psClipRect.putUnitDouble(stringIDToTypeID("top"), charIDToTypeID("#Pxl"), clipBounds.top);
 
-  psClipRect.putUnitDouble(
-    stringIDToTypeID("right"),
-    charIDToTypeID("#Pxl"),
-    clipBounds.right
-  );
-  psClipRect.putUnitDouble(
-    stringIDToTypeID("bottom"),
-    charIDToTypeID("#Pxl"),
-    clipBounds.bottom
-  );
+  psClipRect.putUnitDouble(stringIDToTypeID("right"), charIDToTypeID("#Pxl"), clipBounds.right);
+  psClipRect.putUnitDouble(stringIDToTypeID("bottom"), charIDToTypeID("#Pxl"), clipBounds.bottom);
 
   actionDescriptor.putObject(
     stringIDToTypeID("clipBounds"),
@@ -360,10 +318,7 @@ if (params.clipBounds) {
 }
 
 if (params.boundsOnly) {
-  actionDescriptor.putBoolean(
-    stringIDToTypeID("boundsOnly"),
-    params.boundsOnly
-  );
+  actionDescriptor.putBoolean(stringIDToTypeID("boundsOnly"), params.boundsOnly);
 }
 actionDescriptor.putBoolean(stringIDToTypeID("bounds"), params.bounds);
 //needs to be set explicitly as a boolean

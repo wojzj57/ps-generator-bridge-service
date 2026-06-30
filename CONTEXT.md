@@ -20,6 +20,13 @@ _Avoid_: plugin（太泛）、backend、daemon
 工作区包 `@ps-generator-bridge/sdk`。给**外部用户**用的纯 TS 客户端，同构支持浏览器与 Node ≥ 18，经 WebSocket 连上 [server](#) 调用其能力。它是**协议契约的真身所在**（server 反过来依赖它），且零 PS 依赖、浏览器安全。
 _Avoid_: client（指代具体那个 `PsBridgeClient` 类时可用，但勿用它指代整个包）、api
 
+**发布单元（published package）**:
+本仓库中会发布到 npm 的 workspace 包。目前发布单元是 `@ps-generator-bridge/sdk`、`@ps-generator-bridge/generator`、`@ps-generator-bridge/testkit`；根包 `ps-generator-bridge-service` 只作为 monorepo 编排入口，不是发布单元。
+_Avoid_: 把根包称为 npm 包、把 workspace 包和仓库混用
+
+**Release Pipeline（发布流水线）**:
+从已合并的 Git 提交中推导版本变更，更新发布单元版本，构建产物，并把发布单元发布到 npm 的流程。它管理的是“仓库如何产生 npm 版本”，不是运行时 [server](#) 的能力。
+_Avoid_: deploy（本项目发布到 npm，不部署服务）、build script（只是流水线中的一个步骤）
 **Protocol（协议）**:
 sdk 与 server 之间的消息契约。涵盖**两类方向相反的消息**——[Request](#)（客户端发起、要应答）与 [Event](#)（server 单向推送）——的消息类型、payload schema、错误码。是双方唯一的公共契约，**定义在 sdk 包内**，server type-only 依赖它。
 _Avoid_: API、schema（太泛）、message format

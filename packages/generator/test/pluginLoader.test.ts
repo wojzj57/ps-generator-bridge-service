@@ -119,7 +119,12 @@ describe("loadPlugins", () => {
     const d = await newDir();
     await writePlugin("good", { "index.js": GOOD_SRC });
     const logger = recordingLogger();
-    const res = await loadPlugins({ pluginsDir: d, hostFor: () => fakeHost, knownIds: new Set(), logger });
+    const res = await loadPlugins({
+      pluginsDir: d,
+      hostFor: () => fakeHost,
+      knownIds: new Set(),
+      logger,
+    });
 
     expect(res.loaded).toHaveLength(1);
     expect(res.loaded[0]?.id).toBe("good");

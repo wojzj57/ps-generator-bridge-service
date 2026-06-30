@@ -84,7 +84,11 @@ async function startRoot(): Promise<{
 }
 
 /** Connect to /ws/{pluginId} and resolve once the `connected` handshake arrives. */
-function connect(port: number, pluginId: string, id?: string): Promise<{ ws: WebSocket; clientId: string }> {
+function connect(
+  port: number,
+  pluginId: string,
+  id?: string
+): Promise<{ ws: WebSocket; clientId: string }> {
   const url = `ws://127.0.0.1:${port}/ws/${pluginId}${id ? `?id=${id}` : ""}`;
   const ws = new WebSocket(url);
   openSockets.push(ws);
@@ -296,7 +300,11 @@ describe("root /ws server", () => {
     const { ws, clientId } = await connectRoot(s.port, "root-fixed");
     expect(clientId).toBe("root-fixed");
 
-    const info = await requestOnce(ws, { id: "1", method: ProtocolMethod.GetServerInfo, params: {} });
+    const info = await requestOnce(ws, {
+      id: "1",
+      method: ProtocolMethod.GetServerInfo,
+      params: {},
+    });
     expect(info.result.plugins).toEqual([{ id: "echo" }]);
 
     const greet = await requestOnce(ws, { id: "2", method: "greet", params: { name: "ada" } });

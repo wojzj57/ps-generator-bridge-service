@@ -23,9 +23,14 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "changeset publish --tag latest",
+    "pack:check": "pnpm --filter @ps-generator-bridge/sdk --filter @ps-generator-bridge/generator --filter @ps-generator-bridge/testkit pack --dry-run"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "prettier": "^3.3.3",
     "tsx": "^4.19.2",
     "typescript": "^5.9.3"

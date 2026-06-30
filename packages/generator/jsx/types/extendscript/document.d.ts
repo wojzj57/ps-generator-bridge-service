@@ -47,7 +47,12 @@ declare class Document {
   autoCount(channel: Channel, merge: boolean): void;
   changeMode(destinationMode: ChangeMode, options?: any): void;
   close(saving?: SaveOptions): void;
-  convertProfile(destinationProfile: string, intent: Intent, blackPointCompensation?: boolean, dither?: boolean): void;
+  convertProfile(
+    destinationProfile: string,
+    intent: Intent,
+    blackPointCompensation?: boolean,
+    dither?: boolean
+  ): void;
   crop(bounds: Rectangle, angle?: number, width?: number, height?: number): void;
   duplicate(name?: string, mergeLayersOnly?: boolean): Document;
   exportDocument(exportIn: File, exportAs?: ExportType, options?: ExportOptions): void;
@@ -56,12 +61,23 @@ declare class Document {
   importAnnotations(from: File): void;
   mergeVisibleLayers(): void;
   paste(intoSelection?: boolean): ArtLayer;
-  print(sourceSpace?: SourceSpaceType, printSpace?: string, intent?: Intent, blackPointCompensation?: boolean): void;
+  print(
+    sourceSpace?: SourceSpaceType,
+    printSpace?: string,
+    intent?: Intent,
+    blackPointCompensation?: boolean
+  ): void;
   printOneCopy(): void;
   rasterizeAllLayers(): void;
   recordMeasurements(selection?: MeasurementSource, dataPoints?: string[]): void;
   resizeCanvas(width: number, height: number, anchor?: AnchorPosition): void;
-  resizeImage(width?: number, height?: number, resolution?: number, resampleImage?: ResampleMethod, amount?: number): void;
+  resizeImage(
+    width?: number,
+    height?: number,
+    resolution?: number,
+    resampleImage?: ResampleMethod,
+    amount?: number
+  ): void;
   revealAll(): void;
   rotateCanvas(angle: number): void;
   save(): void;
@@ -79,6 +95,16 @@ declare class Documents {
   readonly typename: string;
   [index: number]: Document;
 
-  add(width?: number, height?: number, resolution?: number, name?: string, mode?: NewDocumentMode, initialFill?: DocumentFill, pixelAspectRatio?: number, bitsPerChannel?: BitsPerChannelType, colorProfileName?: string): Document;
+  add(
+    width?: number,
+    height?: number,
+    resolution?: number,
+    name?: string,
+    mode?: NewDocumentMode,
+    initialFill?: DocumentFill,
+    pixelAspectRatio?: number,
+    bitsPerChannel?: BitsPerChannelType,
+    colorProfileName?: string
+  ): Document;
   getByName(name: string): Document;
 }

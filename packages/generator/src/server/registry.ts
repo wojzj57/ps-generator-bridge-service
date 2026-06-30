@@ -42,9 +42,7 @@ export class Registry implements AssemblyTarget {
   registerApi(route: ApiRouteSpec): void {
     const first = firstSegment(route.url);
     if (first !== undefined && this.reservedSegments.has(first)) {
-      throw new Error(
-        `module @api '${route.url}' collides with reserved plugin id '${first}'`
-      );
+      throw new Error(`module @api '${route.url}' collides with reserved plugin id '${first}'`);
     }
     this.app.route({
       method: route.method as HTTPMethods | HTTPMethods[],

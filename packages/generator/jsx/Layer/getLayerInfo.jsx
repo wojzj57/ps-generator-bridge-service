@@ -10,8 +10,7 @@ if (typeof JSON !== "object") {
 
   var rx_one = /^[\],:{}\s]*$/;
   var rx_two = /\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g;
-  var rx_three =
-    /"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g;
+  var rx_three = /"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g;
   var rx_four = /(?:^|:|,)(?:\s*\[)+/g;
   var rx_escapable =
     /[\\"\u0000-\u001f\u007f-\u009f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g;
@@ -78,11 +77,7 @@ if (typeof JSON !== "object") {
     var partial;
     var value = holder[key];
 
-    if (
-      value &&
-      typeof value === "object" &&
-      typeof value.toJSON === "function"
-    ) {
+    if (value && typeof value === "object" && typeof value.toJSON === "function") {
       value = value.toJSON(key);
     }
     if (typeof rep === "function") {
@@ -113,8 +108,8 @@ if (typeof JSON !== "object") {
             partial.length === 0
               ? "[]"
               : gap
-              ? "[\n" + gap + partial.join(",\n" + gap) + "\n" + mind + "]"
-              : "[" + partial.join(",") + "]";
+                ? "[\n" + gap + partial.join(",\n" + gap) + "\n" + mind + "]"
+                : "[" + partial.join(",") + "]";
           gap = mind;
           return v;
         }
@@ -143,8 +138,8 @@ if (typeof JSON !== "object") {
           partial.length === 0
             ? "{}"
             : gap
-            ? "{\n" + gap + partial.join(",\n" + gap) + "\n" + mind + "}"
-            : "{" + partial.join(",") + "}";
+              ? "{\n" + gap + partial.join(",\n" + gap) + "\n" + mind + "}"
+              : "{" + partial.join(",") + "}";
         gap = mind;
         return v;
     }
@@ -219,8 +214,7 @@ function getLayerInfoByID(layerID) {
   var ref = new ActionReference();
   ref.putProperty(charIDToTypeID("Prpr"), stringIDToTypeID("itemIndex"));
   ref.putIdentifier(stringIDToTypeID("layer"), layerID);
-  result.index =
-    executeActionGet(ref).getInteger(stringIDToTypeID("itemIndex"));
+  result.index = executeActionGet(ref).getInteger(stringIDToTypeID("itemIndex"));
   // type
   var ref = new ActionReference();
   ref.putProperty(charIDToTypeID("Prpr"), stringIDToTypeID("layerKind"));
@@ -236,9 +230,7 @@ function getLayerInfoByID(layerID) {
   var ref = new ActionReference();
   ref.putProperty(charIDToTypeID("Prpr"), stringIDToTypeID("visible"));
   ref.putIdentifier(stringIDToTypeID("layer"), layerID);
-  result.visible = executeActionGet(ref).getBoolean(
-    stringIDToTypeID("visible")
-  );
+  result.visible = executeActionGet(ref).getBoolean(stringIDToTypeID("visible"));
 
   // clip
   var ref = new ActionReference();
@@ -278,11 +270,7 @@ function getLayerInfoByID(layerID) {
 
   // layers
   if (_getChildren) {
-    result.children = layerTreeCollection(
-      result.index - 1,
-      0,
-      undefined
-    ).layers;
+    result.children = layerTreeCollection(result.index - 1, 0, undefined).layers;
   }
   return result;
 }

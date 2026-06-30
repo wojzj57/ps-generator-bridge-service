@@ -27,17 +27,9 @@ function createSelection() {
   try {
     var desc1 = new ActionDescriptor();
     desc1.putInteger(charIDToTypeID("Wdth"), wdth);
-    desc1.putEnumerated(
-      charIDToTypeID("Lctn"),
-      charIDToTypeID("StrL"),
-      charIDToTypeID(location)
-    );
+    desc1.putEnumerated(charIDToTypeID("Lctn"), charIDToTypeID("StrL"), charIDToTypeID(location));
     desc1.putUnitDouble(charIDToTypeID("Opct"), charIDToTypeID("#Prc"), opct);
-    desc1.putEnumerated(
-      charIDToTypeID("Md  "),
-      charIDToTypeID("BlnM"),
-      charIDToTypeID("Nrml")
-    );
+    desc1.putEnumerated(charIDToTypeID("Md  "), charIDToTypeID("BlnM"), charIDToTypeID("Nrml"));
     var desc2 = new ActionDescriptor();
     desc2.putUnitDouble(charIDToTypeID("H   "), charIDToTypeID("#Ang"), h);
     desc2.putDouble(charIDToTypeID("Strt"), s);
@@ -49,4 +41,4 @@ function createSelection() {
   }
 }
 app.activeDocument.suspendHistory("创建选区描边", "createSelection()");
-app.activeDocument.activeLayer.id
+app.activeDocument.activeLayer.id;

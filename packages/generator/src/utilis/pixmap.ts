@@ -26,10 +26,7 @@ export class Pixmap implements PsPixmap {
     this.colorMode = buffer.readUInt8(13);
     this.channelCount = buffer.readUInt8(14);
     this.bitsPerChannel = buffer.readUInt8(15);
-    this.pixels = buffer.slice(
-      16,
-      16 + this.width * this.height * this.channelCount
-    );
+    this.pixels = buffer.slice(16, 16 + this.width * this.height * this.channelCount);
     this.bytesPerPixel = (this.bitsPerChannel / 8) * this.channelCount;
     this.padding = this.rowBytes - this.width * this.channelCount;
     this.readChannel = this.getReadChannel(this.bitsPerChannel);
@@ -37,7 +34,7 @@ export class Pixmap implements PsPixmap {
     this._initGetPixelMethod(this.channelCount);
   }
 
-  public getReadChannel(bitsPerChannel: number) {
+  public getReadChannel(bitsPerChannel: number): (n?: number) => any {
     if (16 === bitsPerChannel) {
       return Buffer.prototype.readUInt16BE;
     }
@@ -47,6 +44,7 @@ export class Pixmap implements PsPixmap {
     if (32 === bitsPerChannel) {
       return Buffer.prototype.readUInt32BE;
     }
+    throw new Error(`Unsupported pixmap bit depth: ${bitsPerChannel}`);
   }
 
   private getPixel1(n: number) {

@@ -67,7 +67,9 @@ describe("Registry.dispatch", () => {
   it("scoped registry uses the same method table but preserves miss fallback", async () => {
     const scoped = new ScopedRegistry();
     const ctx = { generator: fakeGenerator() };
-    expect(await scoped.tryDispatch({ id: "s1", method: "missing", params: {} }, ctx)).toBeUndefined();
+    expect(
+      await scoped.tryDispatch({ id: "s1", method: "missing", params: {} }, ctx)
+    ).toBeUndefined();
 
     scoped.registerMethod("scoped:echo", (params) => params);
     const res = await scoped.tryDispatch(

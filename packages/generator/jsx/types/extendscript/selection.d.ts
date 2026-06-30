@@ -57,7 +57,12 @@ declare class Selection {
    * @param opacity 不透明度（可选）
    * @param preserveTransparency 是否保留透明度（可选）
    */
-  fill(fillType: SolidColor | DocumentFill, mode?: BlendMode, opacity?: number, preserveTransparency?: boolean): void;
+  fill(
+    fillType: SolidColor | DocumentFill,
+    mode?: BlendMode,
+    opacity?: number,
+    preserveTransparency?: boolean
+  ): void;
 
   /**
    * 增大选区以包含所有落在指定容差范围内的相邻像素。
@@ -161,7 +166,14 @@ declare class Selection {
    * @param opacity 不透明度（可选）
    * @param preserveTransparency 是否保留透明度（可选）
    */
-  stroke(strokeColor: SolidColor, width: number, location?: StrokeLocation, mode?: BlendMode, opacity?: number, preserveTransparency?: boolean): void;
+  stroke(
+    strokeColor: SolidColor,
+    width: number,
+    location?: StrokeLocation,
+    mode?: BlendMode,
+    opacity?: number,
+    preserveTransparency?: boolean
+  ): void;
 
   /**
    * 相对于当前位置移动对象。

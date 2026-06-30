@@ -84,10 +84,7 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
    * forced to `false` to fetch only the body layer's pixels. `layerSpec` is
    * required (a layer id; the layer's `rect` drives the scale).
    */
-  async getPreview(options: {
-    documentId?: number;
-    layerSpec: number;
-  }): Promise<ImageResult> {
+  async getPreview(options: { documentId?: number; layerSpec: number }): Promise<ImageResult> {
     const { documentId, layerSpec } = options;
     const resolvedDocId = this.resolveDocumentId(documentId);
     const settings: PsGenerator.GetPixmapSettings = {};
@@ -123,7 +120,10 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
     settings?: PsGenerator.GetPixmapSettings;
   }): Promise<ImageResult> {
     const documentId = this.resolveDocumentId(options.documentId);
-    const pixmap = await this.plugin.generator.getDocumentPixmap(documentId, options.settings ?? {});
+    const pixmap = await this.plugin.generator.getDocumentPixmap(
+      documentId,
+      options.settings ?? {}
+    );
     const buffer = await this.encodePng(pixmap);
     return {
       buffer,
@@ -156,10 +156,7 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
    * so this never uploads even when `plugin.cos` is enabled.
    */
   @ws(ProtocolMethod.ImageGetPreview)
-  async getPreviewWs(options: {
-    documentId?: number;
-    layerSpec: number;
-  }): Promise<WsImageResult> {
+  async getPreviewWs(options: { documentId?: number; layerSpec: number }): Promise<WsImageResult> {
     const result = await this.getPreview(options);
     return this.toWsResult(result, { upload: false });
   }
@@ -353,8 +350,8 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
     }
     throw new Error(
       `Unexpected response from PS in getLayerPixmap: js=${JSON.stringify(js)}, ` +
-      `pixmap=${pixmapBuffer ? "truthy" : "falsy"}, ` +
-      `iccExpected=${params.getICCProfileData}`
+        `pixmap=${pixmapBuffer ? "truthy" : "falsy"}, ` +
+        `iccExpected=${params.getICCProfileData}`
     );
   }
 

@@ -163,7 +163,12 @@ declare class ArtLayer extends Layer {
    * @param highlightLevels 高光色阶
    * @param preserveLuminosity 是否保留明度
    */
-  adjustColorBalance(shadowLevels: number[], midtoneLevels: number[], highlightLevels: number[], preserveLuminosity: boolean): void;
+  adjustColorBalance(
+    shadowLevels: number[],
+    midtoneLevels: number[],
+    highlightLevels: number[],
+    preserveLuminosity: boolean
+  ): void;
 
   /**
    * 使用多达 14 个点调整所选通道的色调范围。
@@ -179,7 +184,13 @@ declare class ArtLayer extends Layer {
    * @param outputRangeStart 输出范围起始（0 到 255）
    * @param outputRangeEnd 输出范围结束（0 到 255）
    */
-  adjustLevels(inputRangeStart: number, inputRangeEnd: number, inputRangeGamma: number, outputRangeStart: number, outputRangeEnd: number): void;
+  adjustLevels(
+    inputRangeStart: number,
+    inputRangeEnd: number,
+    inputRangeGamma: number,
+    outputRangeStart: number,
+    outputRangeEnd: number
+  ): void;
 
   /** 自动调整所选通道的对比度 */
   autoContrast(): void;
@@ -284,7 +295,11 @@ declare class ArtLayer extends Layer {
    * @param blurMethod 模糊方法
    * @param blurQuality 模糊品质
    */
-  applyRadialBlur(amount: number, blurMethod: RadialBlurMethod, blurQuality: RadialBlurQuality): void;
+  applyRadialBlur(
+    amount: number,
+    blurMethod: RadialBlurMethod,
+    blurQuality: RadialBlurQuality
+  ): void;
 
   /**
    * 锐化滤镜。
@@ -302,7 +317,12 @@ declare class ArtLayer extends Layer {
    * @param blurQuality 模糊品质
    * @param mode 模糊模式
    */
-  applySmartBlur(radius: number, threshold: number, blurQuality: SmartBlurQuality, mode: SmartBlurMode): void;
+  applySmartBlur(
+    radius: number,
+    threshold: number,
+    blurQuality: SmartBlurQuality,
+    mode: SmartBlurMode
+  ): void;
 
   /**
    * 球面化滤镜。
@@ -491,7 +511,13 @@ declare class LayerComps {
    * @param position 是否捕获位置（可选）
    * @param visibility 是否捕获可见性（可选）
    */
-  add(name: string, comment?: string, appearance?: boolean, position?: boolean, visibility?: boolean): LayerComp;
+  add(
+    name: string,
+    comment?: string,
+    appearance?: boolean,
+    position?: boolean,
+    visibility?: boolean
+  ): LayerComp;
 
   /**
    * 通过名称获取图层复合。

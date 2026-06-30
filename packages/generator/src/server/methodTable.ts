@@ -14,10 +14,7 @@ export class MethodTable {
     this.methods.set(name, handler);
   }
 
-  async tryDispatch(
-    message: unknown,
-    ctx: HandlerContext
-  ): Promise<ResponseEnvelope | undefined> {
+  async tryDispatch(message: unknown, ctx: HandlerContext): Promise<ResponseEnvelope | undefined> {
     if (!isRequest(message)) return undefined;
     const handler = this.methods.get(message.method);
     if (!handler) return undefined;

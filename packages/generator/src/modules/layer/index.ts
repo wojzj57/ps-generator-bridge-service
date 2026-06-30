@@ -5,39 +5,39 @@ import type { PsBridgeHost } from "../../plugin";
 import type { PsBounds, PsRect } from "../../types/ps";
 
 export class PsLayer {
-    public declare id: number;
-    public declare index: number;
-    public declare name: string;
-    public declare type: number;
-    public declare visible: boolean;
-    public declare bounds: PsBounds;
-    public declare rect: PsRect;
-    public declare clip: boolean;
-    public declare children?: PsLayer[];
-    // public declare generatorSettings?: { [key: string]: any };
+  declare public id: number;
+  declare public index: number;
+  declare public name: string;
+  declare public type: number;
+  declare public visible: boolean;
+  declare public bounds: PsBounds;
+  declare public rect: PsRect;
+  declare public clip: boolean;
+  declare public children?: PsLayer[];
+  // public declare generatorSettings?: { [key: string]: any };
 
-    constructor(init: Partial<PsLayer>) {
-        Object.assign(this, init);
-    }
+  constructor(init: Partial<PsLayer>) {
+    Object.assign(this, init);
+  }
 }
 namespace LayerModule {
-    export type LayerPixelOptions = {
-        resolution?: number;
-    };
-    export interface onImageChangedParams {
-        count: number;
-        id: number;
-        metaDataOnly: boolean;
-        layers: {
-            id: number;
-            bounds: PsBounds;
-            pixels: boolean;
-            removed?: boolean;
-        }[];
-        selection: number[];
-        timeStamp: number;
-        version: string;
-    }
+  export type LayerPixelOptions = {
+    resolution?: number;
+  };
+  export interface onImageChangedParams {
+    count: number;
+    id: number;
+    metaDataOnly: boolean;
+    layers: {
+      id: number;
+      bounds: PsBounds;
+      pixels: boolean;
+      removed?: boolean;
+    }[];
+    selection: number[];
+    timeStamp: number;
+    version: string;
+  }
 }
 
 /**
@@ -46,68 +46,70 @@ namespace LayerModule {
  * implementation by compiler force; the SDK re-exports it via src/contract.ts.
  */
 export interface LayerModuleApi {
-    getLayerInfo(options?: {
-        id?: number;
-        index?: number;
-        getChildren?: boolean;
-        getGeneratorSettings?: boolean;
-    }): Promise<PsLayer>;
-    getLayerInfoByID(layerID: number, options?: { getChildren: boolean }): Promise<PsLayer>;
-    getLayerInfoByIndex(layerIndex: number, options?: { getChildren: boolean }): Promise<PsLayer>;
+  getLayerInfo(options?: {
+    id?: number;
+    index?: number;
+    getChildren?: boolean;
+    getGeneratorSettings?: boolean;
+  }): Promise<PsLayer>;
+  getLayerInfoByID(layerID: number, options?: { getChildren: boolean }): Promise<PsLayer>;
+  getLayerInfoByIndex(layerIndex: number, options?: { getChildren: boolean }): Promise<PsLayer>;
 }
 
 export class LayerModule extends BaseModule implements LayerModuleApi {
-    constructor(plugin: PsBridgeHost) {
-        super("layer", plugin);
-    }
+  constructor(plugin: PsBridgeHost) {
+    super("layer", plugin);
+  }
 
-    @ws(ProtocolMethod.LayerGetInfo)
-    public async getLayerInfo(options?: {
-        id?: number;
-        index?: number;
-        getChildren?: boolean;
-        getGeneratorSettings?: boolean;
-    }): Promise<PsLayer> {
-        return await this.plugin.jsx.execute("Layer/getLayerInfo", {
-            layerID: options?.id,
-            layerIndex: options?.index,
-            getChildren: options?.getChildren,
-            getGeneratorSettings: options?.getGeneratorSettings,
-        });
-    }
+  @ws(ProtocolMethod.LayerGetInfo)
+  public async getLayerInfo(options?: {
+    id?: number;
+    index?: number;
+    getChildren?: boolean;
+    getGeneratorSettings?: boolean;
+  }): Promise<PsLayer> {
+    return await this.plugin.jsx.execute("Layer/getLayerInfo", {
+      layerID: options?.id,
+      layerIndex: options?.index,
+      getChildren: options?.getChildren,
+      getGeneratorSettings: options?.getGeneratorSettings,
+    });
+  }
 
-    @ws(ProtocolMethod.LayerGetInfoById)
-    public getLayerInfoByID(
-        layerIDOrParams: number | { layerID: number; options?: { getChildren: boolean } },
-        options?: {
-            getChildren: boolean;
-        }
-    ): Promise<PsLayer> {
-        const layerID = typeof layerIDOrParams === "number" ? layerIDOrParams : layerIDOrParams.layerID;
-        const resolvedOptions = typeof layerIDOrParams === "number" ? options : layerIDOrParams.options;
-        if (layerID == null) throw new Error("Invalid layerID");
-        const params = {
-            layerID: layerID,
-            getChildren: resolvedOptions?.getChildren,
-        };
-        return this.plugin.jsx.execute("Layer/getLayerInfo", params);
+  @ws(ProtocolMethod.LayerGetInfoById)
+  public getLayerInfoByID(
+    layerIDOrParams: number | { layerID: number; options?: { getChildren: boolean } },
+    options?: {
+      getChildren: boolean;
     }
+  ): Promise<PsLayer> {
+    const layerID = typeof layerIDOrParams === "number" ? layerIDOrParams : layerIDOrParams.layerID;
+    const resolvedOptions = typeof layerIDOrParams === "number" ? options : layerIDOrParams.options;
+    if (layerID == null) throw new Error("Invalid layerID");
+    const params = {
+      layerID: layerID,
+      getChildren: resolvedOptions?.getChildren,
+    };
+    return this.plugin.jsx.execute("Layer/getLayerInfo", params);
+  }
 
-    @ws(ProtocolMethod.LayerGetInfoByIndex)
-    public getLayerInfoByIndex(
-        layerIndexOrParams: number | { layerIndex: number; options?: { getChildren: boolean } },
-        options?: {
-            getChildren: boolean;
-        }
-    ): Promise<PsLayer> {
-        const layerIndex = typeof layerIndexOrParams === "number" ? layerIndexOrParams : layerIndexOrParams.layerIndex;
-        const resolvedOptions = typeof layerIndexOrParams === "number" ? options : layerIndexOrParams.options;
-        if (layerIndex == null) throw new Error("Invalid layerIndex");
-        // 明确定义参数类型
-        const params = {
-            layerIndex,
-            getChildren: resolvedOptions?.getChildren,
-        };
-        return this.plugin.jsx.execute("Layer/getLayerInfo", params);
+  @ws(ProtocolMethod.LayerGetInfoByIndex)
+  public getLayerInfoByIndex(
+    layerIndexOrParams: number | { layerIndex: number; options?: { getChildren: boolean } },
+    options?: {
+      getChildren: boolean;
     }
+  ): Promise<PsLayer> {
+    const layerIndex =
+      typeof layerIndexOrParams === "number" ? layerIndexOrParams : layerIndexOrParams.layerIndex;
+    const resolvedOptions =
+      typeof layerIndexOrParams === "number" ? options : layerIndexOrParams.options;
+    if (layerIndex == null) throw new Error("Invalid layerIndex");
+    // 明确定义参数类型
+    const params = {
+      layerIndex,
+      getChildren: resolvedOptions?.getChildren,
+    };
+    return this.plugin.jsx.execute("Layer/getLayerInfo", params);
+  }
 }

@@ -172,13 +172,21 @@ export class EventManager extends EventEmitter implements PhotoshopEvents {
     return super.off(event, listener as (...args: unknown[]) => void);
   }
 
-  override removeListener<K extends keyof PhotoshopEventMap>(event: K, listener: Listener<K>): this {
+  override removeListener<K extends keyof PhotoshopEventMap>(
+    event: K,
+    listener: Listener<K>
+  ): this {
     return super.removeListener(event, listener as (...args: unknown[]) => void);
   }
 
   /** Dispatch a payload to listeners. Fired by the PS bridge; not for external use. */
-  override emit<K extends keyof PhotoshopEventMap>(event: K, payload: PhotoshopEventMap[K]): boolean {
-    return super.emit(event, payload);
+  override emit<K extends keyof PhotoshopEventMap>(
+    event: K,
+    payload: PhotoshopEventMap[K]
+  ): boolean;
+  override emit(event: string | symbol, ...args: unknown[]): boolean;
+  override emit(event: string | symbol, ...args: unknown[]): boolean {
+    return super.emit(event, ...args);
   }
 
   // --- lazy subscribe / unsubscribe ----------------------------------------

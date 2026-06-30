@@ -1,1 +1,1 @@
-app.activeDocument.activeLayer.id
+app.activeDocument.activeLayer.id;

@@ -1,5 +1,9 @@
 import type { ClientStore } from "./clientStore";
-import { PHOTOSHOP_EVENTS, type EventManager, type PhotoshopEventMap } from "../utilis/eventManager";
+import {
+  PHOTOSHOP_EVENTS,
+  type EventManager,
+  type PhotoshopEventMap,
+} from "../utilis/eventManager";
 
 const ALLOWED = new Set<string>(PHOTOSHOP_EVENTS);
 

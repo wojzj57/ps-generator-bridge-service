@@ -24,8 +24,14 @@ type Invoker = <M extends MethodName>(
 ) => Promise<ProtocolMethods[M]["result"]>;
 
 class PublicEventClient {
-  private readonly listeners = new Map<PhotoshopEventName, Set<PublicListener<PhotoshopEventName>>>();
-  private readonly wrappers = new WeakMap<PublicListener<PhotoshopEventName>, PublicListener<PhotoshopEventName>>();
+  private readonly listeners = new Map<
+    PhotoshopEventName,
+    Set<PublicListener<PhotoshopEventName>>
+  >();
+  private readonly wrappers = new WeakMap<
+    PublicListener<PhotoshopEventName>,
+    PublicListener<PhotoshopEventName>
+  >();
   private readonly activeSubscriptions = new Set<PhotoshopEventName>();
   private readonly pendingSubscriptions = new Set<PhotoshopEventName>();
 
@@ -93,7 +99,9 @@ class PublicEventClient {
       .then(() => {
         if (this.listenerCount(type) > 0) this.activeSubscriptions.add(type);
       })
-      .catch((error) => console.warn(`event subscribe failed for ${type}: ${(error as Error).message}`))
+      .catch((error) =>
+        console.warn(`event subscribe failed for ${type}: ${(error as Error).message}`)
+      )
       .finally(() => this.pendingSubscriptions.delete(type));
   }
 

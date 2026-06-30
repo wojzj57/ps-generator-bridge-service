@@ -274,11 +274,7 @@ describe("ImageModule.parseRawPixels (via exportImage)", () => {
 
   it("encodes a valid PNG whose dimensions match the pixmap", async () => {
     const { generator, image } = setup();
-    emitHappy(
-      generator,
-      { left: 1, top: 1, right: 5, bottom: 5 },
-      makePixmapBuffer(4, 4, 4)
-    );
+    emitHappy(generator, { left: 1, top: 1, right: 5, bottom: 5 }, makePixmapBuffer(4, 4, 4));
 
     const result = await image.exportImage({ layerSpec: 1 });
 

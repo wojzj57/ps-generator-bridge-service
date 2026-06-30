@@ -1,4 +1,3 @@
-
 /**
  * 这个函数接受一个AD的对象，返回这个对象所有属性值的JSON结构
  * @param desc [ActionDescriptor]

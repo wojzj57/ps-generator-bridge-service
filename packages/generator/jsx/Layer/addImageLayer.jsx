@@ -1,31 +1,18 @@
 var filePath = params.filePath;
-var targetLayerId =
-  params.id != undefined && params.id !== "" ? Number(params.id) : null;
+var targetLayerId = params.id != undefined && params.id !== "" ? Number(params.id) : null;
 var layerName = params.name;
 var replace = false;
 
 function getDocumentSize() {
   var ref1 = new ActionReference();
   ref1.putProperty(charIDToTypeID("Prpr"), stringIDToTypeID("width"));
-  ref1.putEnumerated(
-    charIDToTypeID("Dcmn"),
-    charIDToTypeID("Ordn"),
-    charIDToTypeID("Trgt")
-  );
-  var width = executeActionGet(ref1).getUnitDoubleValue(
-    stringIDToTypeID("width")
-  );
+  ref1.putEnumerated(charIDToTypeID("Dcmn"), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
+  var width = executeActionGet(ref1).getUnitDoubleValue(stringIDToTypeID("width"));
 
   var ref2 = new ActionReference();
   ref2.putProperty(charIDToTypeID("Prpr"), stringIDToTypeID("height"));
-  ref2.putEnumerated(
-    charIDToTypeID("Dcmn"),
-    charIDToTypeID("Ordn"),
-    charIDToTypeID("Trgt")
-  );
-  var height = executeActionGet(ref2).getUnitDoubleValue(
-    stringIDToTypeID("height")
-  );
+  ref2.putEnumerated(charIDToTypeID("Dcmn"), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
+  var height = executeActionGet(ref2).getUnitDoubleValue(stringIDToTypeID("height"));
 
   return {
     width: width,
@@ -36,11 +23,7 @@ function getDocumentSize() {
 function rename(str) {
   var desc = new ActionDescriptor();
   var ref = new ActionReference();
-  ref.putEnumerated(
-    charIDToTypeID("Lyr "),
-    charIDToTypeID("Ordn"),
-    charIDToTypeID("Trgt")
-  );
+  ref.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
   desc.putReference(charIDToTypeID("null"), ref);
   var desc2 = new ActionDescriptor();
   desc2.putString(charIDToTypeID("Nm  "), str);
@@ -71,11 +54,7 @@ function addImageLayer(filePath, name, insertIndex) {
 function rasterizeLayer() {
   var desc = new ActionDescriptor();
   var ref = new ActionReference();
-  ref.putEnumerated(
-    charIDToTypeID("Lyr "),
-    charIDToTypeID("Ordn"),
-    charIDToTypeID("Trgt")
-  );
+  ref.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
   desc.putReference(charIDToTypeID("null"), ref);
   executeAction(stringIDToTypeID("rasterizeLayer"), desc, DialogModes.NO);
 }
@@ -83,11 +62,7 @@ function rasterizeLayer() {
 function moveLayer(targetIndex) {
   var desc = new ActionDescriptor();
   var ref1 = new ActionReference();
-  ref1.putEnumerated(
-    charIDToTypeID("Lyr "),
-    charIDToTypeID("Ordn"),
-    charIDToTypeID("Trgt")
-  );
+  ref1.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
   desc.putReference(charIDToTypeID("null"), ref1);
   var ref2 = new ActionReference();
   ref2.putIndex(charIDToTypeID("Lyr "), targetIndex);
@@ -190,7 +165,6 @@ try {
       } else {
         layerId = app.activeDocument.activeLayer.id;
       }
-      
     } catch (error) {}
   }
   app.activeDocument.suspendHistory("导入图片", "toTransform()");

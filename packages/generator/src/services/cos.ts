@@ -65,7 +65,8 @@ export class CosService implements CosServiceApi {
     if (!secretId || !secretKey || !bucket || !region) return undefined;
     const keyPrefix = process.env.PS_BRIDGE_COS_KEY_PREFIX?.trim() || DEFAULT_KEY_PREFIX;
     const expiresRaw = Number(process.env.PS_BRIDGE_COS_URL_EXPIRES);
-    const urlExpires = Number.isFinite(expiresRaw) && expiresRaw > 0 ? expiresRaw : DEFAULT_URL_EXPIRES_SECONDS;
+    const urlExpires =
+      Number.isFinite(expiresRaw) && expiresRaw > 0 ? expiresRaw : DEFAULT_URL_EXPIRES_SECONDS;
     return new CosService({ secretId, secretKey, bucket, region, keyPrefix, urlExpires }, logger);
   }
 

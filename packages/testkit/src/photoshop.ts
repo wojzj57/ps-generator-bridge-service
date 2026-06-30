@@ -6,6 +6,8 @@ export function ensurePhotoshopRunning(): void {
     shell: true,
   });
   if (!output.toLowerCase().includes("photoshop.exe")) {
-    throw new Error("Photoshop is not running. Please open Photoshop first, then rerun this command.");
+    throw new Error(
+      "Photoshop is not running. Please open Photoshop first, then rerun this command."
+    );
   }
 }

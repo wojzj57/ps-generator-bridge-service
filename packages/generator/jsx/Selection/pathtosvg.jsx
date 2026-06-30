@@ -52,8 +52,8 @@ var BBox = function () {
 
 BBox.prototype = {
   grow: function (p) {
-    if (!p || (p.x === undefined || p.y === undefined)) return;
-    
+    if (!p || p.x === undefined || p.y === undefined) return;
+
     if (!this.initialized) {
       this.mx = p.x;
       this.my = p.y;
@@ -74,7 +74,7 @@ BBox.prototype = {
         this.MY = p.y;
       }
     }
-    
+
     // 也要考虑控制点
     this.grow(p.in);
     this.grow(p.out);
@@ -157,10 +157,10 @@ function convertLastedPath(pathItems) {
 function formSVGpath(subpath, bbox) {
   var p0 = subpath[0];
   var path = ["M", p0.x, p0.y];
-  
+
   // 确保第一个点也被计算进边界框
   bbox.grow(p0);
-  
+
   // we want to close this path:
   subpath.push(p0);
   subpath.forEach(function (p, i) {
@@ -187,34 +187,34 @@ function formSinglePathSVG(singlePath) {
   if (!singlePath) {
     return '<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0"></svg>';
   }
-  
+
   var svg = [];
   var bbox = new BBox();
   var d = "";
-  
+
   // 处理单个路径的所有子路径
   singlePath.forEach(function (subpath) {
     d += formSVGpath(subpath, bbox);
   });
-  
+
   // 检查边界框是否有效
   if (!bbox.initialized) {
     return '<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0"></svg>';
   }
-  
+
   // 计算精确的宽高，完全贴合形状
   var w = bbox.MX - bbox.mx;
   var h = bbox.MY - bbox.my;
-  
+
   // 确保宽高至少为1，避免无效的SVG
   w = Math.max(w, 1);
   h = Math.max(h, 1);
-  
+
   svg.push(
     '<path fill="none" stroke="#25b048" stroke-width="2" fill-rule="evenodd" d="' + d + '"/>'
   );
   svg.push("</svg>");
-  
+
   var header =
     '<svg xmlns="http://www.w3.org/2000/svg" width="' +
     Math.round(w) +
@@ -254,4 +254,4 @@ var svg = formSinglePathSVG(firstPathImproved);
 app.preferences.rulerUnits = origUnits;
 
 // 返回 SVG 字符串
-svg
+svg;

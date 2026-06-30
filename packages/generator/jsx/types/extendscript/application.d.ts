@@ -43,7 +43,11 @@ declare class Application {
   doForcedProgress(taskName: string, func: Function): void;
   doProgress(progressString: string, func: Function): void;
   eraseCustomOptions(key: string): void;
-  executeAction(eventID: number, descriptor?: ActionDescriptor, displayDialogs?: DialogModes): ActionDescriptor;
+  executeAction(
+    eventID: number,
+    descriptor?: ActionDescriptor,
+    displayDialogs?: DialogModes
+  ): ActionDescriptor;
   executeActionGet(reference: ActionReference): ActionDescriptor;
   featureEnabled(name: string): boolean;
   getCustomOptions(key: string): ActionDescriptor;

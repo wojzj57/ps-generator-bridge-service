@@ -71,10 +71,7 @@ export class FakeGenerator {
    * Used to drive `JsxRunner.init` (polyfill injection) and `execute` without
    * Photoshop.
    */
-  onEvaluateJSXString?: (
-    script: string,
-    sharedEngineSafe?: boolean
-  ) => unknown;
+  onEvaluateJSXString?: (script: string, sharedEngineSafe?: boolean) => unknown;
 
   /**
    * Fired (on a microtask, after `ImageModule.getPixmap` has subscribed its
@@ -89,10 +86,7 @@ export class FakeGenerator {
    * `exportImage`/`getPreview` whole-document paths (layer tree for
    * `_computeHiddenLayers`, document bounds for preview scaling).
    */
-  onGetDocumentInfo?: (
-    documentId: number | undefined,
-    options?: Record<string, unknown>
-  ) => any;
+  onGetDocumentInfo?: (documentId: number | undefined, options?: Record<string, unknown>) => any;
 
   /**
    * Returns the parsed `PsPixmap` for a `getDocumentPixmap` call. Drives
@@ -145,10 +139,7 @@ export class FakeGenerator {
     return Promise.resolve(this.onEvaluateJSXString?.(script, sharedEngineSafe));
   }
 
-  getDocumentInfo(
-    documentId?: number,
-    options?: Record<string, unknown>
-  ): any {
+  getDocumentInfo(documentId?: number, options?: Record<string, unknown>): any {
     return this.onGetDocumentInfo?.(documentId, options);
   }
 
@@ -162,11 +153,7 @@ export class FakeGenerator {
    * `.resolve`/`.reject` settle it. Records the call and fires `onSendJSXFile`
    * on a microtask so callers' progress handlers are attached first.
    */
-  _sendJSXFile(
-    path: string,
-    params?: Record<string, unknown>,
-    sharedEngineSafe?: boolean
-  ): any {
+  _sendJSXFile(path: string, params?: Record<string, unknown>, sharedEngineSafe?: boolean): any {
     const progressFns: Array<(m: JsxProgressMessage) => void> = [];
     const failFns: Array<(e: unknown) => void> = [];
     const call: FakeJsxFileCall = {

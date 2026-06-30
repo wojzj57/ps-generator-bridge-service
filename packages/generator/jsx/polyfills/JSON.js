@@ -9,8 +9,7 @@ if (typeof JSON !== "object") {
 
     var rx_one = /^[\],:{}\s]*$/;
     var rx_two = /\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g;
-    var rx_three =
-      /"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g;
+    var rx_three = /"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g;
     var rx_four = /(?:^|:|,)(?:\s*\[)+/g;
     var rx_escapable =
       /[\\"\u0000-\u001f\u007f-\u009f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g;
@@ -30,17 +29,17 @@ if (typeof JSON !== "object") {
       Date.prototype.toJSON = function () {
         return isFinite(this.valueOf())
           ? this.getUTCFullYear() +
-          "-" +
-          f(this.getUTCMonth() + 1) +
-          "-" +
-          f(this.getUTCDate()) +
-          "T" +
-          f(this.getUTCHours()) +
-          ":" +
-          f(this.getUTCMinutes()) +
-          ":" +
-          f(this.getUTCSeconds()) +
-          "Z"
+              "-" +
+              f(this.getUTCMonth() + 1) +
+              "-" +
+              f(this.getUTCDate()) +
+              "T" +
+              f(this.getUTCHours()) +
+              ":" +
+              f(this.getUTCMinutes()) +
+              ":" +
+              f(this.getUTCSeconds()) +
+              "Z"
           : null;
       };
 
@@ -58,13 +57,13 @@ if (typeof JSON !== "object") {
       rx_escapable.lastIndex = 0;
       return rx_escapable.test(string)
         ? '"' +
-        string.replace(rx_escapable, function (a) {
-          var c = meta[a];
-          return typeof c === "string"
-            ? c
-            : "\\u" + ("0000" + a.charCodeAt(0).toString(16)).slice(-4);
-        }) +
-        '"'
+            string.replace(rx_escapable, function (a) {
+              var c = meta[a];
+              return typeof c === "string"
+                ? c
+                : "\\u" + ("0000" + a.charCodeAt(0).toString(16)).slice(-4);
+            }) +
+            '"'
         : '"' + string + '"';
     }
 
@@ -77,11 +76,7 @@ if (typeof JSON !== "object") {
       var partial;
       var value = holder[key];
 
-      if (
-        value &&
-        typeof value === "object" &&
-        typeof value.toJSON === "function"
-      ) {
+      if (value && typeof value === "object" && typeof value.toJSON === "function") {
         value = value.toJSON(key);
       }
       if (typeof rep === "function") {
@@ -183,7 +178,5 @@ if (typeof JSON !== "object") {
     }
   })();
 }
-
-
 
 //#endregion

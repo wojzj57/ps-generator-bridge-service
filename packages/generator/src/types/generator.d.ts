@@ -156,10 +156,7 @@ export interface PsGenerator {
   ): Promise<any>;
 
   /** `evaluateJSXFile` forced into the shared script engine. */
-  evaluateJSXFileSharedSafe(
-    path: string,
-    params?: Record<string, any>
-  ): Promise<any>;
+  evaluateJSXFileSharedSafe(path: string, params?: Record<string, any>): Promise<any>;
 
   /** Evaluate a jsx string; resolves `message.value`. */
   evaluateJSXString(s: string, sharedEngineSafe?: boolean): Promise<any>;
@@ -169,11 +166,7 @@ export interface PsGenerator {
 
   /** Low-level jsx-string transport (private in generator-core). Returns the
    *  raw deferred so callers can subscribe to the progress stream. */
-  _sendJSXString(
-    s: string,
-    deferred?: Deferred<any>,
-    sharedEngineSafe?: boolean
-  ): Deferred<any>;
+  _sendJSXString(s: string, deferred?: Deferred<any>, sharedEngineSafe?: boolean): Deferred<any>;
 
   /** Low-level jsx-file transport (private in generator-core). Returns the raw
    *  deferred; the pixmap/shape protocols subscribe to its progress messages. */
@@ -208,20 +201,10 @@ export interface PsGenerator {
   // --- menus ---------------------------------------------------------------
 
   /** Register a menu item; resolves once Photoshop has rebuilt the menu. */
-  addMenuItem(
-    name: string,
-    displayName: string,
-    enabled: boolean,
-    checked: boolean
-  ): Promise<void>;
+  addMenuItem(name: string, displayName: string, enabled: boolean, checked: boolean): Promise<void>;
 
   /** Toggle (and optionally rename) an existing menu item. */
-  toggleMenu(
-    name: string,
-    enabled: boolean,
-    checked: boolean,
-    displayName?: string
-  ): Promise<void>;
+  toggleMenu(name: string, enabled: boolean, checked: boolean, displayName?: string): Promise<void>;
 
   /** Read the enabled/checked state of a menu item, or null if absent. */
   getMenuState(name: string): PsGenerator.MenuState | null;
@@ -241,11 +224,7 @@ export interface PsGenerator {
   // --- generator settings --------------------------------------------------
 
   /** Get a layer's generator settings for a plugin. */
-  getLayerSettingsForPlugin(
-    documentId: number,
-    layerId: number,
-    pluginId: string
-  ): Promise<any>;
+  getLayerSettingsForPlugin(documentId: number, layerId: number, pluginId: string): Promise<any>;
 
   /** Set a layer's generator settings for a plugin. */
   setLayerSettingsForPlugin(
@@ -265,10 +244,7 @@ export interface PsGenerator {
   ): Promise<any>;
 
   /** Extract and parse generator settings from a document object. */
-  extractDocumentSettings(
-    document: Record<string, any>,
-    pluginId?: string
-  ): any;
+  extractDocumentSettings(document: Record<string, any>, pluginId?: string): any;
 
   // --- Photoshop events ----------------------------------------------------
 
@@ -311,10 +287,7 @@ export interface PsGenerator {
   ): Promise<PsPixmap>;
 
   /** Get a pixmap of the whole document in its current visibility state. */
-  getDocumentPixmap(
-    documentId: number,
-    settings: PsGenerator.GetPixmapSettings
-  ): Promise<PsPixmap>;
+  getDocumentPixmap(documentId: number, settings: PsGenerator.GetPixmapSettings): Promise<PsPixmap>;
 
   /** Compute the `getPixmap` settings for a target scaling/padding. */
   getPixmapParams(
@@ -351,11 +324,7 @@ export interface PsGenerator {
   getLayerShape(documentId: number, layerId: number): Promise<{ path: any }>;
 
   /** Resolve to an SVG string for the layer, optionally scaled. */
-  getSVG(
-    documentId: number,
-    layerId: number,
-    settings?: { scale?: number }
-  ): Promise<string>;
+  getSVG(documentId: number, layerId: number, settings?: { scale?: number }): Promise<string>;
 
   /** Resolve to the horizontal/vertical guide positions in a document. */
   getGuides(documentId: number): Promise<PsGenerator.Guides>;
@@ -386,10 +355,7 @@ export interface PsGenerator {
   // --- style (private) -----------------------------------------------------
 
   /** Resolve to extracted style info for a document (private, unstable API). */
-  _getStyleInfo(
-    documentId: number,
-    flags?: { selectedLayers?: boolean }
-  ): Promise<any>;
+  _getStyleInfo(documentId: number, flags?: { selectedLayers?: boolean }): Promise<any>;
 
   // --- settings parsing (private) -----------------------------------------
 
@@ -434,11 +400,7 @@ export interface PsGenerator {
   setCustomOptions(pluginId: string, settings: Record<string, any>): Promise<void>;
 
   /** Update a single custom option key for a plugin. */
-  updateCustomOption(
-    pluginId: string,
-    key: string,
-    value: unknown
-  ): Promise<void>;
+  updateCustomOption(pluginId: string, key: string, value: unknown): Promise<void>;
 
   /** Delete a single custom option key for a plugin. */
   deleteCustomOption(pluginId: string, key: string): Promise<void>;

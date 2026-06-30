@@ -89,7 +89,7 @@ export class JsxRunner implements JsxRunnerApi {
     private readonly generator: PsGenerator,
     private readonly logger: Logger,
     private readonly polyfillsDir = join(__dirname, "..", "jsx", "polyfills")
-  ) { }
+  ) {}
 
   /**
    * A jsx runner scoped to a plugin's own `jsx/` dir (RFC 0005). The returned
@@ -131,9 +131,7 @@ export class JsxRunner implements JsxRunnerApi {
       this.polyfillsCache = "";
       return;
     }
-    const parts = await Promise.all(
-      files.map((file) => readFile(file, "utf8"))
-    );
+    const parts = await Promise.all(files.map((file) => readFile(file, "utf8")));
     this.polyfillsCache = parts.join("\n");
     const value = await this.generator.evaluateJSXString(this.polyfillsCache);
     if (typeof value === "string" && value.startsWith(ERROR_PREFIX)) {
@@ -220,11 +218,7 @@ export class JsxRunner implements JsxRunnerApi {
    * (generator-core's `getPixmap` / `getDocumentPixmap` both use the shared
    * engine).
    */
-  openJSXFile(
-    name: string,
-    params?: Record<string, unknown>,
-    sharedEngineSafe = true
-  ): JsxChannel {
+  openJSXFile(name: string, params?: Record<string, unknown>, sharedEngineSafe = true): JsxChannel {
     const path = this.resolvePath(this.jsxDir, name);
     const deferred = this.generator._sendJSXFile(path, params, sharedEngineSafe);
     return {
@@ -307,7 +301,7 @@ class ScopedJsx implements JsxRunnerApi {
   constructor(
     private readonly root: JsxRunner,
     private readonly baseDir: string
-  ) { }
+  ) {}
 
   execute<T = unknown>(
     name: string,
