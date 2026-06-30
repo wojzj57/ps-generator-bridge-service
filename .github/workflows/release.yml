@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+    paths:
+      - ".changeset/**"
+      - "package.json"
+      - "packages/*/package.json"
+      - "packages/*/CHANGELOG.md"
+      - "CHANGELOG.md"
 
 concurrency:
   group: release-${{ github.ref }}
