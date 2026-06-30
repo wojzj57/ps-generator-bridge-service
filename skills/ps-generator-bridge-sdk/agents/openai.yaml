@@ -1,0 +1,4 @@
+interface:
+  display_name: "PS Bridge SDK"
+  short_description: "Work on the PS Generator Bridge SDK package."
+  default_prompt: "Use $ps-generator-bridge-sdk to update the SDK protocol or client surface."

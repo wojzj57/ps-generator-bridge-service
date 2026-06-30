@@ -1,0 +1,4 @@
+interface:
+  display_name: "PS Bridge Testkit"
+  short_description: "Work on the Windows Photoshop smoke test harness."
+  default_prompt: "Use $ps-generator-bridge-testkit to update the Photoshop smoke test harness."

@@ -40,7 +40,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "README_zh.md"
   ],
   "sideEffects": false,
   "engines": {
