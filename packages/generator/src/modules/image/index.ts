@@ -6,6 +6,7 @@ import type { PsBounds, PsPixmap } from "../../types/ps";
 import { Pixmap } from "../../utilis/pixmap";
 import { ws } from "@ps-generator-bridge/sdk/plugin";
 import { ProtocolMethod, type LayerSpec, type WsImageResult } from "@ps-generator-bridge/sdk";
+import { bridgeError } from "../../errors";
 
 // `LayerSpec` is owned by the protocol (RFC 0008); re-export it so the
 // plugin-facing contract barrel (src/contract.ts) keeps surfacing it from here.
@@ -90,7 +91,7 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
     const settings: PsGenerator.GetPixmapSettings = {};
 
     const layer = await this.plugin.modules.layer.getLayerInfoByID(layerSpec);
-    if (!layer?.rect) throw new Error("Invalid layer info for preview");
+    if (!layer?.rect) throw bridgeError.layerNotFound(layerSpec, { reason: "Invalid layer info for preview" });
     settings.includeClipped = false;
     settings.includeClipBase = false;
     settings.includeAdjustors = false;
@@ -327,11 +328,11 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
       profileResolve(undefined);
     }
 
-    const [js, iccProfileBuffer, pixmapBuffer] = await Promise.all([
-      jsPromise,
-      profilePromise,
-      pixmapPromise,
-    ]);
+    const [js, iccProfileBuffer, pixmapBuffer] = await withChannelTimeout(
+      Promise.all([jsPromise, profilePromise, pixmapPromise]),
+      () => channel.reject(bridgeError.photoshopBusy("getLayerPixmap timed out")),
+      JSX_CHANNEL_TIMEOUT_MS
+    );
     channel.resolve();
 
     if (params.boundsOnly && js && js.bounds) {
@@ -348,7 +349,7 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
       }
       return pixmap;
     }
-    throw new Error(
+    throw bridgeError.jsxFailed(
       `Unexpected response from PS in getLayerPixmap: js=${JSON.stringify(js)}, ` +
         `pixmap=${pixmapBuffer ? "truthy" : "falsy"}, ` +
         `iccExpected=${params.getICCProfileData}`
@@ -363,7 +364,7 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
     if (documentId !== undefined) return documentId;
     const current = this.plugin.modules.document.currentDocument;
     if (current) return current.id;
-    throw new Error("No document opened");
+    throw bridgeError.noDocument("No document opened");
   }
 
   /**
@@ -377,7 +378,7 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
   private parseRawPixels(pixmap: PsPixmap): Buffer {
     const { width, height, channelCount, pixels } = pixmap;
     if (channelCount !== 3 && channelCount !== 4) {
-      throw new Error(`Unsupported channelCount: ${channelCount}`);
+      throw bridgeError.jsxFailed(`Unsupported channelCount: ${channelCount}`);
     }
     // Trust rowBytes only when it can hold a full row; else assume no padding.
     const rowBytes =
@@ -445,3 +446,23 @@ const getScale = (width: number, height: number): number => {
   const yScale = Math.floor(height / 300) || 1;
   return 1 / Math.min(xScale, yScale);
 };
+
+const JSX_CHANNEL_TIMEOUT_MS = 30_000;
+
+function withChannelTimeout<T>(
+  promise: Promise<T>,
+  onTimeout: () => void,
+  timeoutMs: number
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      const error = bridgeError.photoshopBusy(`JSX channel timed out after ${timeoutMs}ms`);
+      onTimeout();
+      reject(error);
+    }, timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}

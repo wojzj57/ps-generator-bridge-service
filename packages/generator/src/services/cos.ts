@@ -1,6 +1,7 @@
 import COS from "cos-nodejs-sdk-v5";
 import { extname } from "node:path";
 import type { Logger } from "../utilis/logger";
+import { bridgeError } from "../errors";
 
 /**
  * Plugin-facing COS contract (RFC 0008). The minimal slice modules and plugins
@@ -107,9 +108,9 @@ export class CosService implements CosServiceApi {
       this.cos.putObject(
         { Bucket: this.config.bucket, Region: this.config.region, Key: key, Body: body },
         (err, data) => {
-          if (err) return reject(new Error(err.message ?? String(err)));
+          if (err) return reject(bridgeError.cosUploadFailed(err.message ?? String(err), { key }));
           if (data.statusCode !== 200) {
-            return reject(new Error(`COS upload failed: status ${data.statusCode}`));
+            return reject(bridgeError.cosUploadFailed(`COS upload failed: status ${data.statusCode}`, { key, statusCode: data.statusCode }));
           }
           this.logger.info(`CosService uploaded object ${key}`);
           resolve();
@@ -123,7 +124,7 @@ export class CosService implements CosServiceApi {
       this.cos.uploadFile(
         { Bucket: this.config.bucket, Region: this.config.region, Key: key, FilePath: filePath },
         (err) => {
-          if (err) return reject(new Error(err.message ?? String(err)));
+          if (err) return reject(bridgeError.cosUploadFailed(err.message ?? String(err), { key, filePath }));
           this.logger.info(`CosService uploaded file ${key}`);
           resolve();
         }
@@ -142,7 +143,7 @@ export class CosService implements CosServiceApi {
           Expires: this.config.urlExpires,
         },
         (err, data) => {
-          if (err) return reject(err instanceof Error ? err : new Error(String(err)));
+          if (err) return reject(bridgeError.cosUploadFailed(err instanceof Error ? err.message : String(err), { key }));
           // Deliberately no `response-content-disposition=attachment`: the URL is
           // meant for `<img src>`, and an attachment disposition would force a
           // download instead of inline display (RFC 0008).

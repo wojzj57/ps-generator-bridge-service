@@ -34,7 +34,7 @@ function setup(generator: PsGenerator): Registry {
 describe("ActionModule", () => {
   it("action:autoCutout runs the cutout jsx and resolves true", async () => {
     const generator = fakeGenerator();
-    generator.onEvaluateJSXFile = () => true;
+    generator.onEvaluateJSXString = () => JSON.stringify({ ok: true, result: true });
     const registry = setup(generator);
 
     const res = await registry.dispatch(
@@ -43,14 +43,13 @@ describe("ActionModule", () => {
     );
 
     expect(res).toMatchObject({ id: "1", ok: true, result: true });
-    expect(generator.jsxCalls).toHaveLength(1);
-    // Path ends in Action/autoCutout.jsx (prefix depends on __dirname at runtime).
-    expect(generator.jsxCalls[0]?.path).toMatch(/Action[\\/]autoCutout\.jsx$/);
+    expect(generator.jsxStringCalls).toHaveLength(1);
+    expect(generator.jsxStringCalls[0]?.script).toContain("__psBridgeStringify");
   });
 
   it("action:removeBackground wraps the jsx result as { success }", async () => {
     const generator = fakeGenerator();
-    generator.onEvaluateJSXFile = () => true;
+    generator.onEvaluateJSXString = () => JSON.stringify({ ok: true, result: true });
     const registry = setup(generator);
 
     const res = await registry.dispatch(
@@ -59,13 +58,12 @@ describe("ActionModule", () => {
     );
 
     expect(res).toMatchObject({ id: "2", ok: true, result: { success: true } });
-    expect(generator.jsxCalls[0]?.path).toMatch(/Action[\\/]removeBackground\.jsx$/);
+    expect(generator.jsxStringCalls).toHaveLength(1);
   });
 
-  it("surfaces a jsx failure as an INTERNAL response", async () => {
+  it("surfaces a jsx failure as a JSX_FAILED response", async () => {
     const generator = fakeGenerator();
-    // The "Error:" prefix makes JsxRunner throw; dispatch turns it into INTERNAL.
-    generator.onEvaluateJSXFile = () => "Error:cutout failed";
+    generator.onEvaluateJSXString = () => "Error:cutout failed";
     const registry = setup(generator);
 
     const res = await registry.dispatch(
@@ -76,7 +74,7 @@ describe("ActionModule", () => {
     expect(res).toMatchObject({
       id: "3",
       ok: false,
-      error: { code: "INTERNAL", message: "cutout failed" },
+      error: { code: "JSX_FAILED", message: "cutout failed", source: "jsx" },
     });
   });
 });

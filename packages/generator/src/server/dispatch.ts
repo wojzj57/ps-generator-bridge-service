@@ -7,6 +7,7 @@ import {
 import type { MethodHandler } from "@ps-generator-bridge/sdk/plugin";
 import type { PsGenerator } from "../types/generator";
 import type { JsxRunnerApi } from "../utilis/jsxRunner";
+import { toProtocolError } from "../errors";
 
 export interface ConnectionSession {
   readonly clientId: string;
@@ -51,16 +52,10 @@ export async function runMethod(
     // SDK re-applies strong types for declared methods.
     return { id: message.id, ok: true, result } as ResponseEnvelope;
   } catch (error) {
-    const thrown = error instanceof Error ? error : new Error(String(error));
-    const code = (thrown as { code?: unknown }).code;
-    const resolvedCode = typeof code === "string" ? code : ErrorCode.Internal;
     return {
       id: message.id,
       ok: false,
-      error: {
-        code: resolvedCode,
-        message: thrown.message,
-      },
+      error: toProtocolError(error, { requestId: message.id, method: message.method }),
     };
   }
 }

@@ -268,7 +268,8 @@ describe("per-plugin server (RFC 0004)", () => {
     const s = await start(echo());
     const { ws, frame } = await firstFrame(s.port, "nope");
     expect(frame.type).toBe("error");
-    expect(frame.data.code).toBe("UNKNOWN_PLUGIN");
+    expect(frame.data.code).toBe("PLUGIN_NOT_FOUND");
+    expect(frame.data.pluginId).toBe("nope");
     await new Promise<void>((resolve) => ws.once("close", () => resolve()));
   });
 

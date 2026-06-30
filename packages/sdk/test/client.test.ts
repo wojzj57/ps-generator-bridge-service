@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { PsBridgeClient } from "../src/client";
+import { isPsBridgeError } from "../src/errors";
 import { FakeTransport } from "./fakeTransport";
 import type { RequestEnvelope } from "../src/protocol";
 
@@ -33,7 +34,45 @@ describe("PsBridgeClient", () => {
     transport.emit(
       JSON.stringify({ id: req.id, ok: false, error: { code: "INTERNAL", message: "boom" } })
     );
-    await expect(promise).rejects.toThrow(/INTERNAL: boom/);
+    await expect(promise).rejects.toMatchObject({
+      name: "PsBridgeError",
+      code: "INTERNAL",
+      message: "boom",
+      requestId: req.id,
+      method: "getServerInfo",
+    });
+  });
+
+  it("preserves structured protocol error fields", async () => {
+    const transport = new FakeTransport();
+    const client = new PsBridgeClient({ transport });
+    const promise = client.getServerInfo();
+    await flush();
+    const req = transport.lastSent() as RequestEnvelope;
+    transport.emit(
+      JSON.stringify({
+        id: req.id,
+        ok: false,
+        error: {
+          code: "PHOTOSHOP_BUSY",
+          message: "busy",
+          details: { duration: 30_000 },
+          retryable: true,
+          source: "jsx",
+        },
+      })
+    );
+    try {
+      await promise;
+      throw new Error("expected rejection");
+    } catch (error) {
+      expect(isPsBridgeError(error)).toBe(true);
+      if (isPsBridgeError(error)) {
+        expect(error.details).toEqual({ duration: 30_000 });
+        expect(error.retryable).toBe(true);
+        expect(error.source).toBe("jsx");
+      }
+    }
   });
 
   it("ignores non-JSON noise and unknown ids", async () => {

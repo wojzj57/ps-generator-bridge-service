@@ -6,6 +6,7 @@ export { PsBridgeClient } from "./client";
 export type { PsBridgeClientOptions } from "./client";
 export { createWebSocketTransport } from "./transport";
 export type { Transport } from "./transport";
+export { PsBridgeError, isPsBridgeError, isRetryableBridgeError } from "./errors";
 export {
   PROTOCOL_VERSION,
   ProtocolMethod,
@@ -25,6 +26,7 @@ export type {
   RequestEnvelope,
   ResponseEnvelope,
   ProtocolError,
+  ErrorSource,
   ProtocolEvents,
   EventName,
   EventEnvelope,

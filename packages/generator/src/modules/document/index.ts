@@ -2,6 +2,7 @@ import { ProtocolMethod } from "@ps-generator-bridge/sdk";
 import { ws } from "@ps-generator-bridge/sdk/plugin";
 import { BaseModule } from "../base";
 import type { PsBridgeHost } from "../../plugin";
+import { bridgeError } from "../../errors";
 
 export type PsDocument = {
   id: number;
@@ -33,19 +34,23 @@ export class DocumentModule extends BaseModule implements DocumentModuleApi {
 
   @ws(ProtocolMethod.DocumentCurrent)
   async getCurrentDocument() {
-    const data = await this.plugin.jsx.execute("Document/getDocumentInfo");
-    if (!data) throw new Error("No document is opened");
+    const data = await this.plugin.jsx.executeSafe("Document/getDocumentInfo");
+    if (!data) {
+      this.currentDocument = null;
+      throw bridgeError.noDocument();
+    }
+    this.currentDocument = data as PsDocument;
     return data as PsDocument;
   }
 
   @ws(ProtocolMethod.DocumentExport)
   async exportDocument(params: Record<string, any>) {
-    if (!params.filePath) throw new Error("filePath is required");
-    return await this.plugin.jsx.execute("Document/exportDocument", params);
+    if (!params.filePath) throw bridgeError.badRequest("filePath is required");
+    return await this.plugin.jsx.executeSafe("Document/exportDocument", params);
   }
 
   @ws(ProtocolMethod.DocumentSave)
   async saveDocument(params: { savePath?: string }) {
-    return await this.plugin.jsx.execute("Document/saveDocument", params);
+    return await this.plugin.jsx.executeSafe("Document/saveDocument", params);
   }
 }

@@ -198,6 +198,67 @@ describe("JsxRunner.execute", () => {
   });
 });
 
+describe("JsxRunner safe execution", () => {
+  it("parses a safe success envelope", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = () => JSON.stringify({ ok: true, result: { ok: 1 } });
+    const runner = new JsxRunner(generator, silentLogger);
+
+    await expect(runner.runSafe("1 + 1")).resolves.toEqual({ ok: 1 });
+  });
+
+  it("turns a safe failure envelope into JSX_FAILED", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = () =>
+      JSON.stringify({ ok: false, error: { code: "JSX_FAILED", message: "bad" } });
+    const runner = new JsxRunner(generator, silentLogger);
+
+    await expect(runner.runSafe("bad()")).rejects.toMatchObject({
+      code: "JSX_FAILED",
+      source: "jsx",
+      message: "bad",
+    });
+  });
+
+  it("preserves safe failure details", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = () =>
+      JSON.stringify({
+        ok: false,
+        error: { code: "JSX_FAILED", message: "bad", details: { line: 12 } },
+      });
+    const runner = new JsxRunner(generator, silentLogger);
+
+    await expect(runner.runSafe("bad()")).rejects.toMatchObject({
+      code: "JSX_FAILED",
+      details: { line: 12 },
+    });
+  });
+
+  it("turns an invalid safe envelope into JSX_FAILED", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = () => "not json";
+    const runner = new JsxRunner(generator, silentLogger);
+
+    await expect(runner.runSafe("bad()")).rejects.toMatchObject({
+      code: "JSX_FAILED",
+      source: "jsx",
+    });
+  });
+
+  it("times out safe execution with PHOTOSHOP_BUSY", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = () => new Promise(() => {});
+    const runner = new JsxRunner(generator, silentLogger);
+
+    await expect(runner.runSafe("while(true){}", { timeoutMs: 1 })).rejects.toMatchObject({
+      code: "PHOTOSHOP_BUSY",
+      retryable: true,
+      source: "jsx",
+    });
+  });
+});
+
 describe("JsxRunner.init", () => {
   it("reads, concatenates (sorted), and injects the polyfill bundle once", async () => {
     const generator = fakeGenerator();

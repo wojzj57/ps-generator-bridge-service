@@ -291,7 +291,15 @@ export interface ProtocolError {
    */
   code: string;
   message: string;
+  details?: Record<string, unknown>;
+  retryable?: boolean;
+  source?: ErrorSource;
+  requestId?: string;
+  method?: string;
+  pluginId?: string;
 }
+
+export type ErrorSource = "protocol" | "generator" | "photoshop" | "jsx" | "plugin" | "cos" | "sdk";
 
 /**
  * Server-level error codes. Plugin-specific codes (e.g. SidePaint's
@@ -302,6 +310,15 @@ export const ErrorCode = {
   UnknownMethod: "UNKNOWN_METHOD",
   BadRequest: "BAD_REQUEST",
   Internal: "INTERNAL",
+  NoDocument: "NO_DOCUMENT",
+  DocumentNotFound: "DOCUMENT_NOT_FOUND",
+  LayerNotFound: "LAYER_NOT_FOUND",
+  PhotoshopUnavailable: "PHOTOSHOP_UNAVAILABLE",
+  PhotoshopBusy: "PHOTOSHOP_BUSY",
+  JsxFailed: "JSX_FAILED",
+  PluginNotFound: "PLUGIN_NOT_FOUND",
+  PluginLoadFailed: "PLUGIN_LOAD_FAILED",
+  CosUploadFailed: "COS_UPLOAD_FAILED",
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 

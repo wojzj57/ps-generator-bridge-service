@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { RawConnection, type RawConnectionOptions } from "../src/connection";
+import { isPsBridgeError } from "../src/errors";
 import type { Transport } from "../src/transport";
 
 /** A transport the test drives by hand: open/fail/recv/drop. */
@@ -103,7 +104,40 @@ describe("RawConnection", () => {
     await tick();
     const sent = conns[0]!.lastSent();
     conns[0]!.recv({ id: sent.id, ok: false, error: { code: "INTERNAL", message: "boom" } });
-    await expect(p).rejects.toThrow(/INTERNAL: boom/);
+    await expect(p).rejects.toMatchObject({
+      code: "INTERNAL",
+      message: "boom",
+      requestId: sent.id,
+      method: "getServerInfo",
+    });
+  });
+
+  it("fails ready on a structured error event before the connected handshake", async () => {
+    const { conn, conns } = harness();
+    conns[0]!.open();
+    conns[0]!.recv({
+      type: "error",
+      data: { code: "PLUGIN_NOT_FOUND", message: "unknown plugin: missing", pluginId: "missing" },
+    });
+    try {
+      await conn.ready();
+      throw new Error("expected rejection");
+    } catch (error) {
+      expect(isPsBridgeError(error)).toBe(true);
+      if (isPsBridgeError(error)) {
+        expect(error.code).toBe("PLUGIN_NOT_FOUND");
+        expect(error.pluginId).toBe("missing");
+      }
+    }
+  });
+
+  it("keeps ordinary error events dispatchable after ready", async () => {
+    const { conn, conns } = harness();
+    await connected(conn, conns);
+    let got: unknown;
+    conn.on("error", (data) => (got = data));
+    conns[0]!.recv({ type: "error", data: { code: "PLUGIN_EVENT", message: "x" } });
+    expect(got).toEqual({ code: "PLUGIN_EVENT", message: "x" });
   });
 
   it("queues an invoke during reconnect and flushes it, reusing the clientId", async () => {

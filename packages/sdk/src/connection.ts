@@ -6,7 +6,9 @@ import {
   type EventName,
   parseFrame,
   isEvent,
+  type ProtocolError,
 } from "./protocol";
+import { PsBridgeError } from "./errors";
 import { RequestTracker } from "./requestTracker";
 import { type Transport, createWebSocketTransport } from "./transport";
 
@@ -157,6 +159,10 @@ export class RawConnection {
     } catch {
       return; // ignore non-JSON noise
     }
+    if (this.state !== "ready" && isHandshakeErrorEvent(message)) {
+      this.fail(new PsBridgeError(message.data));
+      return;
+    }
     if (isEvent(message)) {
       if (message.type === "connected") {
         this.clientId = (message.data as { clientId: string }).clientId;
@@ -202,6 +208,18 @@ export class RawConnection {
     if (!set) return;
     for (const listener of set) listener(data);
   }
+}
+
+function isProtocolError(value: unknown): value is ProtocolError {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.code === "string" && typeof v.message === "string";
+}
+
+function isHandshakeErrorEvent(value: unknown): value is { type: "error"; data: ProtocolError } {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return v.type === "error" && isProtocolError(v.data);
 }
 
 /** @deprecated Use RawConnectionOptions. */

@@ -1,8 +1,9 @@
-import { ErrorCode, ProtocolMethod } from "@ps-generator-bridge/sdk";
+import { ProtocolMethod } from "@ps-generator-bridge/sdk";
 import { PLUGIN_NAME, PLUGIN_VERSION } from "../meta";
 import type { Registry } from "./registry";
 import type { HandlerContext } from "./dispatch";
 import type { PluginInfo } from "./pluginManager";
+import { bridgeError } from "../errors";
 
 /**
  * Register the server's built-in protocol methods — always available, independent
@@ -57,8 +58,6 @@ export function registerBuiltins(registry: Registry, plugins: () => PluginInfo[]
   });
 }
 
-function badRequest(message: string): Error & { code: string } {
-  const error = new Error(message) as Error & { code: string };
-  error.code = ErrorCode.BadRequest;
-  return error;
+function badRequest(message: string): Error {
+  return bridgeError.badRequest(message);
 }

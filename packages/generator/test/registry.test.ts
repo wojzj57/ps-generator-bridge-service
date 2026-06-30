@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import Fastify from "fastify";
 import { ProtocolMethod, type MethodName } from "@ps-generator-bridge/sdk";
+import { bridgeError } from "../src/errors";
 import { Registry } from "../src/server/registry";
 import { ScopedRegistry } from "../src/server/scopedRegistry";
 import { registerBuiltins } from "../src/server/builtins";
@@ -144,6 +145,28 @@ describe("Registry.dispatch", () => {
       id: "4d",
       ok: false,
       error: { code: "INTERNAL", message: "no code here" },
+    });
+  });
+
+  it("normalizes BridgeError fields into the response error", async () => {
+    const registry = newRegistry();
+    registry.registerMethod("doc", () => {
+      throw bridgeError.noDocument();
+    });
+    const res = await registry.dispatch(
+      { id: "4e", method: "doc", params: {} },
+      { generator: fakeGenerator() }
+    );
+    expect(res).toMatchObject({
+      id: "4e",
+      ok: false,
+      error: {
+        code: "NO_DOCUMENT",
+        source: "photoshop",
+        retryable: false,
+        requestId: "4e",
+        method: "doc",
+      },
     });
   });
 

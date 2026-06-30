@@ -3,6 +3,7 @@ import { ws } from "@ps-generator-bridge/sdk/plugin";
 import { BaseModule } from "../base";
 import type { PsBridgeHost } from "../../plugin";
 import type { PsBounds, PsRect } from "../../types/ps";
+import { bridgeError } from "../../errors";
 
 export class PsLayer {
   declare public id: number;
@@ -68,7 +69,7 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
     getChildren?: boolean;
     getGeneratorSettings?: boolean;
   }): Promise<PsLayer> {
-    return await this.plugin.jsx.execute("Layer/getLayerInfo", {
+    return await this.plugin.jsx.executeSafe("Layer/getLayerInfo", {
       layerID: options?.id,
       layerIndex: options?.index,
       getChildren: options?.getChildren,
@@ -85,12 +86,12 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
   ): Promise<PsLayer> {
     const layerID = typeof layerIDOrParams === "number" ? layerIDOrParams : layerIDOrParams.layerID;
     const resolvedOptions = typeof layerIDOrParams === "number" ? options : layerIDOrParams.options;
-    if (layerID == null) throw new Error("Invalid layerID");
+    if (layerID == null) throw bridgeError.badRequest("Invalid layerID");
     const params = {
       layerID: layerID,
       getChildren: resolvedOptions?.getChildren,
     };
-    return this.plugin.jsx.execute("Layer/getLayerInfo", params);
+    return this.plugin.jsx.executeSafe("Layer/getLayerInfo", params);
   }
 
   @ws(ProtocolMethod.LayerGetInfoByIndex)
@@ -104,12 +105,12 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
       typeof layerIndexOrParams === "number" ? layerIndexOrParams : layerIndexOrParams.layerIndex;
     const resolvedOptions =
       typeof layerIndexOrParams === "number" ? options : layerIndexOrParams.options;
-    if (layerIndex == null) throw new Error("Invalid layerIndex");
+    if (layerIndex == null) throw bridgeError.badRequest("Invalid layerIndex");
     // 明确定义参数类型
     const params = {
       layerIndex,
       getChildren: resolvedOptions?.getChildren,
     };
-    return this.plugin.jsx.execute("Layer/getLayerInfo", params);
+    return this.plugin.jsx.executeSafe("Layer/getLayerInfo", params);
   }
 }

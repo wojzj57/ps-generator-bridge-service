@@ -8,6 +8,8 @@ import {
   isRequest,
   isResponse,
   isEvent,
+  type ProtocolError,
+  type ErrorSource,
 } from "../src/protocol";
 
 describe("protocol", () => {
@@ -20,6 +22,9 @@ describe("protocol", () => {
     expect(PROTOCOL_VERSION).toBeGreaterThan(0);
     expect(ErrorCode.UnknownMethod).toBe("UNKNOWN_METHOD");
     expect(ErrorCode.Internal).toBe("INTERNAL");
+    expect(ErrorCode.NoDocument).toBe("NO_DOCUMENT");
+    expect(ErrorCode.PhotoshopBusy).toBe("PHOTOSHOP_BUSY");
+    expect(ErrorCode.PluginNotFound).toBe("PLUGIN_NOT_FOUND");
   });
 
   it("centralizes built-in Request method names", () => {
@@ -31,13 +36,36 @@ describe("protocol", () => {
     expect(ProtocolMethod.DocumentSave).toBe("document:save");
   });
 
-  it("keeps only server-level error codes (RFC 0006 shrinks SidePaint codes out)", () => {
+  it("keeps plugin-specific error codes out of the server-level catalog", () => {
     expect(ErrorCode.BadRequest).toBe("BAD_REQUEST");
     const codes = ErrorCode as Record<string, string>;
     expect(codes.PaintGone).toBeUndefined();
     expect(codes.ImportFailed).toBeUndefined();
     expect(codes.ValueResolve).toBeUndefined();
     expect(codes.UnsupportedScheme).toBeUndefined();
+  });
+
+  it("keeps ProtocolError backward-compatible while accepting structured fields", () => {
+    const oldShape: ProtocolError = { code: "INTERNAL", message: "boom" };
+    const source: ErrorSource = "jsx";
+    const structured: ProtocolError = {
+      code: ErrorCode.JsxFailed,
+      message: "bad jsx",
+      details: { line: 10 },
+      retryable: false,
+      source,
+      requestId: "req-1",
+      method: "jsx:execute",
+      pluginId: "plug",
+    };
+
+    expect(oldShape.message).toBe("boom");
+    expect(structured).toMatchObject({
+      code: "JSX_FAILED",
+      details: { line: 10 },
+      source: "jsx",
+      requestId: "req-1",
+    });
   });
 
   it("throws on invalid JSON", () => {

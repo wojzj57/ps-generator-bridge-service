@@ -62,6 +62,10 @@ function emitHappy(generator: FakeGenerator, bounds = BOUNDS, pixmap = makePixma
   };
 }
 
+function safeLayerInfo(generator: FakeGenerator, value: unknown) {
+  generator.onEvaluateJSXString = () => JSON.stringify({ ok: true, result: value });
+}
+
 /**
  * A *parsed* `PsPixmap` as generator-core's `getDocumentPixmap` returns it (an
  * object, not a raw buffer). `rowBytes` may exceed `width*channelCount` to model
@@ -213,12 +217,7 @@ describe("ImageModule.exportDocument", () => {
 describe("ImageModule.getPreview", () => {
   it("single layer: fetches layer info, forces include*=false, scales via getScale", async () => {
     const { generator, image } = setup();
-    generator.onEvaluateJSXFile = (path, params) => {
-      if (path.includes("getLayerInfo")) {
-        return { rect: { x: 0, y: 0, width: 900, height: 600 } };
-      }
-      return undefined;
-    };
+    safeLayerInfo(generator, { rect: { x: 0, y: 0, width: 900, height: 600 } });
     emitHappy(generator);
 
     await image.getPreview({ layerSpec: 7 });
@@ -231,18 +230,13 @@ describe("ImageModule.getPreview", () => {
     expect(params.includeClipBase).toBe(false);
     expect(params.includeAdjustors).toBe(false);
     expect(params.layerSpec).toBe(7);
-    // The layer-info lookup used the layerID param.
-    expect(generator.jsxCalls[0]?.params).toEqual({ layerID: 7 });
+    // The layer-info lookup used the layerID param inside the safe wrapper.
+    expect(generator.jsxStringCalls[0]?.script).toContain('var params = {"layerID":7};');
   });
 
   it("single layer under 300px keeps original scale (1)", async () => {
     const { generator, image } = setup();
-    generator.onEvaluateJSXFile = (path) => {
-      if (path.includes("getLayerInfo")) {
-        return { rect: { x: 0, y: 0, width: 200, height: 150 } };
-      }
-      return undefined;
-    };
+    safeLayerInfo(generator, { rect: { x: 0, y: 0, width: 200, height: 150 } });
     emitHappy(generator);
 
     await image.getPreview({ layerSpec: 1 });
@@ -254,10 +248,10 @@ describe("ImageModule.getPreview", () => {
 
   it("throws on invalid layer info", async () => {
     const { generator, image } = setup();
-    generator.onEvaluateJSXFile = () => undefined;
+    safeLayerInfo(generator, undefined);
     emitHappy(generator);
 
-    await expect(image.getPreview({ layerSpec: 9 })).rejects.toThrow(/Invalid layer info/);
+    await expect(image.getPreview({ layerSpec: 9 })).rejects.toThrow(/Layer not found: 9/);
   });
 });
 
@@ -284,6 +278,23 @@ describe("ImageModule.parseRawPixels (via exportImage)", () => {
     expect(result.buffer.subarray(0, 8)).toEqual(
       Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
     );
+  });
+
+  it("times out when the pixmap channel does not emit required progress", async () => {
+    vi.useFakeTimers();
+    try {
+      const { image } = setup();
+      const promise = image.exportImage({ layerSpec: 1 });
+      const assertion = expect(promise).rejects.toMatchObject({
+        code: "PHOTOSHOP_BUSY",
+        retryable: true,
+        source: "jsx",
+      });
+      await vi.advanceTimersByTimeAsync(30_000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -312,8 +323,7 @@ describe("ImageModule @ws wrappers (RFC 0008)", () => {
     const { generator, plugin, image } = setup();
     const cos = fakeCos();
     (plugin as unknown as { cos: unknown }).cos = cos;
-    generator.onEvaluateJSXFile = (path) =>
-      path.includes("getLayerInfo") ? { name: "Hero" } : undefined;
+    safeLayerInfo(generator, { name: "Hero" });
     emitHappy(generator);
 
     const result = await image.exportLayerWs({ layerSpec: 5 });
@@ -328,7 +338,7 @@ describe("ImageModule @ws wrappers (RFC 0008)", () => {
     const { generator, plugin, image } = setup();
     const cos = fakeCos();
     (plugin as unknown as { cos: unknown }).cos = cos;
-    generator.onEvaluateJSXFile = () => ({}); // no name
+    safeLayerInfo(generator, {}); // no name
     emitHappy(generator);
 
     await image.exportLayerWs({ layerSpec: 42 });
@@ -342,8 +352,7 @@ describe("ImageModule @ws wrappers (RFC 0008)", () => {
       throw new Error("cos down");
     });
     (plugin as unknown as { cos: unknown }).cos = cos;
-    generator.onEvaluateJSXFile = (path) =>
-      path.includes("getLayerInfo") ? { name: "L" } : undefined;
+    safeLayerInfo(generator, { name: "L" });
     emitHappy(generator);
 
     await expect(image.exportLayerWs({ layerSpec: 1 })).rejects.toThrow("cos down");
@@ -353,8 +362,7 @@ describe("ImageModule @ws wrappers (RFC 0008)", () => {
     const { generator, plugin, image } = setup();
     const cos = fakeCos();
     (plugin as unknown as { cos: unknown }).cos = cos;
-    generator.onEvaluateJSXFile = (path) =>
-      path.includes("getLayerInfo") ? { rect: { x: 0, y: 0, width: 100, height: 100 } } : undefined;
+    safeLayerInfo(generator, { rect: { x: 0, y: 0, width: 100, height: 100 } });
     emitHappy(generator);
 
     const result = await image.getPreviewWs({ layerSpec: 7 });

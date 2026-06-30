@@ -2,11 +2,13 @@ import { readdir, readFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import type { PsGenerator } from "../types/generator";
 import type { Logger } from "./logger";
+import { bridgeError, BridgeError } from "../errors";
 
 // Prefix a jsx return value uses to signal failure (LightAi BaseManager
 // convention). `JsxRunner.run` / `execute` turn such a value into a thrown
 // Error.
 const ERROR_PREFIX = "Error:";
+const DEFAULT_JSX_TIMEOUT_MS = 30_000;
 
 /**
  * A single progress notification emitted by Photoshop while a jsx file
@@ -60,6 +62,21 @@ export interface JsxRunnerApi {
   ): Promise<T>;
   run<T = unknown>(script: string): Promise<T>;
 }
+
+export interface JsxRunOptions {
+  timeoutMs?: number;
+}
+
+type SafeJsxResult<T> =
+  | { ok: true; result: T }
+  | {
+      ok: false;
+      error: {
+        message?: unknown;
+        details?: Record<string, unknown>;
+        retryable?: boolean;
+      };
+    };
 
 /**
  * Runs packaged jsx by name (ADR 0008). Resolves a name like
@@ -156,6 +173,14 @@ export class JsxRunner implements JsxRunnerApi {
     return this.executeIn<T>(this.jsxDir, name, params, sharedEngineSafe);
   }
 
+  async executeSafe<T = unknown>(
+    name: string,
+    params?: Record<string, unknown>,
+    options: JsxRunOptions = {}
+  ): Promise<T> {
+    return this.executeSafeIn<T>(this.jsxDir, name, params, options);
+  }
+
   /**
    * Alias of `execute` on the root runner — always the built-in tree. Present so
    * the root satisfies `JsxRunnerApi` alongside the scoped view; the scoped view
@@ -188,6 +213,23 @@ export class JsxRunner implements JsxRunnerApi {
     return this.normalizeJsxResult<T>(value);
   }
 
+  async executeSafeIn<T = unknown>(
+    baseDir: string,
+    name: string,
+    params?: Record<string, unknown>,
+    options: JsxRunOptions = {}
+  ): Promise<T> {
+    const path = this.resolvePath(baseDir, name);
+    const body = await this.readJsxSource(path);
+    const script = this.wrapSafeScript(body, params);
+    const value = await this.withTimeout(
+      this.generator.evaluateJSXString(script),
+      options.timeoutMs,
+      { name, kind: "file" }
+    );
+    return this.parseSafeResult<T>(value, { name, kind: "file" });
+  }
+
   /**
    * Evaluate an arbitrary jsx string in the default ExtendScript engine (the
    * same engine `init()` primed with polyfills). No `sharedEngineSafe` opt-out:
@@ -199,6 +241,15 @@ export class JsxRunner implements JsxRunnerApi {
   async run<T = unknown>(script: string): Promise<T> {
     const value = await this.generator.evaluateJSXString(script);
     return this.normalizeJsxResult<T>(value);
+  }
+
+  async runSafe<T = unknown>(script: string, options: JsxRunOptions = {}): Promise<T> {
+    const value = await this.withTimeout(
+      this.generator.evaluateJSXString(this.wrapSafeScript(script)),
+      options.timeoutMs,
+      { kind: "string" }
+    );
+    return this.parseSafeResult<T>(value, { kind: "string" });
   }
 
   /**
@@ -244,9 +295,126 @@ export class JsxRunner implements JsxRunnerApi {
    */
   private normalizeJsxResult<T>(value: unknown): T {
     if (typeof value === "string" && value.startsWith(ERROR_PREFIX)) {
-      throw new Error(value.slice(ERROR_PREFIX.length));
+      throw bridgeError.jsxFailed(value.slice(ERROR_PREFIX.length));
     }
     return value as T;
+  }
+
+  private async readJsxSource(path: string): Promise<string> {
+    try {
+      return String(await readFile(path, "utf8"));
+    } catch (error) {
+      const code = (error as { code?: unknown }).code;
+      const sourceSegment = `${sep}src${sep}jsx${sep}`;
+      if (code === "ENOENT" && path.includes(sourceSegment)) {
+        return String(await readFile(path.replace(sourceSegment, `${sep}jsx${sep}`), "utf8"));
+      }
+      throw error;
+    }
+  }
+
+  private wrapSafeScript(script: string, params?: Record<string, unknown>): string {
+    const paramsScript = `var params = ${JSON.stringify(params ?? {})};`;
+    return `
+(function () {
+  function __psBridgeStringify(value) {
+    if (typeof JSON === "object" && JSON && typeof JSON.stringify === "function") {
+      return JSON.stringify(value);
+    }
+    function quote(value) {
+      return '"' + String(value).replace(/\\\\/g, "\\\\\\\\").replace(/"/g, '\\\\"').replace(/\\r/g, "\\\\r").replace(/\\n/g, "\\\\n") + '"';
+    }
+    function stringify(value) {
+      if (value === null || value === undefined) return "null";
+      var type = typeof value;
+      if (type === "number" || type === "boolean") return String(value);
+      if (type === "string") return quote(value);
+      if (value instanceof Array) {
+        var items = [];
+        for (var i = 0; i < value.length; i++) items.push(stringify(value[i]));
+        return "[" + items.join(",") + "]";
+      }
+      var props = [];
+      for (var key in value) {
+        if (Object.prototype.hasOwnProperty.call(value, key)) {
+          props.push(quote(key) + ":" + stringify(value[key]));
+        }
+      }
+      return "{" + props.join(",") + "}";
+    }
+    return stringify(value);
+  }
+  try {
+    var result = (function () {
+      ${paramsScript}
+      ${script}
+      if (typeof result !== "undefined") return result;
+      if (typeof output !== "undefined") return output;
+      return null;
+    })();
+    return __psBridgeStringify({ ok: true, result: result === undefined ? null : result });
+  } catch (err) {
+    return __psBridgeStringify({
+      ok: false,
+      error: {
+        code: "JSX_FAILED",
+        message: String((err && err.message) || err),
+        details: {
+          name: err && err.name,
+          line: err && err.line,
+          fileName: err && err.fileName
+        }
+      }
+    });
+  }
+})();`;
+  }
+
+  private parseSafeResult<T>(value: unknown, context: Record<string, unknown>): T {
+    if (typeof value === "string" && value.startsWith(ERROR_PREFIX)) {
+      throw bridgeError.jsxFailed(value.slice(ERROR_PREFIX.length), context);
+    }
+    if (typeof value !== "string") {
+      throw bridgeError.jsxFailed("Invalid JSX result envelope", { ...context, rawType: typeof value });
+    }
+    let parsed: SafeJsxResult<T>;
+    try {
+      parsed = JSON.parse(value) as SafeJsxResult<T>;
+    } catch {
+      throw bridgeError.jsxFailed("Invalid JSX result envelope", {
+        ...context,
+        raw: value.slice(0, 500),
+      });
+    }
+    if (parsed && parsed.ok === true) return parsed.result;
+    if (parsed && parsed.ok === false) {
+      const message =
+        typeof parsed.error?.message === "string" ? parsed.error.message : "JSX execution failed";
+      throw bridgeError.jsxFailed(message, { ...context, ...parsed.error?.details });
+    }
+    throw bridgeError.jsxFailed("Invalid JSX result envelope", { ...context, parsed });
+  }
+
+  private withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs = DEFAULT_JSX_TIMEOUT_MS,
+    context: Record<string, unknown>
+  ): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        reject(bridgeError.photoshopBusy(`JSX timed out after ${timeoutMs}ms`, context));
+      }, timeoutMs);
+    });
+    return Promise.race([promise, timeout])
+      .catch((error) => {
+        if (error instanceof BridgeError) throw error;
+        const message = error instanceof Error ? error.message : String(error);
+        throw bridgeError.jsxFailed(message, context);
+      })
+      .finally(() => {
+        if (timer) clearTimeout(timer);
+      });
   }
 
   /**

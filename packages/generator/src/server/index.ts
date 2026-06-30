@@ -13,6 +13,7 @@ import type { Logger } from "../utilis/logger";
 import type { PsGenerator } from "../types/generator";
 import type { JsxRunnerApi } from "../utilis/jsxRunner";
 import type { EventManager } from "../utilis/eventManager";
+import { bridgeError } from "../errors";
 
 /** Port the plugin/dev-server fall back to when no port is configured. */
 export const DEFAULT_PORT = 7700;
@@ -117,7 +118,7 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
         socket.send(
           serializeFrame({
             type: "error",
-            data: { code: "UNKNOWN_PLUGIN", message: `unknown plugin: ${pluginId}`, pluginId },
+            data: { ...bridgeError.pluginNotFound(pluginId).toProtocolError(), pluginId },
           })
         );
         socket.close();

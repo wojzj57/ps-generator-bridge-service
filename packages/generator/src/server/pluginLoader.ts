@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
+import { ErrorCode } from "@ps-generator-bridge/sdk";
 import {
   isBasePluginClass,
   type BasePlugin,
@@ -35,6 +36,7 @@ export interface LoadedPlugin {
 export interface SkippedPlugin {
   /** Folder name under pluginsDir, for readable logs. */
   path: string;
+  code: string;
   reason: string;
 }
 
@@ -85,7 +87,7 @@ export async function loadPlugins(options: LoadOptions): Promise<LoadResult> {
       taken.add(outcome.id);
       logger.info(`plugin loaded: ${name} (${outcome.id})`);
     } else {
-      skipped.push({ path: name, reason: outcome.reason });
+      skipped.push({ path: name, code: ErrorCode.PluginLoadFailed, reason: outcome.reason });
       logger.warn(`plugin skipped: ${name} — ${outcome.reason}`);
     }
   }

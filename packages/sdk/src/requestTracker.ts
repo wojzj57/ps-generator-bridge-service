@@ -5,12 +5,14 @@ import {
   type RequestEnvelope,
   type ResponseEnvelope,
 } from "./protocol";
+import { PsBridgeError } from "./errors";
 import type { Transport } from "./transport";
 
 interface Pending {
   resolve: (value: unknown) => void;
   reject: (error: unknown) => void;
   timer: ReturnType<typeof setTimeout>;
+  method: string;
 }
 
 let requestCounter = 0;
@@ -41,6 +43,7 @@ export class RequestTracker {
         resolve: resolve as (value: unknown) => void,
         reject,
         timer,
+        method,
       });
       transport?.send(serializeFrame(envelope));
     });
@@ -78,7 +81,12 @@ export class RequestTracker {
     if (message.ok) {
       pending.resolve(message.result);
     } else {
-      pending.reject(new Error(`${message.error.code}: ${message.error.message}`));
+      pending.reject(
+        PsBridgeError.fromProtocolError(message.error, {
+          requestId: message.id,
+          method: pending.method,
+        })
+      );
     }
   }
 }
