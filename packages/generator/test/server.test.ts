@@ -317,8 +317,8 @@ describe("root /ws server", () => {
 
   it("dispatches jsx builtins through the injected JsxRunner", async () => {
     const { server: s, generator } = await startRoot();
-    generator.onEvaluateJSXString = () => 4;
-    generator.onEvaluateJSXFile = () => ({ ok: true });
+    generator.onEvaluateJSXString = (script) =>
+      script === "2 + 2" ? 4 : ({ ok: true });
     const { ws } = await connectRoot(s.port);
 
     const run = await requestOnce(ws, {
@@ -335,7 +335,8 @@ describe("root /ws server", () => {
       params: { name: "Document/getDocumentInfo", params: { id: 1 } },
     });
     expect(execute).toEqual({ id: "5", ok: true, result: { ok: true } });
-    expect(generator.jsxCalls[0]?.path).toMatch(/Document[\\/]getDocumentInfo\.jsx$/);
+    expect(generator.jsxStringCalls[1]?.script).toContain('var params = {"id":1};');
+    expect(generator.jsxStringCalls[1]?.script).toContain("documentID");
   });
 
   it("pushes subscribed Photoshop events only to matching root clients", async () => {

@@ -63,7 +63,7 @@ function emitHappy(generator: FakeGenerator, bounds = BOUNDS, pixmap = makePixma
 }
 
 function safeLayerInfo(generator: FakeGenerator, value: unknown) {
-  generator.onEvaluateJSXString = () => JSON.stringify({ ok: true, result: value });
+  generator.onEvaluateJSXString = () => value;
 }
 
 /**

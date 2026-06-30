@@ -34,7 +34,7 @@ function setup(generator: PsGenerator): Registry {
 describe("ActionModule", () => {
   it("action:autoCutout runs the cutout jsx and resolves true", async () => {
     const generator = fakeGenerator();
-    generator.onEvaluateJSXString = () => JSON.stringify({ ok: true, result: true });
+    generator.onEvaluateJSXString = () => true;
     const registry = setup(generator);
 
     const res = await registry.dispatch(
@@ -44,12 +44,13 @@ describe("ActionModule", () => {
 
     expect(res).toMatchObject({ id: "1", ok: true, result: true });
     expect(generator.jsxStringCalls).toHaveLength(1);
-    expect(generator.jsxStringCalls[0]?.script).toContain("__psBridgeStringify");
+    expect(generator.jsxStringCalls[0]?.script).toContain("JSON.stringify");
+    expect(generator.jsxStringCalls[0]?.script).not.toContain("ok: true");
   });
 
   it("action:removeBackground wraps the jsx result as { success }", async () => {
     const generator = fakeGenerator();
-    generator.onEvaluateJSXString = () => JSON.stringify({ ok: true, result: true });
+    generator.onEvaluateJSXString = () => true;
     const registry = setup(generator);
 
     const res = await registry.dispatch(

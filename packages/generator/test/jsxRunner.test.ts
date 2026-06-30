@@ -26,7 +26,7 @@ describe("JsxRunner.run", () => {
   it("returns the jsx value verbatim without JSON.parse", async () => {
     const generator = fakeGenerator();
     const json = '{"id":1,"name":"layer"}';
-    generator.onEvaluateJSXFile = () => json;
+    generator.onEvaluateJSXString = () => json;
     const runner = new JsxRunner(generator, silentLogger);
 
     const result = await runner.execute("Document/getDocumentInfo");
@@ -37,7 +37,7 @@ describe("JsxRunner.run", () => {
   it("passes through non-Error objects unchanged", async () => {
     const generator = fakeGenerator();
     const value = { bounds: [0, 0, 10, 10] };
-    generator.onEvaluateJSXFile = () => value;
+    generator.onEvaluateJSXString = () => value;
     const runner = new JsxRunner(generator, silentLogger);
 
     expect(await runner.execute("Document/getDocumentInfo")).toBe(value);
@@ -45,7 +45,7 @@ describe("JsxRunner.run", () => {
 
   it("throws with the message after the Error: prefix", async () => {
     const generator = fakeGenerator();
-    generator.onEvaluateJSXFile = () => "Error:boom";
+    generator.onEvaluateJSXString = () => "Error:boom";
     const runner = new JsxRunner(generator, silentLogger);
 
     await expect(runner.execute("Document/getDocumentInfo")).rejects.toThrow("boom");
@@ -53,32 +53,30 @@ describe("JsxRunner.run", () => {
 
   it("does not treat a value merely containing 'Error:' as a failure", async () => {
     const generator = fakeGenerator();
-    generator.onEvaluateJSXFile = () => "note: Error:not-a-prefix";
+    generator.onEvaluateJSXString = () => "note: Error:not-a-prefix";
     const runner = new JsxRunner(generator, silentLogger);
 
     expect(await runner.execute("Document/getDocumentInfo")).toBe("note: Error:not-a-prefix");
   });
 
-  it("resolves the path by domain and forwards params + sharedEngineSafe", async () => {
+  it("loads a named file and injects params into the safe script", async () => {
     const generator = fakeGenerator();
+    generator.onEvaluateJSXString = () => undefined;
     const runner = new JsxRunner(generator, silentLogger);
 
     await runner.execute("Document/getDocumentInfo", { id: 1 }, true);
 
-    expect(generator.jsxCalls).toHaveLength(1);
-    const call = generator.jsxCalls[0]!;
-    expect(call.path.endsWith(join("jsx", "Document", "getDocumentInfo.jsx"))).toBe(true);
-    expect(call.params).toEqual({ id: 1 });
-    expect(call.sharedEngineSafe).toBe(true);
+    expect(generator.jsxStringCalls).toHaveLength(1);
+    expect(generator.jsxStringCalls[0]?.script).toContain('var params = {"id":1};');
+    expect(generator.jsxStringCalls[0]?.script).toContain("JSON.stringify");
   });
 
   it("resolves to undefined when the hook is absent", async () => {
     const generator = fakeGenerator();
     const runner = new JsxRunner(generator, silentLogger);
 
-    expect(await runner.execute("Action/noop")).toBeUndefined();
-    expect(generator.jsxCalls[0]?.params).toBeUndefined();
-    expect(generator.jsxCalls[0]?.sharedEngineSafe).toBeUndefined();
+    expect(await runner.execute("Document/getDocumentInfo")).toBeUndefined();
+    expect(generator.jsxStringCalls[0]?.script).toContain("var params = {};");
   });
 });
 
@@ -87,35 +85,37 @@ describe("JsxRunner.forPlugin (scoped jsx)", () => {
 
   it("execute resolves '<name>' under the plugin dir and forwards params + sharedEngineSafe", async () => {
     const generator = fakeGenerator();
-    const scoped = new JsxRunner(generator, silentLogger).forPlugin(PLUGIN_DIR);
+    const dir = nextScratch();
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, "landSingle.jsx"), "true;", { encoding: "utf8" });
+    const scopedFromScratch = new JsxRunner(generator, silentLogger).forPlugin(dir);
+    await scopedFromScratch.execute("landSingle", { id: 1 }, true);
 
-    await scoped.execute("landSingle", { id: 1 }, true);
-
-    const call = generator.jsxCalls[0]!;
-    expect(call.path).toBe(join(PLUGIN_DIR, "landSingle.jsx"));
-    expect(call.params).toEqual({ id: 1 });
-    expect(call.sharedEngineSafe).toBe(true);
+    expect(generator.jsxStringCalls[0]?.script).toContain('var params = {"id":1};');
+    expect(generator.jsxStringCalls[0]?.script).toContain("true;");
   });
 
   it("execute resolves nested names under the plugin dir", async () => {
     const generator = fakeGenerator();
-    const scoped = new JsxRunner(generator, silentLogger).forPlugin(PLUGIN_DIR);
+    const dir = nextScratch();
+    await mkdir(join(dir, "sub"), { recursive: true });
+    await writeFile(join(dir, "sub", "deep.jsx"), "7;", { encoding: "utf8" });
+    const scoped = new JsxRunner(generator, silentLogger).forPlugin(dir);
 
     await scoped.execute("sub/deep");
 
-    expect(generator.jsxCalls[0]!.path).toBe(join(PLUGIN_DIR, "sub", "deep.jsx"));
+    expect(generator.jsxStringCalls[0]?.script).toContain("7;");
   });
 
   it("executeBuiltin resolves under the built-in jsx tree, not the plugin dir", async () => {
     const generator = fakeGenerator();
+    generator.onEvaluateJSXString = () => undefined;
     const scoped = new JsxRunner(generator, silentLogger).forPlugin(PLUGIN_DIR);
 
     await scoped.executeBuiltin("Document/getDocumentInfo", { id: 2 });
 
-    const call = generator.jsxCalls[0]!;
-    expect(call.path.endsWith(join("jsx", "Document", "getDocumentInfo.jsx"))).toBe(true);
-    expect(call.path.startsWith(PLUGIN_DIR)).toBe(false);
-    expect(call.params).toEqual({ id: 2 });
+    expect(generator.jsxStringCalls[0]?.script).toContain('var params = {"id":2};');
+    expect(generator.jsxStringCalls[0]?.script).toContain("documentID");
   });
 
   it("run delegates to the root (raw script in the default engine)", async () => {
@@ -129,8 +129,11 @@ describe("JsxRunner.forPlugin (scoped jsx)", () => {
 
   it("normalizes 'Error:'-prefixed results like the root execute", async () => {
     const generator = fakeGenerator();
-    generator.onEvaluateJSXFile = () => "Error:scoped boom";
-    const scoped = new JsxRunner(generator, silentLogger).forPlugin(PLUGIN_DIR);
+    generator.onEvaluateJSXString = () => "Error:scoped boom";
+    const dir = nextScratch();
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, "x.jsx"), "true;", { encoding: "utf8" });
+    const scoped = new JsxRunner(generator, silentLogger).forPlugin(dir);
 
     await expect(scoped.execute("x")).rejects.toThrow("scoped boom");
   });
@@ -139,14 +142,13 @@ describe("JsxRunner.forPlugin (scoped jsx)", () => {
 describe("JsxRunner.executeBuiltin (root)", () => {
   it("coincides with execute on the root runner (built-in tree)", async () => {
     const generator = fakeGenerator();
+    generator.onEvaluateJSXString = () => undefined;
     const runner = new JsxRunner(generator, silentLogger);
 
     await runner.executeBuiltin("Layer/getLayerInfo", { id: 3 }, true);
 
-    const call = generator.jsxCalls[0]!;
-    expect(call.path.endsWith(join("jsx", "Layer", "getLayerInfo.jsx"))).toBe(true);
-    expect(call.params).toEqual({ id: 3 });
-    expect(call.sharedEngineSafe).toBe(true);
+    expect(generator.jsxStringCalls[0]?.script).toContain('var params = {"id":3};');
+    expect(generator.jsxStringCalls[0]?.script).toContain("getLayerInfoByID");
   });
 });
 
@@ -199,7 +201,15 @@ describe("JsxRunner.execute", () => {
 });
 
 describe("JsxRunner safe execution", () => {
-  it("parses a safe success envelope", async () => {
+  it("passes through the raw JSX completion value on success", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = () => ({ ok: 1 });
+    const runner = new JsxRunner(generator, silentLogger);
+
+    await expect(runner.runSafe("1 + 1")).resolves.toEqual({ ok: 1 });
+  });
+
+  it("keeps backward compatibility with an old ok:true envelope", async () => {
     const generator = fakeGenerator();
     generator.onEvaluateJSXString = () => JSON.stringify({ ok: true, result: { ok: 1 } });
     const runner = new JsxRunner(generator, silentLogger);
@@ -235,15 +245,12 @@ describe("JsxRunner safe execution", () => {
     });
   });
 
-  it("turns an invalid safe envelope into JSX_FAILED", async () => {
+  it("passes through a non-envelope string result", async () => {
     const generator = fakeGenerator();
     generator.onEvaluateJSXString = () => "not json";
     const runner = new JsxRunner(generator, silentLogger);
 
-    await expect(runner.runSafe("bad()")).rejects.toMatchObject({
-      code: "JSX_FAILED",
-      source: "jsx",
-    });
+    await expect(runner.runSafe("stringResult()")).resolves.toBe("not json");
   });
 
   it("times out safe execution with PHOTOSHOP_BUSY", async () => {
