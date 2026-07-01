@@ -5,6 +5,7 @@ on:
     branches:
       - master
     paths:
+      - ".github/workflows/release.yml"
       - ".changeset/**"
       - "package.json"
       - "packages/*/package.json"
