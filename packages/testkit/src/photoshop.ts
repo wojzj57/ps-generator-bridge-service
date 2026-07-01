@@ -3,7 +3,6 @@ import { execFileSync } from "node:child_process";
 export function ensurePhotoshopRunning(): void {
   const output = execFileSync("tasklist", ["/FI", "IMAGENAME eq Photoshop.exe", "/NH"], {
     encoding: "utf8",
-    shell: true,
   });
   if (!output.toLowerCase().includes("photoshop.exe")) {
     throw new Error(
