@@ -34,7 +34,7 @@ function respond(transport: FakeTransport, result: unknown): void {
 }
 
 describe("public Connection", () => {
-  it("defaults to the root /ws URL and does not expose invoke", async () => {
+  it("defaults to the root /ws URL and does not expose event facade", async () => {
     let capturedUrl = "";
     const conn = new Connection({
       transportFactory: (url) => {
@@ -43,8 +43,32 @@ describe("public Connection", () => {
       },
     });
     expect(capturedUrl).toBe(DEFAULT_CONNECTION_URL);
-    expect("invoke" in conn).toBe(false);
+    expect("event" in conn).toBe(false);
     conn.close();
+  });
+
+  it("exposes direct invoke for typed and custom ws methods", async () => {
+    const { conn, transports } = harness();
+    const transport = transports[0]!;
+    await connect(conn, transport);
+
+    const info = conn.invoke(ProtocolMethod.GetServerInfo, {});
+    await flush();
+    expect(lastRequest(transport)).toMatchObject({
+      method: ProtocolMethod.GetServerInfo,
+      params: {},
+    });
+    respond(transport, { name: "bridge", version: "1" });
+    await expect(info).resolves.toEqual({ name: "bridge", version: "1" });
+
+    const custom = conn.invoke<{ ok: true }>("paint:ping", { x: 1 });
+    await flush();
+    expect(lastRequest(transport)).toMatchObject({
+      method: "paint:ping",
+      params: { x: 1 },
+    });
+    respond(transport, { ok: true });
+    await expect(custom).resolves.toEqual({ ok: true });
   });
 
   it("subscribes on first event listener and unsubscribes on the last off", async () => {
@@ -53,13 +77,13 @@ describe("public Connection", () => {
     await connect(conn, transport);
 
     const listener = () => undefined;
-    conn.event.on("imageChanged", listener);
+    conn.on("imageChanged", listener);
     await flush();
     expect(lastRequest(transport).method).toBe(ProtocolMethod.EventSubscribe);
     expect(lastRequest(transport).params).toEqual({ type: "imageChanged" });
     respond(transport, { ok: true });
 
-    conn.event.off("imageChanged", listener);
+    conn.off("imageChanged", listener);
     await flush();
     expect(lastRequest(transport).method).toBe(ProtocolMethod.EventUnsubscribe);
     expect(lastRequest(transport).params).toEqual({ type: "imageChanged" });
@@ -71,16 +95,65 @@ describe("public Connection", () => {
     const transport = transports[0]!;
     await connect(conn, transport);
 
-    conn.event.off("imageChanged", () => undefined);
+    conn.off("imageChanged", () => undefined);
     await flush();
     expect(transport.sent).toHaveLength(0);
+  });
+
+  it("listens to custom events without server-side subscription", async () => {
+    const { conn, transports } = harness();
+    const transport = transports[0]!;
+    await connect(conn, transport);
+
+    const seen: unknown[] = [];
+    const listener = (data: unknown) => seen.push(data);
+    conn.on("paint_changed", listener);
+    await flush();
+    expect(transport.sent).toHaveLength(0);
+
+    transport.emit(JSON.stringify({ type: "paint_changed", data: { id: 1 } }));
+    expect(seen).toEqual([{ id: 1 }]);
+
+    conn.off("paint_changed", listener);
+    transport.emit(JSON.stringify({ type: "paint_changed", data: { id: 2 } }));
+    expect(seen).toEqual([{ id: 1 }]);
+  });
+
+  it("supports once for custom events", async () => {
+    const { conn, transports } = harness();
+    const transport = transports[0]!;
+    await connect(conn, transport);
+
+    const seen: unknown[] = [];
+    conn.once("paint_changed", (data) => seen.push(data));
+
+    transport.emit(JSON.stringify({ type: "paint_changed", data: { id: 1 } }));
+    transport.emit(JSON.stringify({ type: "paint_changed", data: { id: 2 } }));
+
+    expect(seen).toEqual([{ id: 1 }]);
+  });
+
+  it("replaces an existing once wrapper for the same listener and event", async () => {
+    const { conn, transports } = harness();
+    const transport = transports[0]!;
+    await connect(conn, transport);
+
+    const seen: unknown[] = [];
+    const listener = (data: unknown) => seen.push(data);
+    conn.once("paint_changed", listener);
+    conn.once("paint_changed", listener);
+
+    transport.emit(JSON.stringify({ type: "paint_changed", data: { id: 1 } }));
+    transport.emit(JSON.stringify({ type: "paint_changed", data: { id: 2 } }));
+
+    expect(seen).toEqual([{ id: 1 }]);
   });
 
   it("deduplicates subscription replay for listeners added before ready", async () => {
     const { conn, transports } = harness();
     const transport = transports[0]!;
 
-    conn.event.on("imageChanged", () => undefined);
+    conn.on("imageChanged", () => undefined);
     await connect(conn, transport);
     await flush();
 
@@ -96,7 +169,7 @@ describe("public Connection", () => {
   it("replays active subscriptions after reconnect", async () => {
     const { conn, transports } = harness();
     await connect(conn, transports[0]!);
-    conn.event.on("toolChanged", () => undefined);
+    conn.on("toolChanged", () => undefined);
     await flush();
     respond(transports[0]!, { ok: true });
 
@@ -107,6 +180,26 @@ describe("public Connection", () => {
     await flush();
     expect(lastRequest(transports[1]!).method).toBe(ProtocolMethod.EventSubscribe);
     expect(lastRequest(transports[1]!).params).toEqual({ type: "toolChanged" });
+    respond(transports[1]!, { ok: true });
+  });
+
+  it("replays subscriptions after reconnect when the previous subscribe is pending", async () => {
+    const { conn, transports } = harness();
+    await connect(conn, transports[0]!);
+    conn.on("imageChanged", () => undefined);
+    await flush();
+    expect(lastRequest(transports[0]!).method).toBe(ProtocolMethod.EventSubscribe);
+    expect(lastRequest(transports[0]!).params).toEqual({ type: "imageChanged" });
+
+    transports[0]!.simulateClose();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(transports).toHaveLength(2);
+    await connect(conn, transports[1]!, "root-1");
+    await flush();
+
+    expect(lastRequest(transports[1]!).method).toBe(ProtocolMethod.EventSubscribe);
+    expect(lastRequest(transports[1]!).params).toEqual({ type: "imageChanged" });
+    respond(transports[0]!, { ok: true });
     respond(transports[1]!, { ok: true });
   });
 
