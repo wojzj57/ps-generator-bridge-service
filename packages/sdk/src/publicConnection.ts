@@ -256,10 +256,7 @@ export class Connection {
     this.pendingSubscriptions.set(type, pendingToken);
     void this.call(ProtocolMethod.EventSubscribe, { type })
       .then(() => {
-        if (
-          this.pendingSubscriptions.get(type) === pendingToken &&
-          this.listenerCount(type) > 0
-        ) {
+        if (this.pendingSubscriptions.get(type) === pendingToken && this.listenerCount(type) > 0) {
           this.activeSubscriptions.add(type);
         }
       })
