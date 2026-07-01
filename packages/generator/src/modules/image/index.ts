@@ -91,7 +91,8 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
     const settings: PsGenerator.GetPixmapSettings = {};
 
     const layer = await this.plugin.modules.layer.getLayerInfoByID(layerSpec);
-    if (!layer?.rect) throw bridgeError.layerNotFound(layerSpec, { reason: "Invalid layer info for preview" });
+    if (!layer?.rect)
+      throw bridgeError.layerNotFound(layerSpec, { reason: "Invalid layer info for preview" });
     settings.includeClipped = false;
     settings.includeClipBase = false;
     settings.includeAdjustors = false;

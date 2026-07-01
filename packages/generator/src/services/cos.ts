@@ -110,7 +110,12 @@ export class CosService implements CosServiceApi {
         (err, data) => {
           if (err) return reject(bridgeError.cosUploadFailed(err.message ?? String(err), { key }));
           if (data.statusCode !== 200) {
-            return reject(bridgeError.cosUploadFailed(`COS upload failed: status ${data.statusCode}`, { key, statusCode: data.statusCode }));
+            return reject(
+              bridgeError.cosUploadFailed(`COS upload failed: status ${data.statusCode}`, {
+                key,
+                statusCode: data.statusCode,
+              })
+            );
           }
           this.logger.info(`CosService uploaded object ${key}`);
           resolve();
@@ -124,7 +129,10 @@ export class CosService implements CosServiceApi {
       this.cos.uploadFile(
         { Bucket: this.config.bucket, Region: this.config.region, Key: key, FilePath: filePath },
         (err) => {
-          if (err) return reject(bridgeError.cosUploadFailed(err.message ?? String(err), { key, filePath }));
+          if (err)
+            return reject(
+              bridgeError.cosUploadFailed(err.message ?? String(err), { key, filePath })
+            );
           this.logger.info(`CosService uploaded file ${key}`);
           resolve();
         }
@@ -143,7 +151,10 @@ export class CosService implements CosServiceApi {
           Expires: this.config.urlExpires,
         },
         (err, data) => {
-          if (err) return reject(bridgeError.cosUploadFailed(err instanceof Error ? err.message : String(err), { key }));
+          if (err)
+            return reject(
+              bridgeError.cosUploadFailed(err instanceof Error ? err.message : String(err), { key })
+            );
           // Deliberately no `response-content-disposition=attachment`: the URL is
           // meant for `<img src>`, and an attachment disposition would force a
           // download instead of inline display (RFC 0008).

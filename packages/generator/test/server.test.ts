@@ -317,8 +317,7 @@ describe("root /ws server", () => {
 
   it("dispatches jsx builtins through the injected JsxRunner", async () => {
     const { server: s, generator } = await startRoot();
-    generator.onEvaluateJSXString = (script) =>
-      script === "2 + 2" ? 4 : ({ ok: true });
+    generator.onEvaluateJSXString = (script) => (script === "2 + 2" ? 4 : { ok: true });
     const { ws } = await connectRoot(s.port);
 
     const run = await requestOnce(ws, {
