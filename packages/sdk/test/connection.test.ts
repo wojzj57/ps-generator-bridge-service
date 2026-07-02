@@ -175,6 +175,7 @@ describe("RawConnection", () => {
     await connected(conn, conns);
     let got: unknown;
     conn.on("ping", (data) => (got = data));
+    expect(conns[0]!.sent).toHaveLength(0);
     conns[0]!.recv("not json"); // ignored
     conns[0]!.recv({ type: "ping", data: { n: 1 } });
     expect(got).toEqual({ n: 1 });

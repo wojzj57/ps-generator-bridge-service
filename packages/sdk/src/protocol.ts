@@ -50,11 +50,11 @@ export interface ProtocolMethods {
     result: unknown;
   };
   [ProtocolMethod.EventSubscribe]: {
-    params: { type: PhotoshopEventName };
+    params: { type: string };
     result: { ok: true };
   };
   [ProtocolMethod.EventUnsubscribe]: {
-    params: { type: PhotoshopEventName };
+    params: { type: string };
     result: { ok: true };
   };
   // Feature-module methods (ADR 0006). The `Domain:action` namespace mirrors the

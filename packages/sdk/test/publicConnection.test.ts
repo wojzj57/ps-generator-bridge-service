@@ -270,6 +270,62 @@ describe("public Connection", () => {
     respond(transport, { ok: true });
   });
 
+  it("subscribes main and plugin event names through the protocol", async () => {
+    for (const type of ["#ready", "paint:changed"]) {
+      const { conn, transports } = harness();
+      const transport = transports[0]!;
+      await connect(conn, transport);
+
+      conn.on(type, () => undefined);
+      await flush();
+
+      expect(lastRequest(transport)).toMatchObject({
+        method: ProtocolMethod.EventSubscribe,
+        params: { type },
+      });
+      respond(transport, { ok: true });
+      conn.close();
+    }
+  });
+
+  it("does not subscribe twice for multiple listeners on the same event", async () => {
+    const { conn, transports } = harness();
+    const transport = transports[0]!;
+    await connect(conn, transport);
+
+    conn.on("paint:changed", () => undefined);
+    await flush();
+    expect(transport.sent).toHaveLength(1);
+
+    conn.on("paint:changed", () => undefined);
+    await flush();
+    expect(transport.sent).toHaveLength(1);
+  });
+
+  it("does not unsubscribe until the last listener is removed", async () => {
+    const { conn, transports } = harness();
+    const transport = transports[0]!;
+    await connect(conn, transport);
+
+    const first = () => undefined;
+    const second = () => undefined;
+    conn.on("paint:changed", first);
+    conn.on("paint:changed", second);
+    await flush();
+    respond(transport, { ok: true });
+
+    conn.off("paint:changed", first);
+    await flush();
+    expect(transport.sent).toHaveLength(1);
+
+    conn.off("paint:changed", second);
+    await flush();
+    expect(lastRequest(transport)).toMatchObject({
+      method: ProtocolMethod.EventUnsubscribe,
+      params: { type: "paint:changed" },
+    });
+  });
+
   it("does not unsubscribe when off does not remove a listener", async () => {
     const { conn, transports } = harness();
     const transport = transports[0]!;
@@ -280,22 +336,32 @@ describe("public Connection", () => {
     expect(transport.sent).toHaveLength(0);
   });
 
-  it("listens to custom events without server-side subscription", async () => {
+  it("listens to custom events after server-side subscription", async () => {
     const { conn, transports } = harness();
     const transport = transports[0]!;
     await connect(conn, transport);
 
     const seen: unknown[] = [];
     const listener = (data: unknown) => seen.push(data);
-    conn.on("paint_changed", listener);
+    conn.on("paint:changed", listener);
     await flush();
-    expect(transport.sent).toHaveLength(0);
+    expect(lastRequest(transport)).toMatchObject({
+      method: ProtocolMethod.EventSubscribe,
+      params: { type: "paint:changed" },
+    });
+    respond(transport, { ok: true });
 
-    transport.emit(JSON.stringify({ type: "paint_changed", data: { id: 1 } }));
+    transport.emit(JSON.stringify({ type: "paint:changed", data: { id: 1 } }));
     expect(seen).toEqual([{ id: 1 }]);
 
-    conn.off("paint_changed", listener);
-    transport.emit(JSON.stringify({ type: "paint_changed", data: { id: 2 } }));
+    conn.off("paint:changed", listener);
+    await flush();
+    expect(lastRequest(transport)).toMatchObject({
+      method: ProtocolMethod.EventUnsubscribe,
+      params: { type: "paint:changed" },
+    });
+
+    transport.emit(JSON.stringify({ type: "paint:changed", data: { id: 2 } }));
     expect(seen).toEqual([{ id: 1 }]);
   });
 
@@ -305,10 +371,20 @@ describe("public Connection", () => {
     await connect(conn, transport);
 
     const seen: unknown[] = [];
-    conn.once("paint_changed", (data) => seen.push(data));
+    conn.once("paint:changed", (data) => seen.push(data));
+    await flush();
+    expect(lastRequest(transport)).toMatchObject({
+      method: ProtocolMethod.EventSubscribe,
+      params: { type: "paint:changed" },
+    });
 
-    transport.emit(JSON.stringify({ type: "paint_changed", data: { id: 1 } }));
-    transport.emit(JSON.stringify({ type: "paint_changed", data: { id: 2 } }));
+    transport.emit(JSON.stringify({ type: "paint:changed", data: { id: 1 } }));
+    await flush();
+    expect(lastRequest(transport)).toMatchObject({
+      method: ProtocolMethod.EventUnsubscribe,
+      params: { type: "paint:changed" },
+    });
+    transport.emit(JSON.stringify({ type: "paint:changed", data: { id: 2 } }));
 
     expect(seen).toEqual([{ id: 1 }]);
   });
@@ -320,11 +396,11 @@ describe("public Connection", () => {
 
     const seen: unknown[] = [];
     const listener = (data: unknown) => seen.push(data);
-    conn.once("paint_changed", listener);
-    conn.once("paint_changed", listener);
+    conn.once("paint:changed", listener);
+    conn.once("paint:changed", listener);
 
-    transport.emit(JSON.stringify({ type: "paint_changed", data: { id: 1 } }));
-    transport.emit(JSON.stringify({ type: "paint_changed", data: { id: 2 } }));
+    transport.emit(JSON.stringify({ type: "paint:changed", data: { id: 1 } }));
+    transport.emit(JSON.stringify({ type: "paint:changed", data: { id: 2 } }));
 
     expect(seen).toEqual([{ id: 1 }]);
   });
@@ -349,7 +425,7 @@ describe("public Connection", () => {
   it("replays active subscriptions after reconnect", async () => {
     const { conn, transports } = harness();
     await connect(conn, transports[0]!);
-    conn.on("toolChanged", () => undefined);
+    conn.on("paint:changed", () => undefined);
     await flush();
     respond(transports[0]!, { ok: true });
 
@@ -359,7 +435,7 @@ describe("public Connection", () => {
     await connect(conn, transports[1]!, "root-1");
     await flush();
     expect(lastRequest(transports[1]!).method).toBe(ProtocolMethod.EventSubscribe);
-    expect(lastRequest(transports[1]!).params).toEqual({ type: "toolChanged" });
+    expect(lastRequest(transports[1]!).params).toEqual({ type: "paint:changed" });
     respond(transports[1]!, { ok: true });
   });
 

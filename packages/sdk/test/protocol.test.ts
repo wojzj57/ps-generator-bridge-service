@@ -9,6 +9,7 @@ import {
   isResponse,
   isEvent,
   type ProtocolError,
+  type ProtocolMethods,
   type ErrorSource,
 } from "../src/protocol";
 
@@ -34,6 +35,18 @@ describe("protocol", () => {
     expect(ProtocolMethod.DocumentCurrent).toBe("document:current");
     expect(ProtocolMethod.DocumentExport).toBe("document:export");
     expect(ProtocolMethod.DocumentSave).toBe("document:save");
+  });
+
+  it("allows subscribing arbitrary string event names", () => {
+    const subscribe: ProtocolMethods[typeof ProtocolMethod.EventSubscribe]["params"] = {
+      type: "paint:changed",
+    };
+    const main: ProtocolMethods[typeof ProtocolMethod.EventUnsubscribe]["params"] = {
+      type: "#ready",
+    };
+
+    expect(subscribe.type).toBe("paint:changed");
+    expect(main.type).toBe("#ready");
   });
 
   it("keeps plugin-specific error codes out of the server-level catalog", () => {
