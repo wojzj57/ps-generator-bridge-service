@@ -5,9 +5,9 @@ import { describe, it, expect, afterEach } from "vitest";
 import { PsBridgeHost } from "../src/plugin";
 import { BaseModule } from "../src/modules/base";
 import { LayerModule, DocumentModule, ActionModule } from "../src/modules";
-import { JsxRunner } from "../src/utilis/jsxRunner";
+import { JsxRunner } from "../src/utils/jsxRunner";
 import type { PluginHost } from "@ps-generator-bridge/sdk/plugin";
-import type { Logger } from "../src/utilis/logger";
+import type { Logger } from "../src/utils/logger";
 import { fakeGenerator } from "./fakeGenerator";
 
 const silentLogger: Logger = { debug() {}, info() {}, warn() {}, error() {} };

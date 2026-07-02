@@ -3,7 +3,7 @@ import { WebSocket } from "ws";
 import { RawConnection } from "@ps-generator-bridge/sdk";
 import { BasePlugin, ws, bootstrap, type PluginHost } from "@ps-generator-bridge/sdk/plugin";
 import { createServer, type PsBridgeServer } from "../src/server";
-import type { Logger } from "../src/utilis/logger";
+import type { Logger } from "../src/utils/logger";
 import { fakeGenerator } from "./fakeGenerator";
 
 const silentLogger: Logger = { debug() {}, info() {}, warn() {}, error() {} };

@@ -3,9 +3,9 @@ import WebSocket from "ws";
 import { ProtocolMethod } from "@ps-generator-bridge/sdk";
 import { createServer, type PsBridgeServer } from "../src/server";
 import { BasePlugin, ws, api, bootstrap, type PluginHost } from "@ps-generator-bridge/sdk/plugin";
-import { EventManager } from "../src/utilis/eventManager";
-import { JsxRunner } from "../src/utilis/jsxRunner";
-import type { Logger } from "../src/utilis/logger";
+import { EventManager } from "../src/utils/eventManager";
+import { JsxRunner } from "../src/utils/jsxRunner";
+import type { Logger } from "../src/utils/logger";
 import { fakeGenerator, type FakeGenerator } from "./fakeGenerator";
 
 const silentLogger: Logger = {

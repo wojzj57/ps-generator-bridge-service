@@ -3,10 +3,10 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, it, expect, afterEach } from "vitest";
 import WebSocket from "ws";
-import { loadPlugins, type LoadResult } from "../src/server/pluginLoader";
+import { loadPlugins, type LoadResult } from "../src/plugins";
 import { createServer, type PsBridgeServer } from "../src/server";
 import type { PluginHost } from "@ps-generator-bridge/sdk/plugin";
-import type { Logger } from "../src/utilis/logger";
+import type { Logger } from "../src/utils/logger";
 import { fakeGenerator } from "./fakeGenerator";
 
 // Plugin packages are CJS; they depend on the published SDK plugin subpath.

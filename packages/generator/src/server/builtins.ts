@@ -2,7 +2,7 @@ import { ProtocolMethod } from "@ps-generator-bridge/sdk";
 import { PLUGIN_NAME, PLUGIN_VERSION } from "../meta";
 import type { Registry } from "./registry";
 import type { HandlerContext } from "./dispatch";
-import type { PluginInfo } from "./pluginManager";
+import type { PluginInfo } from "../plugins";
 import { bridgeError } from "../errors";
 
 /**

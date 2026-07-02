@@ -7,9 +7,9 @@
  * plugin code, and it reuses the same `fakeGenerator()` the suite is built on.
  */
 import { startServer, DEFAULT_PORT } from "../src/server";
-import { EventManager } from "../src/utilis/eventManager";
-import { JsxRunner } from "../src/utilis/jsxRunner";
-import { createLogger } from "../src/utilis/logger";
+import { EventManager } from "../src/utils/eventManager";
+import { JsxRunner } from "../src/utils/jsxRunner";
+import { createLogger } from "../src/utils/logger";
 import { fakeGenerator } from "./fakeGenerator";
 
 const logger = createLogger("dev-server");

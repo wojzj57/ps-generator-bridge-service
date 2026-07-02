@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { Logger } from "../src/utilis/logger";
+import type { Logger } from "../src/utils/logger";
 
 // Mock the COS SDK so the service never touches the network. `vi.hoisted` makes
 // the shared spies available to the hoisted `vi.mock` factory; the fake class's

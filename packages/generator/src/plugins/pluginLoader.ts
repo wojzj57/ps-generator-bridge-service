@@ -8,7 +8,7 @@ import {
   type PluginHost,
 } from "@ps-generator-bridge/sdk/plugin";
 import { isValidPluginId } from "./pluginManager";
-import type { Logger } from "../utilis/logger";
+import type { Logger } from "../utils/logger";
 
 export interface LoadOptions {
   /** Directory whose direct child folders are scanned as plugin packages. */

@@ -1,6 +1,6 @@
 import COS from "cos-nodejs-sdk-v5";
 import { extname } from "node:path";
-import type { Logger } from "../utilis/logger";
+import type { Logger } from "../utils/logger";
 import { bridgeError } from "../errors";
 
 /**

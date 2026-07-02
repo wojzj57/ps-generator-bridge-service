@@ -2,7 +2,7 @@
 // the exported `init(generator, config, logger)`. We ignore generator-core's own
 // logger argument and inject our own. This is the composition root.
 import { PsBridgeHost, type PluginConfig } from "./plugin";
-import { createLogger } from "./utilis/logger";
+import { createLogger } from "./utils/logger";
 import type { PsGenerator } from "./types/generator";
 
 export function init(generator: PsGenerator, config?: PluginConfig): void {
@@ -16,4 +16,4 @@ export function init(generator: PsGenerator, config?: PluginConfig): void {
 export { PsBridgeHost } from "./plugin";
 export type { PluginConfig } from "./plugin";
 export type { PsGenerator } from "./types/generator";
-export { JsxRunner } from "./utilis/jsxRunner";
+export { JsxRunner } from "./utils/jsxRunner";

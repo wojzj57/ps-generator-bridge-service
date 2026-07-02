@@ -1,9 +1,9 @@
 import { join } from "node:path";
 import { describe, it, expect, vi } from "vitest";
 import { ImageModule } from "../src/modules/image";
-import { JsxRunner } from "../src/utilis/jsxRunner";
+import { JsxRunner } from "../src/utils/jsxRunner";
 import { LayerModule } from "../src/modules";
-import type { Logger } from "../src/utilis/logger";
+import type { Logger } from "../src/utils/logger";
 import type { PsBridgeHost } from "../src/plugin";
 import { FakeGenerator, fakeGenerator } from "./fakeGenerator";
 

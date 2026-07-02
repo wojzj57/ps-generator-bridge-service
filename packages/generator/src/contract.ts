@@ -13,7 +13,7 @@ export type { DocumentModuleApi, PsDocument } from "./modules/document";
 export type { ActionModuleApi } from "./modules/action";
 export type { ImageModuleApi, ImageResult, LayerSpec } from "./modules/image";
 export type { CosServiceApi } from "./services/cos";
-export type { JsxRunnerApi } from "./utilis/jsxRunner";
+export type { JsxRunnerApi } from "./utils/jsxRunner";
 export type {
   PhotoshopEvents,
   PhotoshopEventMap,
@@ -21,5 +21,5 @@ export type {
   ImageChangedEvent,
   ImageChangedLayer,
   Bounds,
-} from "./utilis/eventManager";
+} from "./utils/eventManager";
 export type { PsBounds, PsRect } from "./types/ps";

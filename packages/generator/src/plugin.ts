@@ -1,11 +1,11 @@
 import type { PsGenerator, GeneratorMenuChangedEvent } from "./types/generator";
-import type { Logger } from "./utilis/logger";
+import type { Logger } from "./utils/logger";
 import { join } from "node:path";
 import { createServer, DEFAULT_PORT, type PsBridgeServer } from "./server";
 import { bootstrap, type BasePlugin, type PluginHost } from "@ps-generator-bridge/sdk/plugin";
-import { loadPlugins } from "./server/pluginLoader";
-import { JsxRunner } from "./utilis/jsxRunner";
-import { EventManager } from "./utilis/eventManager";
+import { loadPlugins } from "./plugins";
+import { JsxRunner } from "./utils/jsxRunner";
+import { EventManager } from "./utils/eventManager";
 import { MODULES, ActionModule, DocumentModule, LayerModule, ImageModule } from "./modules";
 import { CosService } from "./services/cos";
 import { PLUGIN_NAME, PLUGIN_VERSION } from "./meta";

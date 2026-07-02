@@ -1,5 +1,5 @@
 import type { PsGenerator } from "../src/types/generator";
-import type { JsxProgressMessage } from "../src/utilis/jsxRunner";
+import type { JsxProgressMessage } from "../src/utils/jsxRunner";
 interface MenuItem {
   name: string;
   displayName: string;

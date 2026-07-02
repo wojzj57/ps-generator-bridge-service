@@ -3,7 +3,7 @@ import { BaseModule } from "../base";
 import type { PsBridgeHost } from "../../plugin";
 import type { PsGenerator } from "../../types/generator";
 import type { PsBounds, PsPixmap } from "../../types/ps";
-import { Pixmap } from "../../utilis/pixmap";
+import { Pixmap } from "../../utils/pixmap";
 import { ws } from "@ps-generator-bridge/sdk/plugin";
 import { ProtocolMethod, type LayerSpec, type WsImageResult } from "@ps-generator-bridge/sdk";
 import { bridgeError } from "../../errors";

@@ -5,14 +5,14 @@ import type { WebSocket } from "ws";
 import { parseFrame, serializeFrame } from "@ps-generator-bridge/sdk";
 import { Registry } from "./registry";
 import { registerBuiltins } from "./builtins";
-import { PluginManager, type PluginEntry, type PluginInfo } from "./pluginManager";
+import { PluginManager, type PluginEntry, type PluginInfo } from "../plugins";
 import type { ConnectionSession, HandlerContext } from "./dispatch";
-import { ClientStore, type ClientEntry } from "./clientStore";
+import { ClientStore, type ClientEntry } from "../utils/clientStore";
 import { EventHub } from "./eventHub";
-import type { Logger } from "../utilis/logger";
+import type { Logger } from "../utils/logger";
 import type { PsGenerator } from "../types/generator";
-import type { JsxRunnerApi } from "../utilis/jsxRunner";
-import type { EventManager } from "../utilis/eventManager";
+import type { JsxRunnerApi } from "../utils/jsxRunner";
+import type { EventManager } from "../utils/eventManager";
 import { bridgeError } from "../errors";
 
 /** Port the plugin/dev-server fall back to when no port is configured. */

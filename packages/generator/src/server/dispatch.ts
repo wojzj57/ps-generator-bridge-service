@@ -6,7 +6,7 @@ import {
 } from "@ps-generator-bridge/sdk";
 import type { MethodHandler } from "@ps-generator-bridge/sdk/plugin";
 import type { PsGenerator } from "../types/generator";
-import type { JsxRunnerApi } from "../utilis/jsxRunner";
+import type { JsxRunnerApi } from "../utils/jsxRunner";
 import { toProtocolError } from "../errors";
 
 export interface ConnectionSession {

@@ -2,8 +2,8 @@ import { join } from "node:path";
 import { rm, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { describe, it, expect, afterEach } from "vitest";
-import { JsxRunner } from "../src/utilis/jsxRunner";
-import type { Logger } from "../src/utilis/logger";
+import { JsxRunner } from "../src/utils/jsxRunner";
+import type { Logger } from "../src/utils/logger";
 import { fakeGenerator } from "./fakeGenerator";
 
 const silentLogger: Logger = { debug() {}, info() {}, warn() {}, error() {} };

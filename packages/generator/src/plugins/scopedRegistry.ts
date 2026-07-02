@@ -1,7 +1,7 @@
 import type { ResponseEnvelope } from "@ps-generator-bridge/sdk";
 import type { AssemblyTarget, MethodHandler, ApiRouteSpec } from "@ps-generator-bridge/sdk/plugin";
-import { unknownMethodResponse, type HandlerContext } from "./dispatch";
-import { MethodTable } from "./methodTable";
+import { unknownMethodResponse, type HandlerContext } from "../server/dispatch";
+import { MethodTable } from "../server/methodTable";
 
 /**
  * Per-plugin scoped method table (RFC 0004). Implements the SDK AssemblyTarget

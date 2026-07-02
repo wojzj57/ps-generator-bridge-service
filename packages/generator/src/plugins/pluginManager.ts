@@ -1,7 +1,7 @@
 import type { FastifyInstance, HTTPMethods, RouteHandlerMethod } from "fastify";
 import type { BasePlugin, PluginClientBus } from "@ps-generator-bridge/sdk/plugin";
 import { bootstrap } from "@ps-generator-bridge/sdk/plugin";
-import { ClientStore } from "./clientStore";
+import { ClientStore } from "../utils/clientStore";
 import { ScopedRegistry } from "./scopedRegistry";
 
 /** One loaded plugin's runtime state: the instance, its scoped table, its clients. */

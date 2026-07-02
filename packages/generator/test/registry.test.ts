@@ -3,7 +3,7 @@ import Fastify from "fastify";
 import { ProtocolMethod, type MethodName } from "@ps-generator-bridge/sdk";
 import { bridgeError } from "../src/errors";
 import { Registry } from "../src/server/registry";
-import { ScopedRegistry } from "../src/server/scopedRegistry";
+import { ScopedRegistry } from "../src/plugins";
 import { registerBuiltins } from "../src/server/builtins";
 import { fakeGenerator } from "./fakeGenerator";
 
