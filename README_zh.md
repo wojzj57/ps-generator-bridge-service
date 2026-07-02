@@ -67,7 +67,7 @@ pnpm --filter @ps-generator-bridge/testkit typecheck
 3. 从 `pluginsDir` 或 `PS_BRIDGE_PLUGINS_DIR` 加载可选外部插件。
 4. 注册 document、layer、action、image、JSX、event 等内置能力。
 
-SDK 默认连接 `ws://127.0.0.1:7700/ws`。
+SDK 默认使用 `ws://127.0.0.1:7700` 作为服务 base URL，并连接到 `/ws`。
 
 ## 环境变量
 

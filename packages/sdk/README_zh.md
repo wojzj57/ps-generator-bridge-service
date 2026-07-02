@@ -21,18 +21,37 @@ pnpm --filter @ps-generator-bridge/sdk test
 import { Connection } from "@ps-generator-bridge/sdk";
 
 const connection = new Connection({
-  url: "ws://127.0.0.1:7700/ws",
+  url: "ws://127.0.0.1:7700",
 });
 
 await connection.ready();
 const info = await connection.getServerInfo();
 const document = await connection.modules.document.getCurrentDocument();
 
-connection.event.on("imageChanged", (event) => {
+connection.on("imageChanged", (event) => {
   console.log(event.id, event.layers);
 });
 
 connection.close();
+```
+
+使用静态 HTTP helper 查询服务级信息：
+
+```ts
+const status = await Connection.status();
+const plugins = await Connection.plugins();
+```
+
+需要调用插件私有方法或监听插件事件时，按插件 id 创建 endpoint 连接：
+
+```ts
+const paint = new Connection("paint");
+
+paint.on("paint:changed", (event) => {
+  console.log(event);
+});
+
+await paint.invoke("paint:createSession", { documentId: 1 });
 ```
 
 Node 18-21 没有全局 `WebSocket`，需要注入实现：
@@ -42,18 +61,31 @@ import { Connection } from "@ps-generator-bridge/sdk";
 import WebSocket from "ws";
 
 const connection = new Connection({
-  url: "ws://127.0.0.1:7700/ws",
+  url: "ws://127.0.0.1:7700",
   WebSocket: WebSocket as unknown as typeof globalThis.WebSocket,
 });
 ```
 
 ## 公共接口
 
-- `Connection` 是当前推荐的客户端门面，负责重连、稳定 `clientId`、请求关联、事件、JSX 执行、插件发现和内置模块。
+- `Connection` 是当前推荐的客户端门面，负责重连、稳定 `clientId`、请求关联、事件、JSX 执行和内置模块。
+- `new Connection()` 连接默认 root 服务 URL，`new Connection(options)` 接收 root 服务 URL，`new Connection(pluginId)` 连接插件 endpoint，`new Connection(pluginId, options)` 同时指定两者。
+- `connection.endpoint` 表示当前连接指向 root endpoint 还是插件 endpoint。
+- `connection.clientId` 在握手后暴露服务端分配的 client id。
+- `Connection.status()` 查询 `/health`；`Connection.plugins()` 查询 `/plugins`。
+- `connection.on()`、`connection.once()`、`connection.off()` 通过协议订阅和取消订阅服务端事件。
+- 插件私有 API 通过插件 endpoint 连接上的 `connection.invoke(...)` 调用。
+- `connection.jsx` 执行协议暴露的远程 JSX 方法。插件作者仍应使用 `BasePlugin` 上下文提供的插件作用域 helper。
 - `RawConnection` 提供更底层的强类型 `invoke()` 和事件订阅。
 - `PsBridgeClient` 为兼容旧调用方保留，已废弃，推荐迁移到 `Connection`。
 - `createWebSocketTransport` 和 `Transport` 是测试与自定义运行时使用的传输层 seam。
 - `@ps-generator-bridge/sdk/plugin` 导出插件开发原语（`BasePlugin`、`ws`、`api`、`bootstrap`）以及 type-only 的宿主契约。
+
+旧门面的 breaking changes：
+
+- `options.url` 现在是服务 base URL，例如 `ws://127.0.0.1:7700`；SDK 会追加 `/ws` 或 `/ws/{pluginId}`。
+- `connection.id` 已移除。请使用 `connection.clientId`。
+- `connection.plugin` 已移除。发现插件用 `Connection.plugins()`，调用插件 endpoint 用 `new Connection(pluginId)`。
 
 ## 协议契约
 
@@ -83,8 +115,9 @@ const connection = new Connection({
 - `layer.getLayerInfoByIndex(layerIndex, options?)`
 - `action.autoCutout()`
 - `action.removeBackground()`
-
-Image export 方法已经在协议中定义；在公开门面补齐之前，可通过 `RawConnection.invoke()` 调用。
+- `image.exportLayer(params)`
+- `image.getPreview(params)`
+- `image.exportDocument(params)`
 
 ## 插件开发
 

@@ -67,7 +67,7 @@ The generator package is loaded by `generator-core` through its CommonJS `main.j
 3. Loads optional external plugins from `pluginsDir` or `PS_BRIDGE_PLUGINS_DIR`.
 4. Registers built-in modules for document, layer, action, image, JSX, and event methods.
 
-The SDK connects to `ws://127.0.0.1:7700/ws` by default.
+The SDK uses `ws://127.0.0.1:7700` as the default service base URL and connects to `/ws`.
 
 ## Environment Variables
 

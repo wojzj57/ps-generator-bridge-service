@@ -21,18 +21,37 @@ pnpm --filter @ps-generator-bridge/sdk test
 import { Connection } from "@ps-generator-bridge/sdk";
 
 const connection = new Connection({
-  url: "ws://127.0.0.1:7700/ws",
+  url: "ws://127.0.0.1:7700",
 });
 
 await connection.ready();
 const info = await connection.getServerInfo();
 const document = await connection.modules.document.getCurrentDocument();
 
-connection.event.on("imageChanged", (event) => {
+connection.on("imageChanged", (event) => {
   console.log(event.id, event.layers);
 });
 
 connection.close();
+```
+
+Use static HTTP helpers for service-level discovery:
+
+```ts
+const status = await Connection.status();
+const plugins = await Connection.plugins();
+```
+
+Create plugin endpoint connections by plugin id when you need plugin-private methods or events:
+
+```ts
+const paint = new Connection("paint");
+
+paint.on("paint:changed", (event) => {
+  console.log(event);
+});
+
+await paint.invoke("paint:createSession", { documentId: 1 });
 ```
 
 Node 18-21 do not provide a global `WebSocket`. Inject one when needed:
@@ -42,18 +61,31 @@ import { Connection } from "@ps-generator-bridge/sdk";
 import WebSocket from "ws";
 
 const connection = new Connection({
-  url: "ws://127.0.0.1:7700/ws",
+  url: "ws://127.0.0.1:7700",
   WebSocket: WebSocket as unknown as typeof globalThis.WebSocket,
 });
 ```
 
 ## Public Surface
 
-- `Connection` is the current public client facade. It manages reconnects, stable `clientId`, request correlation, events, JSX execution, plugin discovery, and built-in modules.
+- `Connection` is the current public client facade. It manages reconnects, stable `clientId`, request correlation, events, JSX execution, and built-in modules.
+- `new Connection()` connects to the default root service URL, `new Connection(options)` accepts a root service URL, `new Connection(pluginId)` connects to a plugin endpoint, and `new Connection(pluginId, options)` combines both.
+- `connection.endpoint` reports whether the connection targets the root endpoint or a plugin endpoint.
+- `connection.clientId` exposes the server-assigned client id after the handshake.
+- `Connection.status()` queries `/health`; `Connection.plugins()` queries `/plugins`.
+- `connection.on()`, `connection.once()`, and `connection.off()` subscribe and unsubscribe server events through the protocol.
+- Plugin-private APIs stay on the plugin endpoint connection through `connection.invoke(...)`.
+- `connection.jsx` executes remote protocol-exposed JSX methods. Plugin authors should continue to use plugin-scoped helpers from their `BasePlugin` context.
 - `RawConnection` exposes lower-level typed `invoke()` and event subscription.
 - `PsBridgeClient` is retained for compatibility and is deprecated in favor of `Connection`.
 - `createWebSocketTransport` and `Transport` are the injected transport seam used by tests and custom runtimes.
 - `@ps-generator-bridge/sdk/plugin` exports plugin authoring primitives (`BasePlugin`, `ws`, `api`, `bootstrap`) and type-only host contracts.
+
+Breaking changes from the old facade:
+
+- `options.url` is now the service base URL, for example `ws://127.0.0.1:7700`; the SDK appends `/ws` or `/ws/{pluginId}`.
+- `connection.id` was removed. Use `connection.clientId`.
+- `connection.plugin` was removed. Use `Connection.plugins()` for discovery and `new Connection(pluginId)` for plugin endpoint calls.
 
 ## Protocol Contract
 
@@ -83,8 +115,9 @@ When adding a server capability:
 - `layer.getLayerInfoByIndex(layerIndex, options?)`
 - `action.autoCutout()`
 - `action.removeBackground()`
-
-Image export methods are defined in the protocol and are available through `RawConnection.invoke()` until a public facade is added.
+- `image.exportLayer(params)`
+- `image.getPreview(params)`
+- `image.exportDocument(params)`
 
 ## Plugin Development
 
