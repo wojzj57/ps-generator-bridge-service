@@ -170,7 +170,30 @@ describe("public Connection", () => {
     expect(capturedUrl).toBe("ws://127.0.0.1:7700/ws");
     expect(conn.endpoint).toEqual({ kind: "root" });
     expect("event" in conn).toBe(false);
+    expect("plugin" in conn).toBe(false);
+    // @ts-expect-error plugin facade was removed from public Connection.
+    expect(conn.plugin).toBeUndefined();
     conn.close();
+  });
+
+  it("preserves endpoint-capable instance surfaces on root and plugin connections", () => {
+    const root = harness().conn;
+    const plugin = harness("paint").conn;
+
+    for (const conn of [root, plugin]) {
+      expect(typeof conn.invoke).toBe("function");
+      expect(typeof conn.ready).toBe("function");
+      expect(typeof conn.close).toBe("function");
+      expect(typeof conn.on).toBe("function");
+      expect(typeof conn.once).toBe("function");
+      expect(typeof conn.off).toBe("function");
+      expect(typeof conn.jsx.run).toBe("function");
+      expect(typeof conn.jsx.execute).toBe("function");
+      expect(conn.photoshop).toBeDefined();
+      expect(conn.modules).toBeDefined();
+      expect("plugin" in conn).toBe(false);
+      conn.close();
+    }
   });
 
   it("normalizes root base URLs to /ws endpoints", () => {
@@ -498,21 +521,10 @@ describe("public Connection", () => {
     await expect(name).resolves.toBe("Design.psd");
   });
 
-  it("exposes plugin discovery and typed module wrappers", async () => {
+  it("exposes typed module wrappers", async () => {
     const { conn, transports } = harness();
     const transport = transports[0]!;
     await connect(conn, transport);
-
-    const list = conn.plugin.list();
-    await flush();
-    expect(lastRequest(transport).method).toBe(ProtocolMethod.GetServerInfo);
-    respond(transport, { name: "x", version: "1", plugins: [{ id: "paint" }] });
-    await expect(list).resolves.toEqual([{ id: "paint" }]);
-
-    const has = conn.plugin.has("paint");
-    await flush();
-    respond(transport, { name: "x", version: "1", plugins: [{ id: "paint" }] });
-    await expect(has).resolves.toBe(true);
 
     const layer = conn.modules.layer.getLayerInfo({ id: 7 });
     await flush();

@@ -54,18 +54,6 @@ class PublicJsxRunner implements PsJsxRunner {
   }
 }
 
-class PublicPluginClient {
-  constructor(private readonly getServerInfo: () => Promise<ServerInfo>) {}
-
-  async list(): Promise<PluginInfo[]> {
-    return (await this.getServerInfo()).plugins ?? [];
-  }
-
-  async has(id: string): Promise<boolean> {
-    return (await this.list()).some((plugin) => plugin.id === id);
-  }
-}
-
 class PublicModules {
   readonly layer = {
     getLayerInfo: (params?: ProtocolMethods[typeof ProtocolMethod.LayerGetInfo]["params"]) =>
@@ -103,8 +91,8 @@ class PublicModules {
 }
 
 /**
- * Public root /ws facade. It exposes framework-owned surfaces only: Photoshop
- * events, jsx, Photoshop DOM proxy, plugin discovery, and built-in modules.
+ * Public endpoint-aware facade. It exposes framework-owned surfaces only:
+ * events, jsx, Photoshop DOM proxy, built-in modules, and open-ended invoke.
  */
 export class Connection {
   private readonly raw: RawConnection;
@@ -115,7 +103,6 @@ export class Connection {
 
   readonly jsx: Pick<PublicJsxRunner, "run" | "execute">;
   readonly photoshop: PsPhotoshopProxy;
-  readonly plugin: PublicPluginClient;
   readonly modules: PublicModules;
   readonly endpoint: ConnectionEndpoint;
 
@@ -162,7 +149,6 @@ export class Connection {
     this.jsxClient = new PublicJsxRunner(this.call);
     this.jsx = this.jsxClient;
     this.photoshop = new PsPhotoshopProxy(this.jsxClient);
-    this.plugin = new PublicPluginClient(() => this.getServerInfo());
     this.modules = new PublicModules(this.call);
     this.raw.on("connected", () => {
       const isReconnect = this.hasConnected;
