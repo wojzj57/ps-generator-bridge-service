@@ -23,6 +23,17 @@ export interface ConnectionOptions extends Omit<RawConnectionOptions, "url"> {
   url?: string;
 }
 
+export interface ConnectionHttpOptions {
+  /** Server base URL. Defaults to ws://127.0.0.1:7700. */
+  url?: string;
+  /** Inject fetch for tests or nonstandard runtimes. Defaults to global fetch. */
+  fetch?: typeof fetch;
+}
+
+export type ConnectionStatus =
+  | Readonly<{ ok: true; status: "ok" }>
+  | Readonly<{ ok: false; error: unknown }>;
+
 type Invoker = <M extends MethodName>(
   method: M,
   params: ProtocolMethods[M]["params"]
@@ -127,6 +138,34 @@ export class Connection {
   readonly plugin: PublicPluginClient;
   readonly modules: PublicModules;
   readonly endpoint: ConnectionEndpoint;
+
+  static async status(options: ConnectionHttpOptions = {}): Promise<ConnectionStatus> {
+    try {
+      const url = buildHttpEndpoint(options.url ?? DEFAULT_CONNECTION_URL, "/health");
+      const response = await fetchHttp(url, options.fetch);
+      if (!response.ok) throw httpStatusError(url, response);
+      const body: unknown = await response.json();
+      if (!isHealthResponse(body)) throw new Error(`Malformed response from ${url}`);
+      return { ok: true, status: "ok" };
+    } catch (error) {
+      return { ok: false, error };
+    }
+  }
+
+  static async plugins(options: ConnectionHttpOptions = {}): Promise<PluginInfo[]> {
+    const url = buildHttpEndpoint(options.url ?? DEFAULT_CONNECTION_URL, "/plugins");
+    const response = await fetchHttp(url, options.fetch);
+    if (!response.ok) throw httpStatusError(url, response);
+
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch (error) {
+      throw new Error(`Malformed JSON from ${url}: ${formatError(error)}`);
+    }
+    if (!isPluginsResponse(body)) throw new Error(`Malformed response from ${url}`);
+    return body.plugins;
+  }
 
   constructor();
   constructor(options: ConnectionOptions);
@@ -323,4 +362,61 @@ function buildWebSocketEndpoint(baseUrl: string, endpoint: ConnectionEndpoint): 
     endpoint.kind === "root" ? "/ws" : `/ws/${encodeURIComponent(endpoint.pluginId)}`;
   url.pathname = `${basePath}${endpointPath}`;
   return url.toString();
+}
+
+function buildHttpEndpoint(baseUrl: string, path: `/${string}`): string {
+  const url = new URL(baseUrl);
+  if (url.protocol === "ws:") {
+    url.protocol = "http:";
+  } else if (url.protocol === "wss:") {
+    url.protocol = "https:";
+  } else if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error(`Unsupported connection URL protocol: ${url.protocol}`);
+  }
+
+  const basePath = url.pathname.replace(/\/+$/, "");
+  url.pathname = `${basePath}${path}`;
+  return url.toString();
+}
+
+function resolveFetch(fetchImpl?: typeof fetch): typeof fetch {
+  const resolved = fetchImpl ?? globalThis.fetch;
+  if (typeof resolved !== "function") {
+    throw new Error("Connection HTTP helpers require fetch; pass options.fetch to use this runtime.");
+  }
+  return resolved.bind(globalThis);
+}
+
+async function fetchHttp(url: string, fetchImpl?: typeof fetch): Promise<Response> {
+  try {
+    return await resolveFetch(fetchImpl)(url);
+  } catch (error) {
+    if (error instanceof Error) throw error;
+    throw new Error(`GET ${url} failed: ${formatError(error)}`);
+  }
+}
+
+function httpStatusError(url: string, response: Response): Error {
+  const statusText = response.statusText ? ` ${response.statusText}` : "";
+  return new Error(`GET ${url} failed with HTTP ${response.status}${statusText}`);
+}
+
+function isHealthResponse(value: unknown): value is { status: "ok" } {
+  if (typeof value !== "object" || value === null) return false;
+  return (value as Record<string, unknown>).status === "ok";
+}
+
+function isPluginsResponse(value: unknown): value is { plugins: PluginInfo[] } {
+  if (typeof value !== "object" || value === null) return false;
+  const plugins = (value as Record<string, unknown>).plugins;
+  return Array.isArray(plugins) && plugins.every(isPluginInfo);
+}
+
+function isPluginInfo(value: unknown): value is PluginInfo {
+  if (typeof value !== "object" || value === null) return false;
+  return typeof (value as Record<string, unknown>).id === "string";
+}
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

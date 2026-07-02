@@ -1,9 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { Connection, DEFAULT_CONNECTION_URL, type ConnectionOptions } from "../src/publicConnection";
 import { ProtocolMethod, type RequestEnvelope } from "../src/protocol";
 import { FakeTransport } from "./fakeTransport";
 
 const flush = () => Promise.resolve();
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function harness(
   pluginIdOrOptions?: string | ConnectionOptions,
@@ -40,7 +44,120 @@ function respond(transport: FakeTransport, result: unknown): void {
   transport.emit(JSON.stringify({ id: req.id, ok: true, result }));
 }
 
+function responseJson(body: unknown, init: { status?: number; statusText?: string } = {}): Response {
+  const status = init.status ?? 200;
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: init.statusText ?? "",
+    json: async () => body,
+  } as Response;
+}
+
+function responseJsonError(error: unknown): Response {
+  return {
+    ok: true,
+    status: 200,
+    statusText: "",
+    json: async () => {
+      throw error;
+    },
+  } as unknown as Response;
+}
+
+function fetchHarness(response: Response) {
+  const urls: string[] = [];
+  const fetchImpl: typeof fetch = async (input) => {
+    urls.push(String(input));
+    return response;
+  };
+  return { fetchImpl, urls };
+}
+
 describe("public Connection", () => {
+  it("status fetches /health using the default HTTP base URL", async () => {
+    const { fetchImpl, urls } = fetchHarness(responseJson({ status: "ok" }));
+
+    await expect(Connection.status({ fetch: fetchImpl })).resolves.toEqual({
+      ok: true,
+      status: "ok",
+    });
+    expect(urls).toEqual(["http://127.0.0.1:7700/health"]);
+  });
+
+  it("status converts ws and wss base URLs to HTTP health URLs", async () => {
+    const { fetchImpl, urls } = fetchHarness(responseJson({ status: "ok" }));
+
+    await Connection.status({ url: "ws://host:7700", fetch: fetchImpl });
+    await Connection.status({ url: "wss://secure:7700/", fetch: fetchImpl });
+
+    expect(urls).toEqual(["http://host:7700/health", "https://secure:7700/health"]);
+  });
+
+  it("status returns ok false for fetch, HTTP, and malformed response failures", async () => {
+    const fetchRejects: typeof fetch = async () => {
+      throw new Error("offline");
+    };
+    const httpFailure = fetchHarness(responseJson({ status: "ok" }, { status: 503 }));
+    const malformedJson = fetchHarness(responseJsonError(new Error("bad json")));
+    const malformed = fetchHarness(responseJson({ status: "starting" }));
+
+    await expect(Connection.status({ fetch: fetchRejects })).resolves.toMatchObject({
+      ok: false,
+    });
+    await expect(Connection.status({ fetch: httpFailure.fetchImpl })).resolves.toMatchObject({
+      ok: false,
+    });
+    await expect(Connection.status({ fetch: malformedJson.fetchImpl })).resolves.toMatchObject({
+      ok: false,
+    });
+    await expect(Connection.status({ fetch: malformed.fetchImpl })).resolves.toMatchObject({
+      ok: false,
+    });
+  });
+
+  it("plugins fetches /plugins and returns plugin info", async () => {
+    const { fetchImpl, urls } = fetchHarness(responseJson({ plugins: [{ id: "paint" }] }));
+
+    await expect(Connection.plugins({ fetch: fetchImpl })).resolves.toEqual([{ id: "paint" }]);
+    expect(urls).toEqual(["http://127.0.0.1:7700/plugins"]);
+  });
+
+  it("plugins uses injected fetch and converts HTTP helper protocols", async () => {
+    const { fetchImpl, urls } = fetchHarness(responseJson({ plugins: [] }));
+
+    await Connection.plugins({ url: "https://host:7700/base/", fetch: fetchImpl });
+    await Connection.plugins({ url: "ws://socket:7700", fetch: fetchImpl });
+
+    expect(urls).toEqual(["https://host:7700/base/plugins", "http://socket:7700/plugins"]);
+  });
+
+  it("plugins throws ordinary errors for HTTP and malformed response failures", async () => {
+    const fetchRejects: typeof fetch = async () => {
+      throw "offline";
+    };
+    const httpFailure = fetchHarness(responseJson({ plugins: [] }, { status: 500 }));
+    const malformedJson = fetchHarness(responseJsonError(new Error("bad json")));
+    const malformedShape = fetchHarness(responseJson({ plugins: [{ name: "paint" }] }));
+
+    await expect(Connection.plugins({ fetch: fetchRejects })).rejects.toThrow(/offline/);
+    await expect(Connection.plugins({ fetch: httpFailure.fetchImpl })).rejects.toThrow(
+      /HTTP 500/
+    );
+    await expect(Connection.plugins({ fetch: malformedJson.fetchImpl })).rejects.toThrow(
+      /Malformed JSON/
+    );
+    await expect(Connection.plugins({ fetch: malformedShape.fetchImpl })).rejects.toThrow(
+      /Malformed response/
+    );
+  });
+
+  it("plugins throws an actionable error when fetch is unavailable", async () => {
+    vi.stubGlobal("fetch", undefined);
+
+    await expect(Connection.plugins()).rejects.toThrow(/pass options\.fetch/);
+  });
+
   it("defaults to the root /ws endpoint and does not expose event facade", async () => {
     let capturedUrl = "";
     const conn = new Connection({

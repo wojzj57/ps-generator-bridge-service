@@ -1,5 +1,10 @@
 export { Connection, DEFAULT_CONNECTION_URL } from "./publicConnection";
-export type { ConnectionEndpoint, ConnectionOptions } from "./publicConnection";
+export type {
+  ConnectionEndpoint,
+  ConnectionHttpOptions,
+  ConnectionOptions,
+  ConnectionStatus,
+} from "./publicConnection";
 export { RawConnection } from "./connection";
 export type { RawConnectionOptions } from "./connection";
 export { PsBridgeClient } from "./client";
