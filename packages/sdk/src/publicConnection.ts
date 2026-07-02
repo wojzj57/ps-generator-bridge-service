@@ -12,10 +12,14 @@ import {
 import { RawConnection, type RawConnectionOptions } from "./connection";
 import { PsPhotoshopProxy, type PsJsxRunner } from "./photoshop";
 
-export const DEFAULT_CONNECTION_URL = "ws://127.0.0.1:7700/ws";
+export const DEFAULT_CONNECTION_URL = "ws://127.0.0.1:7700";
+
+export type ConnectionEndpoint =
+  | Readonly<{ kind: "root" }>
+  | Readonly<{ kind: "plugin"; pluginId: string }>;
 
 export interface ConnectionOptions extends Omit<RawConnectionOptions, "url"> {
-  /** Root ws:// URL. Defaults to ws://127.0.0.1:7700/ws. */
+  /** Server base URL. Defaults to ws://127.0.0.1:7700. */
   url?: string;
 }
 
@@ -122,9 +126,18 @@ export class Connection {
   readonly photoshop: PsPhotoshopProxy;
   readonly plugin: PublicPluginClient;
   readonly modules: PublicModules;
+  readonly endpoint: ConnectionEndpoint;
 
-  constructor(options: ConnectionOptions = {}) {
-    this.raw = new RawConnection({ ...options, url: options.url ?? DEFAULT_CONNECTION_URL });
+  constructor();
+  constructor(options: ConnectionOptions);
+  constructor(pluginId: string, options?: ConnectionOptions);
+  constructor(pluginIdOrOptions?: string | ConnectionOptions, options: ConnectionOptions = {}) {
+    const parsed = parseConnectionArgs(pluginIdOrOptions, options);
+    this.endpoint = parsed.endpoint;
+    this.raw = new RawConnection({
+      ...parsed.options,
+      url: buildWebSocketEndpoint(parsed.options.url ?? DEFAULT_CONNECTION_URL, parsed.endpoint),
+    });
     this.call = (method, params) => this.raw.invoke(method, params);
     this.jsxClient = new PublicJsxRunner(this.call);
     this.jsx = this.jsxClient;
@@ -138,7 +151,7 @@ export class Connection {
     });
   }
 
-  get id(): string | undefined {
+  get clientId(): string | undefined {
     return this.raw.id;
   }
 
@@ -277,4 +290,37 @@ export class Connection {
       console.warn(`event unsubscribe failed for ${type}: ${(error as Error).message}`)
     );
   }
+}
+
+function parseConnectionArgs(
+  pluginIdOrOptions: string | ConnectionOptions | undefined,
+  options: ConnectionOptions
+): { endpoint: ConnectionEndpoint; options: ConnectionOptions } {
+  if (typeof pluginIdOrOptions === "string") {
+    return {
+      endpoint: Object.freeze({ kind: "plugin", pluginId: pluginIdOrOptions }),
+      options,
+    };
+  }
+  return {
+    endpoint: Object.freeze({ kind: "root" }),
+    options: pluginIdOrOptions ?? {},
+  };
+}
+
+function buildWebSocketEndpoint(baseUrl: string, endpoint: ConnectionEndpoint): string {
+  const url = new URL(baseUrl);
+  if (url.protocol === "http:") {
+    url.protocol = "ws:";
+  } else if (url.protocol === "https:") {
+    url.protocol = "wss:";
+  } else if (url.protocol !== "ws:" && url.protocol !== "wss:") {
+    throw new Error(`Unsupported connection URL protocol: ${url.protocol}`);
+  }
+
+  const basePath = url.pathname.replace(/\/+$/, "");
+  const endpointPath =
+    endpoint.kind === "root" ? "/ws" : `/ws/${encodeURIComponent(endpoint.pluginId)}`;
+  url.pathname = `${basePath}${endpointPath}`;
+  return url.toString();
 }

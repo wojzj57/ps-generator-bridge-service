@@ -1,13 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { Connection, DEFAULT_CONNECTION_URL } from "../src/publicConnection";
+import { Connection, DEFAULT_CONNECTION_URL, type ConnectionOptions } from "../src/publicConnection";
 import { ProtocolMethod, type RequestEnvelope } from "../src/protocol";
 import { FakeTransport } from "./fakeTransport";
 
 const flush = () => Promise.resolve();
 
-function harness() {
+function harness(
+  pluginIdOrOptions?: string | ConnectionOptions,
+  options: ConnectionOptions = {}
+) {
   const transports: FakeTransport[] = [];
-  const conn = new Connection({
+  const baseOptions = {
     transportFactory: () => {
       const transport = new FakeTransport();
       transports.push(transport);
@@ -15,7 +18,11 @@ function harness() {
     },
     retryDelayMs: 0,
     timeoutMs: 1000,
-  });
+  };
+  const conn =
+    typeof pluginIdOrOptions === "string"
+      ? new Connection(pluginIdOrOptions, { ...baseOptions, ...options })
+      : new Connection({ ...baseOptions, ...pluginIdOrOptions });
   return { conn, transports };
 }
 
@@ -34,7 +41,7 @@ function respond(transport: FakeTransport, result: unknown): void {
 }
 
 describe("public Connection", () => {
-  it("defaults to the root /ws URL and does not expose event facade", async () => {
+  it("defaults to the root /ws endpoint and does not expose event facade", async () => {
     let capturedUrl = "";
     const conn = new Connection({
       transportFactory: (url) => {
@@ -42,9 +49,65 @@ describe("public Connection", () => {
         return new FakeTransport();
       },
     });
-    expect(capturedUrl).toBe(DEFAULT_CONNECTION_URL);
+    expect(DEFAULT_CONNECTION_URL).toBe("ws://127.0.0.1:7700");
+    expect(capturedUrl).toBe("ws://127.0.0.1:7700/ws");
+    expect(conn.endpoint).toEqual({ kind: "root" });
     expect("event" in conn).toBe(false);
     conn.close();
+  });
+
+  it("normalizes root base URLs to /ws endpoints", () => {
+    let capturedUrl = "";
+    const conn = new Connection({
+      url: "http://host:7700/",
+      transportFactory: (url) => {
+        capturedUrl = url;
+        return new FakeTransport();
+      },
+    });
+
+    expect(capturedUrl).toBe("ws://host:7700/ws");
+    expect(conn.endpoint).toEqual({ kind: "root" });
+    conn.close();
+  });
+
+  it("connects plugin constructors to the default /ws/{pluginId} endpoint", () => {
+    let capturedUrl = "";
+    const conn = new Connection("paint", {
+      transportFactory: (url) => {
+        capturedUrl = url;
+        return new FakeTransport();
+      },
+    });
+
+    expect(capturedUrl).toBe("ws://127.0.0.1:7700/ws/paint");
+    expect(conn.endpoint).toEqual({ kind: "plugin", pluginId: "paint" });
+    conn.close();
+  });
+
+  it("normalizes plugin base URLs to /ws/{pluginId} endpoints", () => {
+    let capturedUrl = "";
+    const conn = new Connection("paint", {
+      url: "https://host:7700",
+      transportFactory: (url) => {
+        capturedUrl = url;
+        return new FakeTransport();
+      },
+    });
+
+    expect(capturedUrl).toBe("wss://host:7700/ws/paint");
+    expect(conn.endpoint).toEqual({ kind: "plugin", pluginId: "paint" });
+    conn.close();
+  });
+
+  it("exposes clientId from the handshake without the old id getter", async () => {
+    const { conn, transports } = harness("paint");
+    await connect(conn, transports[0]!, "plugin-client-1");
+
+    expect(conn.clientId).toBe("plugin-client-1");
+    expect("id" in conn).toBe(false);
+    // @ts-expect-error id was removed from public Connection.
+    expect(conn.id).toBeUndefined();
   });
 
   it("exposes direct invoke for typed and custom ws methods", async () => {
