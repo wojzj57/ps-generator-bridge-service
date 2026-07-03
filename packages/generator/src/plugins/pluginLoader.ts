@@ -20,7 +20,7 @@ export interface LoadOptions {
    * `<pluginDir>/jsx`. The loader stays ignorant of jsx scoping — `PsBridgeHost`
    * owns the per-plugin wrapper.
    */
-  hostFor: (pluginDir: string) => PluginHost;
+  hostFor: (pluginDir: string, pluginId: string) => PluginHost;
   /** Plugin ids already taken — enforced unique across the whole load. */
   knownIds: Set<string>;
   logger: Logger;
@@ -100,7 +100,7 @@ type Outcome =
 
 async function loadOne(
   dir: string,
-  hostFor: (pluginDir: string) => PluginHost,
+  hostFor: (pluginDir: string, pluginId: string) => PluginHost,
   taken: Set<string>
 ): Promise<Outcome> {
   // Read + parse package.json.
@@ -161,7 +161,7 @@ async function loadOne(
     return { kind: "skipped", reason: `duplicate id '${id}'` };
   }
   try {
-    const host = hostFor(dir);
+    const host = hostFor(dir, id);
     const plugin = new (S as new (id: string, host: PluginHost) => BasePlugin)(id, host);
     return { kind: "loaded", id, plugin, path: entry };
   } catch (err) {

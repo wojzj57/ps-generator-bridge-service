@@ -36,6 +36,7 @@ export type {
   PsBounds,
   PsRect,
   PhotoshopEvents,
+  PluginEvents,
   PhotoshopEventMap,
   PhotoshopEventListener,
   ImageChangedEvent,
@@ -43,7 +44,6 @@ export type {
   Bounds,
 } from "@ps-generator-bridge/generator/contract";
 
-export type { PluginClientBus } from "./bus";
 export type { AssemblyTarget, MethodHandler, ApiHandler, ApiRouteSpec, HttpMethod } from "./types";
 
 // Photoshop DOM proxy reached through `this.photoshop` on a plugin. The proxy

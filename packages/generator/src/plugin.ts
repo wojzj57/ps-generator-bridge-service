@@ -5,7 +5,7 @@ import { createServer, DEFAULT_PORT, type PsBridgeServer } from "./server";
 import { bootstrap, type BasePlugin, type PluginHost } from "@ps-generator-bridge/sdk/plugin";
 import { loadPlugins } from "./plugins";
 import { JsxRunner } from "./utils/jsxRunner";
-import { EventManager } from "./utils/eventManager";
+import { EventManager, RuntimeEventManager, type PluginEvents } from "./utils/eventManager";
 import { MODULES, ActionModule, DocumentModule, LayerModule, ImageModule } from "./modules";
 import { CosService } from "./services/cos";
 import { PLUGIN_NAME, PLUGIN_VERSION } from "./meta";
@@ -62,6 +62,8 @@ export class PsBridgeHost implements PluginHost {
   private plugins: BasePlugin[] = [];
   private readonly _jsx: JsxRunner;
   private readonly _events: EventManager;
+  private readonly _runtimeEvents: RuntimeEventManager;
+  private readonly _hostEvents: PluginEvents;
   /**
    * Optional object-storage upload service (RFC 0008). Set from the environment
    * at construction — present only when the `PS_BRIDGE_COS_*` fields are configured;
@@ -83,6 +85,8 @@ export class PsBridgeHost implements PluginHost {
     };
     this._jsx = new JsxRunner(generator, logger, overrides?.polyfillsDir);
     this._events = new EventManager(generator);
+    this._runtimeEvents = new RuntimeEventManager(this._events);
+    this._hostEvents = this._runtimeEvents.createPluginFacade("host");
     this.cos = CosService.fromEnv(logger);
     logger.info(this.cos ? "CosService enabled" : "CosService disabled (env incomplete)");
   }
@@ -92,9 +96,9 @@ export class PsBridgeHost implements PluginHost {
     return this._jsx;
   }
 
-  /** Photoshop event subscriptions owned by the host. */
-  get events(): EventManager {
-    return this._events;
+  /** Host event facade. Plugins receive their own facade from `hostFor`. */
+  get events(): PluginEvents {
+    return this._hostEvents;
   }
 
   /**
@@ -105,10 +109,10 @@ export class PsBridgeHost implements PluginHost {
    * still reaches the built-in tree. Passed to `loadPlugins` as the `hostFor`
    * factory; the plugin never sees the concrete `PsBridgeHost`.
    */
-  private hostFor(pluginDir: string): PluginHost {
+  private hostFor(pluginDir: string, pluginId: string): PluginHost {
     return {
       modules: this.modules,
-      events: this._events,
+      events: this._runtimeEvents.createPluginFacade(pluginId),
       jsx: this._jsx.forPlugin(join(pluginDir, "jsx")),
       cos: this.cos,
     };
@@ -137,6 +141,7 @@ export class PsBridgeHost implements PluginHost {
       generator: this.generator,
       jsx: this._jsx,
       events: this._events,
+      runtimeEvents: this._runtimeEvents,
       logger: this.logger,
     });
     this.server = server;
@@ -154,7 +159,7 @@ export class PsBridgeHost implements PluginHost {
       join(__dirname, "..", "plugins");
     const { loaded, skipped } = await loadPlugins({
       pluginsDir,
-      hostFor: (pluginDir) => this.hostFor(pluginDir),
+      hostFor: (pluginDir, pluginId) => this.hostFor(pluginDir, pluginId),
       knownIds: new Set(),
       logger: this.logger,
     });
@@ -177,6 +182,10 @@ export class PsBridgeHost implements PluginHost {
     // after `listen` — so priming here is early enough.
     await this._jsx.init();
     await server.listen();
+    this._runtimeEvents.emitMain("#ready", {
+      port: server.port,
+      plugins: server.pluginManager.list(),
+    });
     this.logger.info(`${PLUGIN_NAME} initialized`);
   }
 
@@ -200,8 +209,17 @@ export class PsBridgeHost implements PluginHost {
 
   /** Stop the WebSocket service (used by tests; PS teardown is process exit). */
   async close(): Promise<void> {
+    this._runtimeEvents.emitMain("#closing", { reason: "host-close" });
+    for (const plugin of [...this.plugins].reverse()) {
+      try {
+        await plugin.onDispose?.();
+      } catch (error) {
+        this.logger.error(`plugin dispose failed: ${plugin.id}`, error);
+      }
+    }
     await this.server?.close();
     this.server = undefined;
+    this._runtimeEvents.dispose();
   }
 }
 

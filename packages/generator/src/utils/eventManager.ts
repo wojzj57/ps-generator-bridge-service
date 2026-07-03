@@ -1,5 +1,8 @@
 import { EventEmitter } from "node:events";
+import { MAIN_EVENTS, type MainEventMap, type MainEventName } from "@ps-generator-bridge/sdk";
+import { bridgeError } from "../errors";
 import type { PsGenerator } from "../types/generator";
+import type { ClientStore } from "./clientStore";
 
 // Photoshop event contract (RFC 0003). The generator owns these payload shapes
 // (they are our own protocol JSON, not Adobe PS DOM objects); the SDK re-exports
@@ -105,6 +108,22 @@ export interface PhotoshopEvents {
   off<K extends keyof PhotoshopEventMap>(event: K, listener: PhotoshopEventListener<K>): this;
 }
 
+export type RuntimeEventListener = (payload: unknown) => void;
+
+export interface PluginEvents {
+  on<K extends keyof PhotoshopEventMap>(event: K, listener: PhotoshopEventListener<K>): this;
+  on<K extends MainEventName>(event: K, listener: (payload: MainEventMap[K]) => void): this;
+  on(type: string, listener: RuntimeEventListener): this;
+  once<K extends keyof PhotoshopEventMap>(event: K, listener: PhotoshopEventListener<K>): this;
+  once<K extends MainEventName>(event: K, listener: (payload: MainEventMap[K]) => void): this;
+  once(type: string, listener: RuntimeEventListener): this;
+  off<K extends keyof PhotoshopEventMap>(event: K, listener: PhotoshopEventListener<K>): this;
+  off<K extends MainEventName>(event: K, listener: (payload: MainEventMap[K]) => void): this;
+  off(type: string, listener: RuntimeEventListener): this;
+  emit(type: string, payload: unknown): boolean;
+  dispose(): void;
+}
+
 type Listener<K extends keyof PhotoshopEventMap> = PhotoshopEventListener<K>;
 
 /** The events callers may listen to — the runtime source for the allowlist. */
@@ -123,6 +142,7 @@ export const PHOTOSHOP_EVENTS: (keyof PhotoshopEventMap)[] = [
 ];
 
 const ALLOWED = new Set<string>(PHOTOSHOP_EVENTS);
+const MAIN = new Set<string>(MAIN_EVENTS);
 
 // EventEmitter's own meta/internal event names, which flow through our
 // newListener/removeListener handlers and must bypass the allowlist guard.
@@ -216,4 +236,275 @@ export class EventManager extends EventEmitter implements PhotoshopEvents {
     this.generator.removePhotoshopEventListener(event, bridge);
     this.bridges.delete(key);
   }
+
+  dispose(): void {
+    for (const [event, bridge] of this.bridges) {
+      this.generator.removePhotoshopEventListener(event, bridge);
+    }
+    this.bridges.clear();
+    this.removeAllListeners();
+  }
+}
+
+export type EventEndpointScope =
+  | Readonly<{ kind: "root" }>
+  | Readonly<{ kind: "plugin"; pluginId: string }>;
+
+export interface RemoteEventSubscription {
+  scope: EventEndpointScope;
+  clientId: string;
+  clients: ClientStore;
+  type: string;
+}
+
+export class EventScope {
+  private readonly emitter = new EventEmitter();
+
+  on(type: string, listener: RuntimeEventListener): this {
+    this.emitter.on(type, listener);
+    return this;
+  }
+
+  once(type: string, listener: RuntimeEventListener): this {
+    this.emitter.once(type, listener);
+    return this;
+  }
+
+  off(type: string, listener: RuntimeEventListener): this {
+    this.emitter.off(type, listener);
+    return this;
+  }
+
+  emit(type: string, payload: unknown): boolean {
+    return this.emitter.emit(type, payload);
+  }
+
+  dispose(): void {
+    this.emitter.removeAllListeners();
+  }
+}
+
+export class RuntimeEventManager {
+  readonly mainScope = new EventScope();
+  private readonly pluginScopes = new Map<string, EventScope>();
+
+  constructor(readonly generatorEvents: EventManager) {}
+
+  createPluginScope(pluginId: string): EventScope {
+    const existing = this.pluginScopes.get(pluginId);
+    if (existing) return existing;
+    const scope = new EventScope();
+    this.pluginScopes.set(pluginId, scope);
+    return scope;
+  }
+
+  getPluginScope(pluginId: string): EventScope | undefined {
+    return this.pluginScopes.get(pluginId);
+  }
+
+  createPluginFacade(pluginId: string): PluginEventFacade {
+    this.createPluginScope(pluginId);
+    return new PluginEventFacade(this, pluginId);
+  }
+
+  subscribeRemote(options: RemoteEventSubscription): void {
+    options.clients.subscribe(options.clientId, options.type, () => this.bindRemote(options));
+  }
+
+  unsubscribeRemote(options: RemoteEventSubscription): void {
+    options.clients.unsubscribe(options.clientId, options.type);
+  }
+
+  emitMain<K extends MainEventName>(type: K, payload: MainEventMap[K]): boolean {
+    return this.mainScope.emit(type, payload);
+  }
+
+  emitPlugin(pluginId: string, type: string, payload: unknown): boolean {
+    return this.createPluginScope(pluginId).emit(type, payload);
+  }
+
+  disposePlugin(pluginId: string): void {
+    const scope = this.pluginScopes.get(pluginId);
+    scope?.dispose();
+    this.pluginScopes.delete(pluginId);
+  }
+
+  dispose(): void {
+    this.mainScope.dispose();
+    for (const scope of this.pluginScopes.values()) scope.dispose();
+    this.pluginScopes.clear();
+    this.generatorEvents.dispose();
+  }
+
+  bindPluginListener(type: string, pluginId: string, listener: RuntimeEventListener): () => void {
+    const target = this.resolvePluginSubscriptionTarget(pluginId, type);
+    onRuntimeTarget(target, type, listener);
+    return () => offRuntimeTarget(target, type, listener);
+  }
+
+  unbindPluginListener(type: string, pluginId: string, listener: RuntimeEventListener): void {
+    offRuntimeTarget(this.resolvePluginSubscriptionTarget(pluginId, type), type, listener);
+  }
+
+  private bindRemote(options: RemoteEventSubscription): () => void {
+    const target = this.resolveRemoteTarget(options.scope, options.type);
+    const listener = (payload: unknown) =>
+      options.clients.emit(options.clientId, options.type, payload);
+    onRuntimeTarget(target, options.type, listener);
+    return () => offRuntimeTarget(target, options.type, listener);
+  }
+
+  private resolveRemoteTarget(scope: EventEndpointScope, type: string): EventScope | EventManager {
+    if (isPhotoshopEvent(type)) return this.generatorEvents;
+    if (isMainEvent(type)) return this.mainScope;
+    if (type.startsWith("#")) {
+      throw bridgeError.badRequest(`unknown main event: ${type}`);
+    }
+    if (scope.kind === "root") {
+      throw bridgeError.badRequest(
+        `plugin event subscription is only available on plugin endpoints: ${type}`
+      );
+    }
+    return this.createPluginScope(scope.pluginId);
+  }
+
+  private resolvePluginSubscriptionTarget(
+    pluginId: string,
+    type: string
+  ): EventScope | EventManager {
+    if (isPhotoshopEvent(type)) return this.generatorEvents;
+    if (isMainEvent(type)) return this.mainScope;
+    if (type.startsWith("#")) {
+      throw bridgeError.badRequest(`unknown main event: ${type}`);
+    }
+    return this.createPluginScope(pluginId);
+  }
+}
+
+export class PluginEventFacade implements PluginEvents {
+  private readonly disposers = new Map<RuntimeEventListener, Map<string, () => void>>();
+  private readonly wrappers = new WeakMap<
+    RuntimeEventListener,
+    Map<string, RuntimeEventListener>
+  >();
+
+  constructor(
+    private readonly runtime: RuntimeEventManager,
+    private readonly pluginId: string
+  ) {}
+
+  on(type: string, listener: RuntimeEventListener): this {
+    this.addDisposer(
+      type,
+      listener,
+      this.runtime.bindPluginListener(type, this.pluginId, listener)
+    );
+    return this;
+  }
+
+  once(type: string, listener: RuntimeEventListener): this {
+    this.removeOnceWrapper(type, listener);
+    const wrapped = (payload: unknown) => {
+      this.off(type, wrapped);
+      listener(payload);
+    };
+    let wrappersByType = this.wrappers.get(listener);
+    if (!wrappersByType) {
+      wrappersByType = new Map();
+      this.wrappers.set(listener, wrappersByType);
+    }
+    wrappersByType.set(type, wrapped);
+    return this.on(type, wrapped);
+  }
+
+  off(type: string, listener: RuntimeEventListener): this {
+    const wrappersByType = this.wrappers.get(listener);
+    const wrapped = wrappersByType?.get(type);
+    wrappersByType?.delete(type);
+    if (wrappersByType?.size === 0) this.wrappers.delete(listener);
+
+    const target = wrapped ?? listener;
+    const disposer = this.removeDisposer(type, target);
+    if (disposer) {
+      disposer();
+    } else {
+      this.runtime.unbindPluginListener(type, this.pluginId, target);
+    }
+    return this;
+  }
+
+  emit(type: string, payload: unknown): boolean {
+    return this.runtime.emitPlugin(this.pluginId, type, payload);
+  }
+
+  dispose(): void {
+    for (const disposersByType of this.disposers.values()) {
+      for (const dispose of disposersByType.values()) dispose();
+    }
+    this.disposers.clear();
+  }
+
+  private addDisposer(type: string, listener: RuntimeEventListener, dispose: () => void): void {
+    let disposersByType = this.disposers.get(listener);
+    if (!disposersByType) {
+      disposersByType = new Map();
+      this.disposers.set(listener, disposersByType);
+    }
+    disposersByType.set(type, dispose);
+  }
+
+  private removeDisposer(type: string, listener: RuntimeEventListener): (() => void) | undefined {
+    const disposersByType = this.disposers.get(listener);
+    const dispose = disposersByType?.get(type);
+    disposersByType?.delete(type);
+    if (disposersByType?.size === 0) this.disposers.delete(listener);
+    return dispose;
+  }
+
+  private removeOnceWrapper(type: string, listener: RuntimeEventListener): void {
+    const wrappersByType = this.wrappers.get(listener);
+    const wrapped = wrappersByType?.get(type);
+    if (!wrapped) return;
+    wrappersByType?.delete(type);
+    if (wrappersByType?.size === 0) this.wrappers.delete(listener);
+    this.off(type, wrapped);
+  }
+}
+
+export function isPhotoshopEvent(type: string): type is keyof PhotoshopEventMap {
+  return ALLOWED.has(type);
+}
+
+export function isMainEvent(type: string): type is MainEventName {
+  return MAIN.has(type);
+}
+
+function onRuntimeTarget(
+  target: EventScope | EventManager,
+  type: string,
+  listener: RuntimeEventListener
+): void {
+  if (target instanceof EventScope) {
+    target.on(type, listener);
+    return;
+  }
+  target.on(
+    type as keyof PhotoshopEventMap,
+    listener as PhotoshopEventListener<keyof PhotoshopEventMap>
+  );
+}
+
+function offRuntimeTarget(
+  target: EventScope | EventManager,
+  type: string,
+  listener: RuntimeEventListener
+): void {
+  if (target instanceof EventScope) {
+    target.off(type, listener);
+    return;
+  }
+  target.off(
+    type as keyof PhotoshopEventMap,
+    listener as PhotoshopEventListener<keyof PhotoshopEventMap>
+  );
 }

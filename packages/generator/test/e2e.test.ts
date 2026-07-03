@@ -1,9 +1,10 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { WebSocket } from "ws";
-import { RawConnection } from "@ps-generator-bridge/sdk";
+import { ProtocolMethod, RawConnection } from "@ps-generator-bridge/sdk";
 import { BasePlugin, ws, bootstrap, type PluginHost } from "@ps-generator-bridge/sdk/plugin";
 import { createServer, type PsBridgeServer } from "../src/server";
 import type { Logger } from "../src/utils/logger";
+import { EventManager, RuntimeEventManager } from "../src/utils/eventManager";
 import { fakeGenerator } from "./fakeGenerator";
 
 const silentLogger: Logger = { debug() {}, info() {}, warn() {}, error() {} };
@@ -15,6 +16,10 @@ class EchoService extends BasePlugin {
   @ws("echo:ping")
   ping(params: { n?: number }): { pong: number } {
     return { pong: params?.n ?? 0 };
+  }
+
+  publish(type: string, data: unknown): boolean {
+    return this.events.emit(type, data);
   }
 }
 
@@ -38,8 +43,14 @@ afterEach(async () => {
 
 describe("end-to-end: Connection <-> per-plugin server", () => {
   it("handshakes on /ws/{id}, invokes scoped + fallback methods, and receives plugin events", async () => {
-    server = createServer({ port: 0, generator: fakeGenerator(), logger: silentLogger });
-    server.pluginManager.register(new EchoService("echo", {} as unknown as PluginHost));
+    const generator = fakeGenerator();
+    const events = new RuntimeEventManager(new EventManager(generator));
+    server = createServer({ port: 0, generator, runtimeEvents: events, logger: silentLogger });
+    server.pluginManager.register(
+      new EchoService("echo", {
+        events: events.createPluginFacade("echo"),
+      } as unknown as PluginHost)
+    );
     bootstrap(new GreetModule(), server.registry);
     await server.listen();
 
@@ -63,9 +74,10 @@ describe("end-to-end: Connection <-> per-plugin server", () => {
     const info = await conn.invoke("getServerInfo", {});
     expect(info).toMatchObject({ psVersion: "26.0.0", plugins: [{ id: "echo" }] });
 
-    // a plugin broadcast reaches only that plugin's connected client
+    // plugin events are delivered after an explicit protocol subscription
+    await conn.invoke(ProtocolMethod.EventSubscribe, { type: "tick" });
     const broadcastSeen = new Promise((resolve) => conn!.on("tick", resolve));
-    server.pluginManager.get("echo")!.plugin.broadcast("tick", { n: 7 });
+    (server.pluginManager.get("echo")!.plugin as EchoService).publish("tick", { n: 7 });
     expect(await broadcastSeen).toEqual({ n: 7 });
   });
 });

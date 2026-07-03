@@ -6,8 +6,13 @@ export interface ClientEntry {
   clientId: string;
   socket: WebSocket;
   connectedAt: number;
-  /** Event types this client subscribed to. Reserved; not yet filtered on. */
-  subscriptions: Set<string>;
+  /** Event subscriptions owned by this logical clientId. Preserved on reconnect. */
+  subscriptions: Map<string, ClientSubscription>;
+}
+
+export interface ClientSubscription {
+  type: string;
+  dispose: () => void;
 }
 
 /**
@@ -25,7 +30,7 @@ export class ClientStore {
    */
   add(clientId: string, socket: WebSocket): ClientEntry {
     const existing = this.clients.get(clientId);
-    const subscriptions = existing?.subscriptions ?? new Set<string>();
+    const subscriptions = existing?.subscriptions ?? new Map<string, ClientSubscription>();
     const entry: ClientEntry = { clientId, socket, connectedAt: Date.now(), subscriptions };
     // Replace the entry first, then close the old socket: its `close` handler runs
     // `remove(clientId, oldSocket)`, which is now a no-op because the entry already
@@ -54,18 +59,29 @@ export class ClientStore {
     return undefined;
   }
 
-  subscribe(clientId: string, type: string): boolean {
+  subscribe(clientId: string, type: string, bind: () => () => void): boolean {
     const entry = this.clients.get(clientId);
     if (!entry || entry.subscriptions.has(type)) return false;
-    entry.subscriptions.add(type);
+    const dispose = bind();
+    entry.subscriptions.set(type, { type, dispose });
     return true;
   }
 
   unsubscribe(clientId: string, type: string): boolean {
     const entry = this.clients.get(clientId);
-    if (!entry || !entry.subscriptions.has(type)) return false;
+    const subscription = entry?.subscriptions.get(type);
+    if (!entry || !subscription) return false;
+    subscription.dispose();
     entry.subscriptions.delete(type);
     return true;
+  }
+
+  releaseSubscriptions(entry: ClientEntry | undefined): void {
+    if (!entry) return;
+    for (const subscription of entry.subscriptions.values()) {
+      subscription.dispose();
+    }
+    entry.subscriptions.clear();
   }
 
   /** Push an Event to one client (no-op if it is not connected). */
@@ -73,22 +89,6 @@ export class ClientStore {
     const entry = this.clients.get(clientId);
     if (entry) {
       sendEvent(entry.socket, type, data);
-    }
-  }
-
-  /** Push an Event to every connected client. */
-  broadcast(type: string, data: unknown): void {
-    for (const entry of this.clients.values()) {
-      sendEvent(entry.socket, type, data);
-    }
-  }
-
-  /** Push an Event only to clients subscribed to that Event type. */
-  broadcastSubscribed(type: string, data: unknown): void {
-    for (const entry of this.clients.values()) {
-      if (entry.subscriptions.has(type)) {
-        sendEvent(entry.socket, type, data);
-      }
     }
   }
 }

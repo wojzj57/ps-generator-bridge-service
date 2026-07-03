@@ -42,7 +42,7 @@ export function registerBuiltins(registry: Registry, plugins: () => PluginInfo[]
   });
   registry.registerMethod(ProtocolMethod.EventSubscribe, async (params, ctx) => {
     const context = ctx as HandlerContext;
-    if (!context.session) throw badRequest("event subscription is only available on /ws");
+    if (!context.session) throw badRequest("event subscription session is not available");
     const { type } = params as { type?: unknown };
     if (typeof type !== "string") throw badRequest("type is required");
     context.session.subscribe(type);
@@ -50,7 +50,7 @@ export function registerBuiltins(registry: Registry, plugins: () => PluginInfo[]
   });
   registry.registerMethod(ProtocolMethod.EventUnsubscribe, async (params, ctx) => {
     const context = ctx as HandlerContext;
-    if (!context.session) throw badRequest("event subscription is only available on /ws");
+    if (!context.session) throw badRequest("event subscription session is not available");
     const { type } = params as { type?: unknown };
     if (typeof type !== "string") throw badRequest("type is required");
     context.session.unsubscribe(type);

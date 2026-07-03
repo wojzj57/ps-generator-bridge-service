@@ -3,6 +3,7 @@ import {
   serializeFrame,
   parseFrame,
   PROTOCOL_VERSION,
+  MAIN_EVENTS,
   ProtocolMethod,
   ErrorCode,
   isRequest,
@@ -10,6 +11,7 @@ import {
   isEvent,
   type ProtocolError,
   type ProtocolMethods,
+  type ProtocolEvents,
   type ErrorSource,
 } from "../src/protocol";
 
@@ -47,6 +49,18 @@ describe("protocol", () => {
 
     expect(subscribe.type).toBe("paint:changed");
     expect(main.type).toBe("#ready");
+  });
+
+  it("models main plugin events in ProtocolEvents", () => {
+    const ready: ProtocolEvents["#ready"] = {
+      port: 7700,
+      plugins: [{ id: "paint" }],
+    };
+    const closing: ProtocolEvents["#closing"] = { reason: "host-close" };
+
+    expect(MAIN_EVENTS).toEqual(["#ready", "#closing"]);
+    expect(ready.plugins[0]?.id).toBe("paint");
+    expect(closing.reason).toBe("host-close");
   });
 
   it("keeps plugin-specific error codes out of the server-level catalog", () => {

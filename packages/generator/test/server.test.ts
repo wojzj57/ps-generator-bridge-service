@@ -3,7 +3,7 @@ import WebSocket from "ws";
 import { ProtocolMethod } from "@ps-generator-bridge/sdk";
 import { createServer, type PsBridgeServer } from "../src/server";
 import { BasePlugin, ws, api, bootstrap, type PluginHost } from "@ps-generator-bridge/sdk/plugin";
-import { EventManager } from "../src/utils/eventManager";
+import { EventManager, RuntimeEventManager } from "../src/utils/eventManager";
 import { JsxRunner } from "../src/utils/jsxRunner";
 import type { Logger } from "../src/utils/logger";
 import { fakeGenerator, type FakeGenerator } from "./fakeGenerator";
@@ -28,6 +28,10 @@ class EchoService extends BasePlugin {
   @api("/status")
   async status(): Promise<{ ok: true }> {
     return { ok: true };
+  }
+
+  publish(type: string, data: unknown): boolean {
+    return this.events.emit(type, data);
   }
 }
 
@@ -54,33 +58,46 @@ afterEach(async () => {
  * routes land before `listen()` (fastify requires it). Mirrors the plugin's
  * onInit ordering (RFC 0004).
  */
-async function start(...plugins: BasePlugin[]): Promise<PsBridgeServer> {
-  const s = createServer({ port: 0, generator: fakeGenerator(), logger: silentLogger });
-  for (const svc of plugins) s.pluginManager.register(svc);
+type PluginFixture = BasePlugin | ((events: RuntimeEventManager) => BasePlugin);
+
+async function start(...plugins: PluginFixture[]): Promise<PsBridgeServer> {
+  const generator = fakeGenerator();
+  const events = new RuntimeEventManager(new EventManager(generator));
+  const s = createServer({ port: 0, generator, runtimeEvents: events, logger: silentLogger });
+  for (const svc of plugins) {
+    s.pluginManager.register(typeof svc === "function" ? svc(events) : svc);
+  }
   await s.listen();
   server = s;
   return s;
 }
 
-const echo = () => new EchoService("echo", {} as unknown as PluginHost);
+const echo = (events?: RuntimeEventManager, id = "echo") =>
+  new EchoService(id, {
+    events: events?.createPluginFacade(id),
+  } as unknown as PluginHost);
 
 async function startRoot(): Promise<{
   server: PsBridgeServer;
   generator: FakeGenerator;
+  events: RuntimeEventManager;
 }> {
   const generator = fakeGenerator();
+  const eventManager = new EventManager(generator);
+  const events = new RuntimeEventManager(eventManager);
   const s = createServer({
     port: 0,
     generator,
     jsx: new JsxRunner(generator, silentLogger),
-    events: new EventManager(generator),
+    events: eventManager,
+    runtimeEvents: events,
     logger: silentLogger,
   });
-  s.pluginManager.register(echo());
+  s.pluginManager.register(echo(events));
   bootstrap(new GreetModule(), s.registry);
   await s.listen();
   server = s;
-  return { server: s, generator };
+  return { server: s, generator, events };
 }
 
 /** Connect to /ws/{pluginId} and resolve once the `connected` handshake arrives. */
@@ -212,55 +229,88 @@ describe("per-plugin server (RFC 0004)", () => {
     expect(response).toMatchObject({ id: "4", ok: false, error: { code: "UNKNOWN_METHOD" } });
   });
 
-  it("broadcast reaches every client of the plugin (scoped to /ws/{id})", async () => {
-    const s = await start(echo());
+  it("delivers plugin events only to subscribed clients of the plugin", async () => {
+    const s = await start((events) => echo(events));
     const a = await connect(s.port, "echo");
     const b = await connect(s.port, "echo");
+    await requestOnce(a.ws, {
+      id: "sub-a",
+      method: ProtocolMethod.EventSubscribe,
+      params: { type: "ping" },
+    });
+    await requestOnce(b.ws, {
+      id: "sub-b",
+      method: ProtocolMethod.EventSubscribe,
+      params: { type: "ping" },
+    });
     const gotA = nextEvent(a.ws, "ping");
     const gotB = nextEvent(b.ws, "ping");
-    s.pluginManager.get("echo")!.plugin.broadcast("ping", { n: 1 });
+    (s.pluginManager.get("echo")!.plugin as EchoService).publish("ping", { n: 1 });
     expect((await gotA).data).toEqual({ n: 1 });
     expect((await gotB).data).toEqual({ n: 1 });
   });
 
-  it("send reaches only the targeted client of the plugin", async () => {
-    const s = await start(echo());
+  it("does not deliver plugin events to unsubscribed clients", async () => {
+    const s = await start((events) => echo(events));
     const a = await connect(s.port, "echo", "client-a");
     const b = await connect(s.port, "echo", "client-b");
+    await requestOnce(a.ws, {
+      id: "sub-a",
+      method: ProtocolMethod.EventSubscribe,
+      params: { type: "hey" },
+    });
     let bGotIt = false;
     b.ws.on("message", (data) => {
       if (JSON.parse(String(data)).type === "hey") bGotIt = true;
     });
     const gotA = nextEvent(a.ws, "hey");
-    s.pluginManager.get("echo")!.plugin.send("client-a", "hey", { only: "a" });
-    expect((await gotA).data).toEqual({ only: "a" });
+    (s.pluginManager.get("echo")!.plugin as EchoService).publish("hey", { only: "subscribed" });
+    expect((await gotA).data).toEqual({ only: "subscribed" });
     await new Promise((r) => setTimeout(r, 20));
     expect(bGotIt).toBe(false);
   });
 
-  it("broadcast does not leak to a different plugin's clients", async () => {
-    const s = await start(echo(), new EchoService("other", {} as unknown as PluginHost));
+  it("plugin events do not leak to a different plugin's clients", async () => {
+    const s = await start(
+      (events) => echo(events),
+      (events) => echo(events, "other")
+    );
     const echoClient = await connect(s.port, "echo");
     const otherClient = await connect(s.port, "other");
+    await requestOnce(echoClient.ws, {
+      id: "sub-echo",
+      method: ProtocolMethod.EventSubscribe,
+      params: { type: "ping" },
+    });
+    await requestOnce(otherClient.ws, {
+      id: "sub-other",
+      method: ProtocolMethod.EventSubscribe,
+      params: { type: "ping" },
+    });
     let otherGotIt = false;
     otherClient.ws.on("message", (data) => {
       if (JSON.parse(String(data)).type === "ping") otherGotIt = true;
     });
     const gotEcho = nextEvent(echoClient.ws, "ping");
-    s.pluginManager.get("echo")!.plugin.broadcast("ping", { n: 2 });
+    (s.pluginManager.get("echo")!.plugin as EchoService).publish("ping", { n: 2 });
     expect((await gotEcho).data).toEqual({ n: 2 });
     await new Promise((r) => setTimeout(r, 20));
     expect(otherGotIt).toBe(false);
   });
 
-  it("takes over the entry when the same id reconnects (old socket closed)", async () => {
-    const s = await start(echo());
+  it("takes over the entry when the same id reconnects and preserves subscriptions", async () => {
+    const s = await start((events) => echo(events));
     const first = await connect(s.port, "echo", "dup");
+    await requestOnce(first.ws, {
+      id: "sub",
+      method: ProtocolMethod.EventSubscribe,
+      params: { type: "ping" },
+    });
     const oldClosed = new Promise<void>((resolve) => first.ws.once("close", () => resolve()));
     const second = await connect(s.port, "echo", "dup");
     await oldClosed; // old socket was closed by the takeover
     const got = nextEvent(second.ws, "ping");
-    s.pluginManager.get("echo")!.plugin.broadcast("ping", { n: 3 });
+    (s.pluginManager.get("echo")!.plugin as EchoService).publish("ping", { n: 3 });
     expect((await got).data).toEqual({ n: 3 });
   });
 
@@ -370,26 +420,67 @@ describe("root /ws server", () => {
     expect(generator.listeners.get("imageChanged")).toHaveLength(0);
   });
 
-  it("rejects event subscription on plugin endpoints and unknown root event names", async () => {
-    const { server: s } = await startRoot();
+  it("releases remote subscriptions when a client finally disconnects", async () => {
+    const { server: s, generator } = await startRoot();
+    const imageClient = await connectRoot(s.port, "image-client");
+
+    await requestOnce(imageClient.ws, {
+      id: "release-sub",
+      method: ProtocolMethod.EventSubscribe,
+      params: { type: "imageChanged" },
+    });
+    expect(generator.listeners.get("imageChanged")).toHaveLength(1);
+
+    const closed = new Promise<void>((resolve) => imageClient.ws.once("close", () => resolve()));
+    imageClient.ws.close();
+    await closed;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(generator.listeners.get("imageChanged")).toHaveLength(0);
+  });
+
+  it("supports endpoint-aware event subscriptions and rejects root plugin events", async () => {
+    const { server: s, generator, events } = await startRoot();
     const plugin = await connect(s.port, "echo");
-    const pluginResponse = await requestOnce(plugin.ws, {
+    const pluginPhotoshop = await requestOnce(plugin.ws, {
       id: "8",
       method: ProtocolMethod.EventSubscribe,
       params: { type: "imageChanged" },
     });
-    expect(pluginResponse).toMatchObject({
-      id: "8",
-      ok: false,
-      error: { code: "BAD_REQUEST", message: "event subscription is only available on /ws" },
-    });
+    expect(pluginPhotoshop).toEqual({ id: "8", ok: true, result: { ok: true } });
 
-    const root = await connectRoot(s.port);
-    const unknown = await requestOnce(root.ws, {
+    const gotPluginImage = nextEvent(plugin.ws, "imageChanged");
+    const imagePayload = { version: "1", timeStamp: 1, count: 1, id: 100 };
+    generator.emit("imageChanged", imagePayload);
+    expect((await gotPluginImage).data).toEqual(imagePayload);
+
+    const pluginMain = await requestOnce(plugin.ws, {
       id: "9",
       method: ProtocolMethod.EventSubscribe,
-      params: { type: "nope" },
+      params: { type: "#ready" },
     });
-    expect(unknown).toMatchObject({ id: "9", ok: false });
+    expect(pluginMain).toEqual({ id: "9", ok: true, result: { ok: true } });
+    const gotPluginReady = nextEvent(plugin.ws, "#ready");
+    events.emitMain("#ready", { port: s.port, plugins: [{ id: "echo" }] });
+    expect((await gotPluginReady).data).toEqual({ port: s.port, plugins: [{ id: "echo" }] });
+
+    const root = await connectRoot(s.port);
+    const rootMain = await requestOnce(root.ws, {
+      id: "10",
+      method: ProtocolMethod.EventSubscribe,
+      params: { type: "#ready" },
+    });
+    expect(rootMain).toEqual({ id: "10", ok: true, result: { ok: true } });
+
+    const rootPluginEvent = await requestOnce(root.ws, {
+      id: "11",
+      method: ProtocolMethod.EventSubscribe,
+      params: { type: "paint:changed" },
+    });
+    expect(rootPluginEvent).toMatchObject({
+      id: "11",
+      ok: false,
+      error: { code: "BAD_REQUEST" },
+    });
   });
 });

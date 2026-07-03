@@ -7,10 +7,12 @@ import {
 import type { MethodHandler } from "@ps-generator-bridge/sdk/plugin";
 import type { PsGenerator } from "../types/generator";
 import type { JsxRunnerApi } from "../utils/jsxRunner";
+import type { EventEndpointScope } from "../utils/eventManager";
 import { toProtocolError } from "../errors";
 
 export interface ConnectionSession {
   readonly clientId: string;
+  readonly scope: EventEndpointScope;
   subscribe(type: string): void;
   unsubscribe(type: string): void;
 }

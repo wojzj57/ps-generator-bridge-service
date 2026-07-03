@@ -50,11 +50,11 @@ export interface ProtocolMethods {
     result: unknown;
   };
   [ProtocolMethod.EventSubscribe]: {
-    params: { type: string };
+    params: { type: SubscribableEventName };
     result: { ok: true };
   };
   [ProtocolMethod.EventUnsubscribe]: {
-    params: { type: string };
+    params: { type: SubscribableEventName };
     result: { ok: true };
   };
   // Feature-module methods (ADR 0006). The `Domain:action` namespace mirrors the
@@ -238,6 +238,20 @@ export interface PhotoshopEventMap {
 
 export type PhotoshopEventName = keyof PhotoshopEventMap;
 
+export interface MainEventMap {
+  "#ready": {
+    port: number;
+    plugins: PluginInfo[];
+  };
+  "#closing": {
+    reason: "host-close" | "process-exit";
+  };
+}
+
+export const MAIN_EVENTS = ["#ready", "#closing"] as const;
+export type MainEventName = keyof MainEventMap;
+export type SubscribableEventName = PhotoshopEventName | MainEventName | (string & {});
+
 /** A request envelope sent client -> server. */
 export interface RequestEnvelope<M extends MethodName = MethodName> {
   id: string;
@@ -255,7 +269,7 @@ export type ResponseEnvelope<M extends MethodName = MethodName> =
  * (ADR 0006): declared keys are strongly typed; an undeclared `type` still flows
  * through the looser `on(type: string, ...)` / `EventEnvelope` overloads.
  */
-export interface ProtocolEvents {
+export interface ProtocolEvents extends MainEventMap {
   /** Handshake: the first event after a socket opens, carrying the clientId. */
   connected: { clientId: string };
   workspaceChanged: PhotoshopEventMap["workspaceChanged"];

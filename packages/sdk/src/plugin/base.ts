@@ -1,6 +1,5 @@
 import type { PluginHost } from "./host";
-import type { PluginClientBus } from "./bus";
-import type { JsxRunnerApi, PhotoshopEvents } from "@ps-generator-bridge/generator/contract";
+import type { JsxRunnerApi, PluginEvents } from "@ps-generator-bridge/generator/contract";
 import { PsPhotoshopProxy } from "../photoshop";
 
 // A *global* brand so "extends BasePlugin" can be detected across
@@ -27,10 +26,10 @@ const BASE_PLUGIN_BRAND = Symbol.for("ps-generator-bridge.BasePlugin");
  * plugins (ADR 0006 convention); the assembler's `registerMethod` is a silent
  * `Map.set`, so prefix uniqueness is the developer's responsibility.
  *
- * Client push: `broadcast`/`send` reach only this plugin's own online clients,
- * via the PluginClientBus the server attaches after construction. A subclass
- * may override `onConnect`/`onDisconnect` to react to its clients coming and
- * going; the defaults are no-ops.
+ * Client push goes through `this.events.emit(...)`; remote clients receive only
+ * events they subscribed to through the protocol. A subclass may override
+ * `onConnect`/`onDisconnect` to react to its clients coming and going; the
+ * defaults are no-ops.
  */
 export abstract class BasePlugin {
   /** Stable URL identity of this plugin (read from the class's `static id`). */
@@ -38,7 +37,6 @@ export abstract class BasePlugin {
   /** The abstract plugin contract (never the concrete server plugin). */
   protected readonly plugin: PluginHost;
 
-  private bus: PluginClientBus | undefined;
   private _photoshop: PsPhotoshopProxy | undefined;
 
   constructor(id: string, plugin: PluginHost) {
@@ -62,11 +60,11 @@ export abstract class BasePlugin {
   }
 
   /**
-   * Typed, listen-only Photoshop event stream (shortcut for `this.plugin.events`).
-   * Subscriptions are lazy on the server side: the first `on`/`once` for an event
-   * subscribes upstream, and the last `off` unsubscribes.
+   * Plugin event facade (shortcut for `this.plugin.events`). It listens to
+   * Photoshop events, main plugin events, and this plugin's local event scope;
+   * `emit` always publishes to this plugin's local scope.
    */
-  protected get events(): PhotoshopEvents {
+  protected get events(): PluginEvents {
     return this.plugin.events;
   }
 
@@ -81,30 +79,14 @@ export abstract class BasePlugin {
     return (this._photoshop ??= new PsPhotoshopProxy(this.jsx));
   }
 
-  /**
-   * Attach the per-plugin client bus. Called by the server's assembler after
-   * construction and before `listen`, so `broadcast`/`send` are live by the time
-   * any handler can fire. Not part of the public Plugin authoring API.
-   */
-  _attachBus(bus: PluginClientBus): void {
-    this.bus = bus;
-  }
-
-  /** Push an Event to every online client of this plugin. */
-  broadcast(type: string, data: unknown): void {
-    this.bus?.broadcast(type, data);
-  }
-
-  /** Push an Event to one client of this plugin (no-op if not connected). */
-  send(clientId: string, type: string, data: unknown): void {
-    this.bus?.send(clientId, type, data);
-  }
-
   /** Called after a client handshake registers with this plugin. Default no-op. */
   onConnect(_clientId: string): void {}
 
   /** Called after a client socket is removed from this plugin. Default no-op. */
   onDisconnect(_clientId: string): void {}
+
+  /** Called during host shutdown before event resources are disposed. */
+  onDispose?(): void | Promise<void>;
 }
 
 // Stamp the brand on the prototype (inherited by every subclass) so the loader's

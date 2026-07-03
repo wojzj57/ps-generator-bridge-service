@@ -1,8 +1,9 @@
 import type { FastifyInstance, HTTPMethods, RouteHandlerMethod } from "fastify";
-import type { BasePlugin, PluginClientBus } from "@ps-generator-bridge/sdk/plugin";
+import type { BasePlugin } from "@ps-generator-bridge/sdk/plugin";
 import { bootstrap } from "@ps-generator-bridge/sdk/plugin";
 import { ClientStore } from "../utils/clientStore";
 import { ScopedRegistry } from "./scopedRegistry";
+import type { RuntimeEventManager } from "../utils/eventManager";
 
 /** One loaded plugin's runtime state: the instance, its scoped table, its clients. */
 export interface PluginEntry {
@@ -19,7 +20,7 @@ export interface PluginInfo {
 /**
  * Owns the loaded plugins and their per-plugin runtime state (RFC 0004). Each
  * plugin gets its own scoped method table and ClientStore; `register` wires
- * them up: attaches a PluginClientBus backed by the ClientStore, bootstraps the
+ * them up: creates the plugin event scope, bootstraps the
  * plugin's `@ws`/`@api` metadata into the scoped table, and flushes `@api`
  * routes to fastify under `/{pluginId}/{path}`. All before `listen()`.
  *
@@ -30,7 +31,10 @@ export interface PluginInfo {
 export class PluginManager {
   private readonly plugins = new Map<string, PluginEntry>();
 
-  constructor(private readonly app: FastifyInstance) {}
+  constructor(
+    private readonly app: FastifyInstance,
+    private readonly events?: RuntimeEventManager
+  ) {}
 
   /** All registered plugin ids, in registration order. */
   get ids(): string[] {
@@ -48,8 +52,8 @@ export class PluginManager {
   }
 
   /**
-   * Register a plugin: build its scoped table + ClientStore, attach the client
-   * bus, bootstrap its handlers, and flush its `@api` routes to fastify. Throws
+   * Register a plugin: build its scoped table + ClientStore, create its event
+   * scope, bootstrap its handlers, and flush its `@api` routes to fastify. Throws
    * on a duplicate or illegal id. Must run before `listen()`.
    */
   register(plugin: BasePlugin): PluginEntry {
@@ -63,11 +67,7 @@ export class PluginManager {
 
     const scoped = new ScopedRegistry();
     const clients = new ClientStore();
-    const bus: PluginClientBus = {
-      broadcast: (type, data) => clients.broadcast(type, data),
-      send: (clientId, type, data) => clients.emit(clientId, type, data),
-    };
-    plugin._attachBus(bus);
+    this.events?.createPluginScope(id);
     bootstrap(plugin, scoped);
 
     for (const route of scoped.routes) {

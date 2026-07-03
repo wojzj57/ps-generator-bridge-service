@@ -16,6 +16,7 @@ export type { CosServiceApi } from "./services/cos";
 export type { JsxRunnerApi } from "./utils/jsxRunner";
 export type {
   PhotoshopEvents,
+  PluginEvents,
   PhotoshopEventMap,
   PhotoshopEventListener,
   ImageChangedEvent,

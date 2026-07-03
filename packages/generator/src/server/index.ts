@@ -7,12 +7,11 @@ import { Registry } from "./registry";
 import { registerBuiltins } from "./builtins";
 import { PluginManager, type PluginEntry, type PluginInfo } from "../plugins";
 import type { ConnectionSession, HandlerContext } from "./dispatch";
-import { ClientStore, type ClientEntry } from "../utils/clientStore";
-import { EventHub } from "./eventHub";
+import { ClientStore } from "../utils/clientStore";
 import type { Logger } from "../utils/logger";
 import type { PsGenerator } from "../types/generator";
 import type { JsxRunnerApi } from "../utils/jsxRunner";
-import type { EventManager } from "../utils/eventManager";
+import { EventManager, RuntimeEventManager, type EventEndpointScope } from "../utils/eventManager";
 import { bridgeError } from "../errors";
 
 /** Port the plugin/dev-server fall back to when no port is configured. */
@@ -25,6 +24,7 @@ export interface StartServerOptions {
   generator: PsGenerator;
   jsx?: JsxRunnerApi;
   events?: EventManager;
+  runtimeEvents?: RuntimeEventManager;
   logger: Logger;
 }
 
@@ -60,11 +60,12 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
   const app = Fastify({ logger: false });
   let boundPort = 0;
 
-  const pluginManager = new PluginManager(app);
+  const runtimeEvents =
+    options.runtimeEvents ?? new RuntimeEventManager(events ?? new EventManager(generator));
+  const pluginManager = new PluginManager(app, runtimeEvents);
   const registry = new Registry(app);
   registerBuiltins(registry, () => pluginManager.list());
   const rootClients = new ClientStore();
-  const rootEvents = events ? new EventHub(events, rootClients) : undefined;
 
   app.get("/health", async () => ({ status: "ok" }));
   app.get("/plugins", async () => ({ plugins: pluginManager.list() }));
@@ -81,23 +82,12 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
       logger.info(`client connected: ${clientId} -> root`);
       socket.send(serializeFrame({ type: "connected", data: { clientId } }));
 
-      const session: ConnectionSession = {
+      const session = createEventSession({
         clientId,
-        subscribe: (type) => {
-          const added = rootClients.subscribe(clientId, type);
-          if (!added) return;
-          try {
-            rootEvents?.subscribe(type);
-          } catch (error) {
-            rootClients.unsubscribe(clientId, type);
-            throw error;
-          }
-        },
-        unsubscribe: (type) => {
-          const removed = rootClients.unsubscribe(clientId, type);
-          if (removed) rootEvents?.unsubscribe(type);
-        },
-      };
+        clients: rootClients,
+        events: runtimeEvents,
+        scope: { kind: "root" },
+      });
       const ctx: HandlerContext = { generator, jsx, session };
 
       socket.on("message", (data) => {
@@ -105,7 +95,7 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
       });
       socket.on("close", () => {
         const removed = rootClients.remove(clientId, socket);
-        releaseSubscriptions(removed, rootEvents);
+        rootClients.releaseSubscriptions(removed);
         logger.info(`client disconnected: ${clientId} -> root`);
       });
       socket.on("error", (error) => logger.error("socket error", error));
@@ -132,13 +122,20 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
       logger.info(`client connected: ${clientId} -> plugin ${pluginId}`);
       // First frame after connect is the handshake Event carrying the clientId.
       socket.send(serializeFrame({ type: "connected", data: { clientId } }));
-      const ctx: HandlerContext = { generator, jsx };
+      const session = createEventSession({
+        clientId,
+        clients: entry.clients,
+        events: runtimeEvents,
+        scope: { kind: "plugin", pluginId },
+      });
+      const ctx: HandlerContext = { generator, jsx, session };
 
       socket.on("message", (data) => {
         void handlePluginFrame(socket, String(data), entry, registry, ctx, logger);
       });
       socket.on("close", () => {
-        entry.clients.remove(clientId, socket);
+        const removed = entry.clients.remove(clientId, socket);
+        entry.clients.releaseSubscriptions(removed);
         entry.plugin.onDisconnect(clientId);
         logger.info(`client disconnected: ${clientId} -> plugin ${pluginId}`);
       });
@@ -193,13 +190,6 @@ export async function startServer(options: StartServerOptions): Promise<PsBridge
   return server;
 }
 
-function releaseSubscriptions(entry: ClientEntry | undefined, hub: EventHub | undefined): void {
-  if (!entry || !hub) return;
-  for (const type of entry.subscriptions) {
-    hub.unsubscribe(type);
-  }
-}
-
 async function handlePluginFrame(
   socket: WebSocket,
   data: string,
@@ -227,3 +217,31 @@ async function handlePluginFrame(
 
 // Re-export so callers that previously imported this from here keep working.
 export type { PluginInfo };
+
+function createEventSession(options: {
+  clientId: string;
+  clients: ClientStore;
+  events: RuntimeEventManager;
+  scope: EventEndpointScope;
+}): ConnectionSession {
+  return {
+    clientId: options.clientId,
+    scope: options.scope,
+    subscribe: (type) => {
+      options.events.subscribeRemote({
+        scope: options.scope,
+        clientId: options.clientId,
+        clients: options.clients,
+        type,
+      });
+    },
+    unsubscribe: (type) => {
+      options.events.unsubscribeRemote({
+        scope: options.scope,
+        clientId: options.clientId,
+        clients: options.clients,
+        type,
+      });
+    },
+  };
+}

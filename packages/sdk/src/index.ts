@@ -15,6 +15,7 @@ export { PsBridgeError, isPsBridgeError, isRetryableBridgeError } from "./errors
 export {
   PROTOCOL_VERSION,
   ProtocolMethod,
+  MAIN_EVENTS,
   ErrorCode,
   parseFrame,
   serializeFrame,
@@ -34,6 +35,9 @@ export type {
   ErrorSource,
   ProtocolEvents,
   EventName,
+  MainEventMap,
+  MainEventName,
+  SubscribableEventName,
   EventEnvelope,
   PhotoshopEventMap,
   PhotoshopEventName,

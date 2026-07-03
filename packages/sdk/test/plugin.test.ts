@@ -5,7 +5,6 @@ import {
   api,
   bootstrap,
   type AssemblyTarget,
-  type PluginClientBus,
   type PluginHost,
   type MethodHandler,
   type ApiRouteSpec,
@@ -18,6 +17,13 @@ const fakeHost = {
     run: () => Promise.resolve(),
     execute: () => Promise.resolve(),
     executeBuiltin: () => Promise.resolve(),
+  },
+  events: {
+    on: () => fakeHost.events,
+    once: () => fakeHost.events,
+    off: () => fakeHost.events,
+    emit: () => true,
+    dispose: () => undefined,
   },
   modules: { layer: {}, document: {}, action: {} },
 } as unknown as PluginHost;
@@ -42,23 +48,10 @@ describe("BasePlugin", () => {
     expect(s.id).toBe("test");
   });
 
-  it("broadcast/send delegate to the attached bus", () => {
+  it("does not expose the removed direct push APIs", () => {
     const s = new TestPlugin("test", fakeHost);
-    const calls: string[] = [];
-    const bus: PluginClientBus = {
-      broadcast: (type) => calls.push(`b:${type}`),
-      send: (clientId, type) => calls.push(`s:${clientId}:${type}`),
-    };
-    s._attachBus(bus);
-    s.broadcast("paint_changed", { x: 1 });
-    s.send("c1", "hey", {});
-    expect(calls).toEqual(["b:paint_changed", "s:c1:hey"]);
-  });
-
-  it("broadcast/send are no-ops before the bus is attached", () => {
-    const s = new TestPlugin("test", fakeHost);
-    expect(() => s.broadcast("x", 1)).not.toThrow();
-    expect(() => s.send("c", "x", 1)).not.toThrow();
+    expect("broadcast" in s).toBe(false);
+    expect("send" in s).toBe(false);
   });
 
   it("onConnect/onDisconnect default to no-ops and are overridable", () => {
