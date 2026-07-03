@@ -1,6 +1,6 @@
 {
   "name": "@ps-generator-bridge/testkit",
-  "version": "0.2.0",
+  "version": "0.1.3",
   "description": "Windows Photoshop + generator-core smoke harness for PS Generator Bridge plugins",
   "license": "MIT",
   "author": "wojzj57",

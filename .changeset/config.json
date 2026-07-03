@@ -3,7 +3,7 @@
   "changelog": "@changesets/cli/changelog",
   "commit": false,
   "fixed": [
-    ["@ps-generator-bridge/sdk", "@ps-generator-bridge/generator", "@ps-generator-bridge/testkit"]
+    ["@ps-generator-bridge/sdk", "@ps-generator-bridge/generator"]
   ],
   "linked": [],
   "access": "public",
