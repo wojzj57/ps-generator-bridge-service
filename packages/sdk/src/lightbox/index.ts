@@ -1,4 +1,4 @@
-import { Connection, type ConnectionHttpOptions } from "./publicConnection";
+import { Connection, type ConnectionHttpOptions } from "../publicConnection";
 
 const LIGHTBOX_PHOTOSHOP_URL = "http://arthub.woa.com/blade/shareQywxChat?code=ty3Lp2U7";
 

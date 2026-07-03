@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { RawConnection, type RawConnectionOptions } from "../src/connection";
 import { isPsBridgeError } from "../src/errors";
-import type { Transport } from "../src/transport";
+import type { Transport } from "../src/connection/transport";
 
 /** A transport the test drives by hand: open/fail/recv/drop. */
 class FakeConn implements Transport {

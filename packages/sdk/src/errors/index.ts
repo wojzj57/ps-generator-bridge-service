@@ -1,4 +1,4 @@
-import type { ErrorSource, ProtocolError } from "./protocol";
+import type { ErrorSource, ProtocolError } from "../protocol";
 
 export interface PsBridgeErrorContext {
   requestId?: string;

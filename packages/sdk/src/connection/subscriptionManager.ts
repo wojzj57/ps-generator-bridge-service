@@ -1,4 +1,4 @@
-import { ProtocolMethod } from "./protocol";
+import { ProtocolMethod } from "../protocol";
 
 type EventListener = (data: unknown) => void;
 

@@ -1,4 +1,4 @@
-import { type MethodName, type ProtocolMethods, type ServerInfo } from "./protocol";
+import { type MethodName, type ProtocolMethods, type ServerInfo } from "../protocol";
 import { RequestTracker } from "./requestTracker";
 import { type Transport, createWebSocketTransport } from "./transport";
 

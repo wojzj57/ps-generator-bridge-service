@@ -7,8 +7,8 @@ import {
   parseFrame,
   isEvent,
   type ProtocolError,
-} from "./protocol";
-import { PsBridgeError } from "./errors";
+} from "../protocol";
+import { PsBridgeError } from "../errors";
 import { RequestTracker } from "./requestTracker";
 import { type Transport, createWebSocketTransport } from "./transport";
 

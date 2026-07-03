@@ -4,8 +4,8 @@ import {
   serializeFrame,
   type RequestEnvelope,
   type ResponseEnvelope,
-} from "./protocol";
-import { PsBridgeError } from "./errors";
+} from "../protocol";
+import { PsBridgeError } from "../errors";
 import type { Transport } from "./transport";
 
 interface Pending {

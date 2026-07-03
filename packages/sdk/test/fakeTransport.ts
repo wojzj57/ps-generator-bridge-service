@@ -1,4 +1,4 @@
-import type { Transport } from "../src/transport";
+import type { Transport } from "../src/connection/transport";
 
 /**
  * In-memory Transport that records sent frames and lets a test push responses.

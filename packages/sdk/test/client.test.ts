@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PsBridgeClient } from "../src/client";
+import { PsBridgeClient } from "../src/connection/client";
 import { isPsBridgeError } from "../src/errors";
 import { FakeTransport } from "./fakeTransport";
 import type { RequestEnvelope } from "../src/protocol";

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createWebSocketTransport } from "../src/transport";
+import { createWebSocketTransport } from "../src/connection/transport";
 
 /** Minimal stand-in for a WebSocket implementation, driven by the test. */
 class FakeWS {

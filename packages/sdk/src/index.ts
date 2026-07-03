@@ -9,10 +9,10 @@ export { openPhotoshopOnLightBox } from "./lightbox";
 export type { LightBoxOpener, OpenPhotoshopOnLightBoxOptions } from "./lightbox";
 export { RawConnection } from "./connection";
 export type { RawConnectionOptions } from "./connection";
-export { PsBridgeClient } from "./client";
-export type { PsBridgeClientOptions } from "./client";
-export { createWebSocketTransport } from "./transport";
-export type { Transport } from "./transport";
+export { PsBridgeClient } from "./connection/client";
+export type { PsBridgeClientOptions } from "./connection/client";
+export { createWebSocketTransport } from "./connection/transport";
+export type { Transport } from "./connection/transport";
 export { PsBridgeError, isPsBridgeError, isRetryableBridgeError } from "./errors";
 export {
   PROTOCOL_VERSION,
