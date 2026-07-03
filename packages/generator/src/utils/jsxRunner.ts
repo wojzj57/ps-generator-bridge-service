@@ -1,8 +1,10 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import type { PsGenerator } from "../types/generator";
-import type { Logger } from "./logger";
+import { setGeneratorLogger, useLogger, type Logger } from "@ps-generator-bridge/sdk/plugin";
 import { bridgeError, BridgeError } from "../errors";
+
+const log = useLogger("jsx");
 
 // Prefix a jsx return value uses to signal failure (LightAi BaseManager
 // convention). `JsxRunner.run` / `execute` turn such a value into a thrown
@@ -104,9 +106,11 @@ export class JsxRunner implements JsxRunnerApi {
 
   constructor(
     private readonly generator: PsGenerator,
-    private readonly logger: Logger,
+    logger: Logger,
     private readonly polyfillsDir = join(__dirname, "..", "jsx", "polyfills")
-  ) {}
+  ) {
+    setGeneratorLogger(logger);
+  }
 
   /**
    * A jsx runner scoped to a plugin's own `jsx/` dir (RFC 0005). The returned
@@ -144,7 +148,7 @@ export class JsxRunner implements JsxRunnerApi {
   async init(): Promise<void> {
     const files = await this.collectPolyfillFiles();
     if (files.length === 0) {
-      this.logger.debug("polyfills dir empty, skipping injection");
+      log.debug("polyfills dir empty, skipping injection");
       this.polyfillsCache = "";
       return;
     }
@@ -154,7 +158,7 @@ export class JsxRunner implements JsxRunnerApi {
     if (typeof value === "string" && value.startsWith(ERROR_PREFIX)) {
       throw new Error(value.slice(ERROR_PREFIX.length));
     }
-    this.logger.debug(`polyfills injected: ${files.length} files`);
+    log.debug(`polyfills injected: ${files.length} files`);
   }
 
   /**

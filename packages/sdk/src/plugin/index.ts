@@ -15,6 +15,8 @@
 // Runtime authoring kit (stays in the SDK).
 export { BasePlugin, isBasePluginClass } from "./base";
 export { ws, api, bootstrap } from "./decorators";
+export { setGeneratorLogger, useLogger } from "./logger";
+export type { Logger, LogLevel } from "./logger";
 
 // The one hand-written curation of the host (its member types come from the
 // generator contract).

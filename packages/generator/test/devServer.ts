@@ -9,10 +9,10 @@
 import { startServer, DEFAULT_PORT } from "../src/server";
 import { EventManager } from "../src/utils/eventManager";
 import { JsxRunner } from "../src/utils/jsxRunner";
-import { createLogger } from "../src/utils/logger";
+import { useLogger } from "@ps-generator-bridge/sdk/plugin";
 import { fakeGenerator } from "./fakeGenerator";
 
-const logger = createLogger("dev-server");
+const logger = useLogger("dev-server");
 
 const port = Number(process.env.PS_BRIDGE_PORT ?? DEFAULT_PORT);
 const generator = fakeGenerator();

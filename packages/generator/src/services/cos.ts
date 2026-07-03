@@ -1,7 +1,9 @@
 import COS from "cos-nodejs-sdk-v5";
 import { extname } from "node:path";
-import type { Logger } from "../utils/logger";
+import { setGeneratorLogger, useLogger, type Logger } from "@ps-generator-bridge/sdk/plugin";
 import { bridgeError } from "../errors";
+
+const log = useLogger("cos");
 
 /**
  * Plugin-facing COS contract (RFC 0008). The minimal slice modules and plugins
@@ -47,8 +49,9 @@ export class CosService implements CosServiceApi {
 
   constructor(
     private readonly config: CosConfig,
-    private readonly logger: Logger
+    logger: Logger
   ) {
+    setGeneratorLogger(logger);
     this.cos = new COS({ SecretId: config.secretId, SecretKey: config.secretKey });
   }
 
@@ -117,7 +120,7 @@ export class CosService implements CosServiceApi {
               })
             );
           }
-          this.logger.info(`CosService uploaded object ${key}`);
+          log.info(`CosService uploaded object ${key}`);
           resolve();
         }
       );
@@ -133,7 +136,7 @@ export class CosService implements CosServiceApi {
             return reject(
               bridgeError.cosUploadFailed(err.message ?? String(err), { key, filePath })
             );
-          this.logger.info(`CosService uploaded file ${key}`);
+          log.info(`CosService uploaded file ${key}`);
           resolve();
         }
       );

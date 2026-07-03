@@ -5,7 +5,7 @@ import { bootstrap } from "@ps-generator-bridge/sdk/plugin";
 import { Registry } from "../src/server/registry";
 import { ActionModule } from "../src/modules/action";
 import { JsxRunner } from "../src/utils/jsxRunner";
-import type { Logger } from "../src/utils/logger";
+import type { Logger } from "@ps-generator-bridge/sdk/plugin";
 import type { PsBridgeHost } from "../src/plugin";
 import type { PsGenerator } from "../src/types/generator";
 import { fakeGenerator } from "./fakeGenerator";

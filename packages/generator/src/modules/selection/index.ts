@@ -1,11 +1,13 @@
 import { MainEvent, ProtocolMethod } from "@ps-generator-bridge/sdk";
-import { ws } from "@ps-generator-bridge/sdk/plugin";
+import { useLogger, ws } from "@ps-generator-bridge/sdk/plugin";
 import { BaseModule } from "../base";
 import type { PsBridgeHost } from "../../plugin";
 import type { PsRect } from "../../types/ps";
 
 const SELECTION_ACTION_EVENTS = ["setd", "SbtF", "AddT", "move"] as const;
 const CHANGE_COOLDOWN_MS = 500;
+
+const log = useLogger("selection");
 
 type SelectionActionEvent = (typeof SELECTION_ACTION_EVENTS)[number];
 
@@ -75,7 +77,7 @@ export class SelectionModule extends BaseModule implements SelectionModuleApi {
         events: [...SELECTION_ACTION_EVENTS],
       });
     } catch (error) {
-      this.plugin.logger.warn("selection event registration failed", error);
+      log.warn("selection event registration failed", error);
     }
     this.messageBus = getPhotoshopMessageBus(this.plugin.generator);
     this.messageBus?.on("message", this.onPhotoshopMessage);

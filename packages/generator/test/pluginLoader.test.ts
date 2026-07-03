@@ -6,7 +6,7 @@ import WebSocket from "ws";
 import { loadPlugins, type LoadResult } from "../src/plugins";
 import { createServer, type PsBridgeServer } from "../src/server";
 import type { PluginHost } from "@ps-generator-bridge/sdk/plugin";
-import type { Logger } from "../src/utils/logger";
+import type { Logger } from "@ps-generator-bridge/sdk/plugin";
 import { fakeGenerator } from "./fakeGenerator";
 
 // Plugin packages are CJS; they depend on the published SDK plugin subpath.

@@ -36,6 +36,21 @@ the protocol contract. `generator` depends on `sdk` type-only.
 5. **Tests** are TypeScript via injected seams (`FakeGenerator`, `FakeTransport`); no real Photoshop
    needed for unit tests.
 
+## Logger convention
+
+Logger is part of the plugin authoring surface. Import it only from
+`@ps-generator-bridge/sdk/plugin`, and create a module-level `log`:
+
+```ts
+import { useLogger } from "@ps-generator-bridge/sdk/plugin";
+
+const log = useLogger("selection");
+
+log.warn("selection event registration failed", error);
+```
+
+Do not mix `logger`, `console.*`, or `this.plugin.logger` for module logs.
+
 ## Documentation boundaries
 
 - `docs/` is the public documentation source for GitHub and GitHub Pages.

@@ -8,7 +8,7 @@ import { BaseModule } from "../src/modules/base";
 import { LayerModule, DocumentModule, ActionModule, SelectionModule } from "../src/modules";
 import { JsxRunner } from "../src/utils/jsxRunner";
 import type { PluginHost } from "@ps-generator-bridge/sdk/plugin";
-import type { Logger } from "../src/utils/logger";
+import type { Logger } from "@ps-generator-bridge/sdk/plugin";
 import { fakeGenerator } from "./fakeGenerator";
 
 const silentLogger: Logger = { debug() {}, info() {}, warn() {}, error() {} };

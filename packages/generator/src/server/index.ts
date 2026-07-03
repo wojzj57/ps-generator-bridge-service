@@ -8,11 +8,13 @@ import { registerBuiltins } from "./builtins";
 import { PluginManager, type PluginEntry, type PluginInfo } from "../plugins";
 import type { ConnectionSession, HandlerContext } from "./dispatch";
 import { ClientStore } from "../utils/clientStore";
-import type { Logger } from "../utils/logger";
+import { setGeneratorLogger, useLogger, type Logger } from "@ps-generator-bridge/sdk/plugin";
 import type { PsGenerator } from "../types/generator";
 import type { JsxRunnerApi } from "../utils/jsxRunner";
 import { EventManager, RuntimeEventManager, type EventEndpointScope } from "../utils/eventManager";
 import { bridgeError } from "../errors";
+
+const log = useLogger("server");
 
 /** Port the plugin/dev-server fall back to when no port is configured. */
 export const DEFAULT_PORT = 7700;
@@ -53,10 +55,11 @@ export interface PsBridgeServer {
  * error frame then a close (not a bare 404).
  */
 export function createServer(options: StartServerOptions): PsBridgeServer {
-  const { port, host = "127.0.0.1", generator, jsx, events, logger } = options;
+  const { port, host = "127.0.0.1", generator, jsx, events } = options;
+  setGeneratorLogger(options.logger);
 
-  // Fastify's own pino logger is disabled: all server logging flows through the
-  // injected Logger, keeping one log format and one test seam (ADR 0003).
+  // Fastify's own pino logger is disabled: server logs flow through the bridge
+  // logger, keeping one log format (ADR 0003).
   const app = Fastify({ logger: false });
   let boundPort = 0;
 
@@ -79,7 +82,7 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
       const requested = query?.id;
       const clientId = requested && requested.length > 0 ? requested : randomUUID();
       rootClients.add(clientId, socket);
-      logger.info(`client connected: ${clientId} -> root`);
+      log.info(`client connected: ${clientId} -> root`);
       socket.send(serializeFrame({ type: "connected", data: { clientId } }));
 
       const session = createEventSession({
@@ -91,14 +94,14 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
       const ctx: HandlerContext = { generator, jsx, session };
 
       socket.on("message", (data) => {
-        void handleRootFrame(socket, String(data), registry, ctx, logger);
+        void handleRootFrame(socket, String(data), registry, ctx);
       });
       socket.on("close", () => {
         const removed = rootClients.remove(clientId, socket);
         rootClients.releaseSubscriptions(removed);
-        logger.info(`client disconnected: ${clientId} -> root`);
+        log.info(`client disconnected: ${clientId} -> root`);
       });
-      socket.on("error", (error) => logger.error("socket error", error));
+      socket.on("error", (error) => log.error("socket error", error));
     });
 
     instance.get("/ws/:pluginId", { websocket: true }, (socket: WebSocket, req) => {
@@ -119,7 +122,7 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
       const clientId = requested && requested.length > 0 ? requested : randomUUID();
       entry.clients.add(clientId, socket);
       entry.plugin.onConnect(clientId);
-      logger.info(`client connected: ${clientId} -> plugin ${pluginId}`);
+      log.info(`client connected: ${clientId} -> plugin ${pluginId}`);
       // First frame after connect is the handshake Event carrying the clientId.
       socket.send(serializeFrame({ type: "connected", data: { clientId } }));
       const session = createEventSession({
@@ -131,15 +134,15 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
       const ctx: HandlerContext = { generator, jsx, session };
 
       socket.on("message", (data) => {
-        void handlePluginFrame(socket, String(data), entry, registry, ctx, logger);
+        void handlePluginFrame(socket, String(data), entry, registry, ctx);
       });
       socket.on("close", () => {
         const removed = entry.clients.remove(clientId, socket);
         entry.clients.releaseSubscriptions(removed);
         entry.plugin.onDisconnect(clientId);
-        logger.info(`client disconnected: ${clientId} -> plugin ${pluginId}`);
+        log.info(`client disconnected: ${clientId} -> plugin ${pluginId}`);
       });
-      socket.on("error", (error) => logger.error("socket error", error));
+      socket.on("error", (error) => log.error("socket error", error));
     });
   });
 
@@ -153,7 +156,7 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
       await app.listen({ port, host });
       const address = app.server.address();
       boundPort = typeof address === "object" && address ? address.port : port;
-      logger.info(
+      log.info(
         `PS Generator Bridge server listening on http://${host}:${boundPort} (ws + /health + /plugins)`
       );
     },
@@ -165,14 +168,13 @@ async function handleRootFrame(
   socket: WebSocket,
   data: string,
   registry: Registry,
-  ctx: HandlerContext,
-  logger: Logger
+  ctx: HandlerContext
 ): Promise<void> {
   let parsed: unknown;
   try {
     parsed = parseFrame(data);
   } catch {
-    logger.warn("dropping non-JSON frame");
+    log.warn("dropping non-JSON frame");
     return;
   }
   const response = await registry.dispatch(parsed, ctx);
@@ -195,14 +197,13 @@ async function handlePluginFrame(
   data: string,
   entry: PluginEntry,
   registry: Registry,
-  ctx: HandlerContext,
-  logger: Logger
+  ctx: HandlerContext
 ): Promise<void> {
   let parsed: unknown;
   try {
     parsed = parseFrame(data);
   } catch {
-    logger.warn("dropping non-JSON frame");
+    log.warn("dropping non-JSON frame");
     return;
   }
   // Scoped first, global fallback. tryDispatch returns undefined when no scoped

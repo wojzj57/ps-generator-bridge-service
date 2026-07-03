@@ -5,7 +5,7 @@ import { createServer, type PsBridgeServer } from "../src/server";
 import { BasePlugin, ws, api, bootstrap, type PluginHost } from "@ps-generator-bridge/sdk/plugin";
 import { EventManager, RuntimeEventManager } from "../src/utils/eventManager";
 import { JsxRunner } from "../src/utils/jsxRunner";
-import type { Logger } from "../src/utils/logger";
+import type { Logger } from "@ps-generator-bridge/sdk/plugin";
 import { fakeGenerator, type FakeGenerator } from "./fakeGenerator";
 
 const silentLogger: Logger = {

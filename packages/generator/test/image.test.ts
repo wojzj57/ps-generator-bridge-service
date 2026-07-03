@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { ImageModule } from "../src/modules/image";
 import { JsxRunner } from "../src/utils/jsxRunner";
 import { LayerModule } from "../src/modules";
-import type { Logger } from "../src/utils/logger";
+import type { Logger } from "@ps-generator-bridge/sdk/plugin";
 import type { PsBridgeHost } from "../src/plugin";
 import { FakeGenerator, fakeGenerator } from "./fakeGenerator";
 

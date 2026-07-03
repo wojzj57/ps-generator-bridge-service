@@ -1,8 +1,14 @@
 import type { PsGenerator, GeneratorMenuChangedEvent } from "./types/generator";
-import type { Logger } from "./utils/logger";
 import { join } from "node:path";
 import { createServer, DEFAULT_PORT, type PsBridgeServer } from "./server";
-import { bootstrap, type BasePlugin, type PluginHost } from "@ps-generator-bridge/sdk/plugin";
+import {
+  bootstrap,
+  setGeneratorLogger,
+  useLogger,
+  type BasePlugin,
+  type Logger,
+  type PluginHost,
+} from "@ps-generator-bridge/sdk/plugin";
 import { loadPlugins } from "./plugins";
 import { JsxRunner } from "./utils/jsxRunner";
 import { EventManager, RuntimeEventManager, type PluginEvents } from "./utils/eventManager";
@@ -28,6 +34,7 @@ type BuiltinModuleMainEventName = Exclude<
 const MENU_ID = "psGeneratorBridge";
 const MENU_LABEL = "PS Generator Bridge: Server";
 const MENU_EVENT = "generatorMenuChanged";
+const log = useLogger("ps-bridge");
 
 // Re-exported for callers that imported it from here before the server module
 // owned the default (now defined in ./server).
@@ -88,10 +95,9 @@ export class PsBridgeHost implements PluginHost {
   private constructor(
     public readonly generator: PsGenerator,
     public readonly config: PluginConfig,
-    public readonly logger: Logger,
     overrides?: JsxRunnerOverrides
   ) {
-    this._jsx = new JsxRunner(generator, logger, overrides?.polyfillsDir);
+    this._jsx = new JsxRunner(generator, log, overrides?.polyfillsDir);
     this._events = new EventManager(generator);
     this._runtimeEvents = new RuntimeEventManager(this._events);
     this._hostEvents = this._runtimeEvents.createPluginFacade("host");
@@ -102,8 +108,8 @@ export class PsBridgeHost implements PluginHost {
       image: new MODULES.image(this),
       selection: new MODULES.selection(this),
     };
-    this.cos = CosService.fromEnv(logger);
-    logger.info(this.cos ? "CosService enabled" : "CosService disabled (env incomplete)");
+    this.cos = CosService.fromEnv(log);
+    log.info(this.cos ? "CosService enabled" : "CosService disabled (env incomplete)");
   }
 
   /** Run packaged jsx by name (ADR 0008). Used by modules and other server callers. */
@@ -147,15 +153,16 @@ export class PsBridgeHost implements PluginHost {
     logger: Logger,
     overrides?: JsxRunnerOverrides
   ): Promise<PsBridgeHost> {
-    const host = new PsBridgeHost(generator, config, logger, overrides);
+    setGeneratorLogger(logger);
+    const host = new PsBridgeHost(generator, config, overrides);
     await host.onInit();
     return host;
   }
 
   private async onInit(): Promise<void> {
-    this.logger.info(`${PLUGIN_NAME} v${PLUGIN_VERSION} initializing`);
+    log.info(`${PLUGIN_NAME} v${PLUGIN_VERSION} initializing`);
     this.createMenuItem();
-    const port = this.config.port ?? portFromEnv(this.logger) ?? DEFAULT_PORT;
+    const port = this.config.port ?? portFromEnv() ?? DEFAULT_PORT;
     // Build first, then let modules/plugins register their routes/methods, then
     // listen — fastify requires all HTTP routes before listen (ADR 0006).
     const server = createServer({
@@ -164,7 +171,7 @@ export class PsBridgeHost implements PluginHost {
       jsx: this._jsx,
       events: this._events,
       runtimeEvents: this._runtimeEvents,
-      logger: this.logger,
+      logger: log,
     });
     this.server = server;
     // Plugins are loaded entirely from `pluginsDir`: scan its direct child
@@ -183,9 +190,9 @@ export class PsBridgeHost implements PluginHost {
       pluginsDir,
       hostFor: (pluginDir, pluginId) => this.hostFor(pluginDir, pluginId),
       knownIds: new Set(),
-      logger: this.logger,
+      logger: log,
     });
-    for (const s of skipped) this.logger.warn(`plugin skipped: ${s.path} — ${s.reason}`);
+    for (const s of skipped) log.warn(`plugin skipped: ${s.path} - ${s.reason}`);
     this.plugins = loaded.map((l) => l.plugin);
     // Register every plugin (scoped table + per-plugin ClientStore + bus +
     // /ws/{id} dispatch + prefixed @api) before module bootstrap, so plugin ids
@@ -209,7 +216,7 @@ export class PsBridgeHost implements PluginHost {
       port: server.port,
       plugins: server.pluginManager.list(),
     });
-    this.logger.info(`${PLUGIN_NAME} initialized`);
+    log.info(`${PLUGIN_NAME} initialized`);
   }
 
   private createMenuItem(): void {
@@ -217,7 +224,7 @@ export class PsBridgeHost implements PluginHost {
     this.generator.onPhotoshopEvent(MENU_EVENT, (event: GeneratorMenuChangedEvent) =>
       this.handleMenuClicked(event)
     );
-    this.logger.debug(`menu item registered: ${MENU_ID}`);
+    log.debug(`menu item registered: ${MENU_ID}`);
   }
 
   // "generatorMenuChanged" fires for *every* plugin's menu, so we must filter to
@@ -237,7 +244,7 @@ export class PsBridgeHost implements PluginHost {
       try {
         await plugin.onDispose?.();
       } catch (error) {
-        this.logger.error(`plugin dispose failed: ${plugin.id}`, error);
+        log.error(`plugin dispose failed: ${plugin.id}`, error);
       }
     }
     this.modules.selection.dispose();
@@ -247,11 +254,11 @@ export class PsBridgeHost implements PluginHost {
   }
 }
 
-function portFromEnv(logger: Logger): number | undefined {
+function portFromEnv(): number | undefined {
   const raw = process.env.PS_BRIDGE_PORT;
   if (!raw) return undefined;
   const port = Number(raw);
   if (Number.isInteger(port) && port > 0 && port <= 65535) return port;
-  logger.warn(`ignoring invalid PS_BRIDGE_PORT: ${raw}`);
+  log.warn(`ignoring invalid PS_BRIDGE_PORT: ${raw}`);
   return undefined;
 }

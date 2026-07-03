@@ -8,7 +8,7 @@ import {
   type PluginHost,
 } from "@ps-generator-bridge/sdk/plugin";
 import { isValidPluginId } from "./pluginManager";
-import type { Logger } from "../utils/logger";
+import type { Logger } from "@ps-generator-bridge/sdk/plugin";
 
 export interface LoadOptions {
   /** Directory whose direct child folders are scanned as plugin packages. */
@@ -58,7 +58,7 @@ export interface LoadResult {
  * so a plugin ships with its dependencies installed beside it — the loader adds
  * no resolution machinery of its own.
  *
- * Invalid or broken packages are skipped with a `logger.warn` naming the folder
+ * Invalid or broken packages are skipped with a `log.warn` naming the folder
  * and reason — one bad package never stops the others or the host. A folder with
  * no `package.json`, or a `package.json` with no `main`, is skipped. A missing
  * `pluginsDir` is the default state (no plugins installed) and is a debug log.
@@ -66,7 +66,7 @@ export interface LoadResult {
  * package bundles its own SDK copy.
  */
 export async function loadPlugins(options: LoadOptions): Promise<LoadResult> {
-  const { pluginsDir, hostFor, knownIds, logger } = options;
+  const { pluginsDir, hostFor, knownIds, logger: log } = options;
   const loaded: LoadedPlugin[] = [];
   const skipped: SkippedPlugin[] = [];
   const taken = new Set(knownIds);
@@ -75,7 +75,7 @@ export async function loadPlugins(options: LoadOptions): Promise<LoadResult> {
   try {
     dirs = scanPluginDirs(pluginsDir);
   } catch (err) {
-    logger.debug(`pluginsDir not loaded: ${pluginsDir} (${(err as Error).message})`);
+    log.debug(`pluginsDir not loaded: ${pluginsDir} (${(err as Error).message})`);
     return { loaded, skipped };
   }
 
@@ -85,10 +85,10 @@ export async function loadPlugins(options: LoadOptions): Promise<LoadResult> {
     if (outcome.kind === "loaded") {
       loaded.push({ id: outcome.id, plugin: outcome.plugin, path: outcome.path });
       taken.add(outcome.id);
-      logger.info(`plugin loaded: ${name} (${outcome.id})`);
+      log.info(`plugin loaded: ${name} (${outcome.id})`);
     } else {
       skipped.push({ path: name, code: ErrorCode.PluginLoadFailed, reason: outcome.reason });
-      logger.warn(`plugin skipped: ${name} — ${outcome.reason}`);
+      log.warn(`plugin skipped: ${name} — ${outcome.reason}`);
     }
   }
   return { loaded, skipped };

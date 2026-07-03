@@ -3,7 +3,7 @@ import { WebSocket } from "ws";
 import { ProtocolMethod, RawConnection } from "@ps-generator-bridge/sdk";
 import { BasePlugin, ws, bootstrap, type PluginHost } from "@ps-generator-bridge/sdk/plugin";
 import { createServer, type PsBridgeServer } from "../src/server";
-import type { Logger } from "../src/utils/logger";
+import type { Logger } from "@ps-generator-bridge/sdk/plugin";
 import { EventManager, RuntimeEventManager } from "../src/utils/eventManager";
 import { fakeGenerator } from "./fakeGenerator";
 
