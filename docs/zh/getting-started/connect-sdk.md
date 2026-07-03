@@ -64,3 +64,13 @@ const plugins = await Connection.plugins();
 ```
 
 `Connection.status()` 返回 `{ ok: true, status: "ok" }` 或 `{ ok: false, error }`。`Connection.plugins()` 返回 `PluginInfo[]`，遇到 HTTP、fetch 或响应形状错误时抛出普通 `Error`。
+
+仅在本地 bridge 服务不健康时打开 LightBox Photoshop 入口页：
+
+```ts
+import { openPhotoshopOnLightBox } from "@ps-generator-bridge/sdk";
+
+await openPhotoshopOnLightBox();
+```
+
+`openPhotoshopOnLightBox()` 会先调用 `Connection.status()`。如果 bridge 已经健康，它不会做任何事；否则会在新的浏览器页面中打开 LightBox Photoshop 入口页。

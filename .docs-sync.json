@@ -1,11 +1,6 @@
 {
   "version": 1,
-  "reviewedCommit": "e8eb4257752ff0dab0908942ee6beaedef3c09cb",
+  "reviewedCommit": "c206e203ac135e10ae49477184b688b6eca34fc9",
   "updatedAt": "2026-07-03",
-  "surfaces": [
-    "docs",
-    "README.md",
-    "README_zh.md",
-    "packages/*/README.md"
-  ]
+  "surfaces": ["docs", "README.md", "README_zh.md", "packages/*/README.md"]
 }

@@ -89,3 +89,13 @@ connection.close();
 ```ts
 const plugins = await Connection.plugins();
 ```
+
+LightBox Photoshop 启动能力是独立 helper，不是 `Connection` 方法：
+
+```ts
+import { openPhotoshopOnLightBox } from "@ps-generator-bridge/sdk";
+
+await openPhotoshopOnLightBox();
+```
+
+它会先检查 `Connection.status()`，只有当 status 结果为 `ok: false` 时，才会在新的浏览器页面中打开 LightBox 入口页。

@@ -64,3 +64,13 @@ const plugins = await Connection.plugins();
 ```
 
 `Connection.status()` returns `{ ok: true, status: "ok" }` or `{ ok: false, error }`. `Connection.plugins()` returns `PluginInfo[]` and throws an ordinary `Error` on HTTP, fetch, or response-shape failures.
+
+Open the LightBox Photoshop entry page only when the local bridge server is not healthy:
+
+```ts
+import { openPhotoshopOnLightBox } from "@ps-generator-bridge/sdk";
+
+await openPhotoshopOnLightBox();
+```
+
+`openPhotoshopOnLightBox()` calls `Connection.status()` first. If the bridge is already healthy, it does nothing; otherwise it opens the LightBox Photoshop entry page in a new browser page.

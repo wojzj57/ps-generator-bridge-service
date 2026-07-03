@@ -5,7 +5,12 @@
 根导出：
 
 ```ts
-import { Connection, RawConnection, ProtocolMethod } from "@ps-generator-bridge/sdk";
+import {
+  Connection,
+  RawConnection,
+  ProtocolMethod,
+  openPhotoshopOnLightBox,
+} from "@ps-generator-bridge/sdk";
 ```
 
 重要导出：
@@ -13,6 +18,7 @@ import { Connection, RawConnection, ProtocolMethod } from "@ps-generator-bridge/
 - `Connection`
 - `RawConnection`
 - `DEFAULT_CONNECTION_URL`
+- `openPhotoshopOnLightBox`
 - `createWebSocketTransport`
 - `PsBridgeError`
 - 协议常量和类型
