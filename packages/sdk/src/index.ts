@@ -5,6 +5,8 @@ export type {
   ConnectionOptions,
   ConnectionStatus,
 } from "./publicConnection";
+export { openPhotoshopOnLightBox } from "./lightbox";
+export type { LightBoxOpener, OpenPhotoshopOnLightBoxOptions } from "./lightbox";
 export { RawConnection } from "./connection";
 export type { RawConnectionOptions } from "./connection";
 export { PsBridgeClient } from "./client";
