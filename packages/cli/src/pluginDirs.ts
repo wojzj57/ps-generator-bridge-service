@@ -25,7 +25,7 @@ export async function preparePluginSource(options: HarnessOptions): Promise<Plug
 
   const pluginDir = requireDirectory(options.plugin, "--plugin");
   requirePackageEntry(pluginDir);
-  const tempRoot = mkdtempSync(join(tmpdir(), "ps-bridge-test-"));
+  const tempRoot = mkdtempSync(join(tmpdir(), "ps-generator-bridge-"));
   const pluginsDir = join(tempRoot, "plugins");
   const linkName = safeName(basename(pluginDir));
   const linkPath = join(pluginsDir, linkName);

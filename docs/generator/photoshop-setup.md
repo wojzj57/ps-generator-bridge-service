@@ -25,11 +25,11 @@ The generator package is loaded through its CommonJS `main.js` entry. The export
 
 ## Smoke Harness
 
-Use `@ps-generator-bridge/testkit` on Windows to verify the real Photoshop boot path:
+Use `@ps-generator-bridge/cli` on Windows to verify the real Photoshop boot path:
 
 ```bash
-ps-bridge-test setup
-ps-bridge-test run --plugin ./my-plugin --expect-plugin myPlugin
+ps-generator-bridge setup-core
+ps-generator-bridge run --plugin ./my-plugin --expect-plugin myPlugin
 ```
 
 The harness waits for `/health`, checks `/plugins`, and runs an SDK `getServerInfo` call.

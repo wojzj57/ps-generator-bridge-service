@@ -9,7 +9,7 @@ PS Generator Bridge Service is a monorepo for exposing Photoshop Generator capab
 
 - `@ps-generator-bridge/sdk` is the isomorphic client SDK and the source of truth for the protocol contract.
 - `@ps-generator-bridge/generator` is the Photoshop Generator plugin loaded by Adobe `generator-core`.
-- `@ps-generator-bridge/testkit` is a Windows smoke harness for real Photoshop and `generator-core`.
+- `@ps-generator-bridge/cli` provides command-line tools, including a Windows smoke harness for real Photoshop and `generator-core`.
 
 The generator package depends on the SDK contract type-only. Keep protocol changes in `packages/sdk/src/protocol.ts` first, then implement the server behavior in `packages/generator`.
 
@@ -19,14 +19,14 @@ The generator package depends on the SDK contract type-only. Keep protocol chang
 | -------------------- | -------------------------------------------------------------------- | -------------------------------- |
 | `packages/sdk`       | WebSocket client, protocol types, plugin authoring primitives        | Browser and Node >=18            |
 | `packages/generator` | Photoshop Generator plugin, WebSocket server, module and plugin host | Photoshop bundled Node / Node 18 |
-| `packages/testkit`   | CLI smoke harness for Photoshop + `generator-core`                   | Windows Node >=18                |
+| `packages/cli`       | CLI tools and Photoshop + `generator-core` smoke harness             | Windows Node >=18 for run/dev    |
 
 ## Requirements
 
 - Node.js >=18
 - pnpm 11.5.0
 - Photoshop with Generator and Remote Connections enabled for real Photoshop runs
-- Windows for `@ps-generator-bridge/testkit`
+- Windows for `@ps-generator-bridge/cli` run/dev smoke commands
 
 ## Install
 
@@ -52,7 +52,7 @@ Use package filters for focused work:
 ```bash
 pnpm --filter @ps-generator-bridge/sdk test
 pnpm --filter @ps-generator-bridge/generator test
-pnpm --filter @ps-generator-bridge/testkit typecheck
+pnpm --filter @ps-generator-bridge/cli typecheck
 ```
 
 ## Development Flow
@@ -61,7 +61,7 @@ pnpm --filter @ps-generator-bridge/testkit typecheck
 2. Expose client-facing helpers in the SDK when the method should be public.
 3. Implement server handlers in `packages/generator` modules or built-ins.
 4. Add unit tests with injected seams (`FakeTransport`, `FakeGenerator`) before relying on real Photoshop.
-5. Use the testkit or VSCode launch configs for real Photoshop smoke checks.
+5. Use the CLI smoke harness or VSCode launch configs for real Photoshop smoke checks.
 
 ## Runtime Overview
 

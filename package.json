@@ -30,7 +30,7 @@
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "changeset publish --tag latest",
-    "pack:check": "pnpm --filter @ps-generator-bridge/sdk --filter @ps-generator-bridge/generator --filter @ps-generator-bridge/testkit pack --dry-run"
+    "pack:check": "pnpm --filter @ps-generator-bridge/sdk --filter @ps-generator-bridge/generator --filter @ps-generator-bridge/cli pack --dry-run"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",

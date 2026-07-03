@@ -52,12 +52,12 @@ import type { PluginEvents, JsxRunnerApi } from "@ps-generator-bridge/generator/
 
 The SDK plugin subpath re-exports these types for plugin authors.
 
-## `@ps-generator-bridge/testkit`
+## `@ps-generator-bridge/cli`
 
 CLI binary:
 
 ```bash
-ps-bridge-test
+ps-generator-bridge
 ```
 
-Use it for Windows Photoshop + `generator-core` smoke checks.
+Use it for command-line tooling, including Windows Photoshop + `generator-core` smoke checks. The package does not expose a public import API.

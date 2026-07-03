@@ -49,4 +49,4 @@ pnpm --filter @ps-generator-bridge/generator typecheck
 pnpm --filter @ps-generator-bridge/generator test
 ```
 
-Unit tests should not require real Photoshop. Use real Photoshop only through manual launch configs or the testkit smoke harness.
+Unit tests should not require real Photoshop. Use real Photoshop only through manual launch configs or the CLI smoke harness.

@@ -25,11 +25,11 @@ generator 包通过 CommonJS `main.js` 入口加载。导出的 `init(generator,
 
 ## 冒烟测试工具
 
-在 Windows 上使用 `@ps-generator-bridge/testkit` 验证真实 Photoshop 启动路径：
+在 Windows 上使用 `@ps-generator-bridge/cli` 验证真实 Photoshop 启动路径：
 
 ```bash
-ps-bridge-test setup
-ps-bridge-test run --plugin ./my-plugin --expect-plugin myPlugin
+ps-generator-bridge setup-core
+ps-generator-bridge run --plugin ./my-plugin --expect-plugin myPlugin
 ```
 
 该工具会等待 `/health`，检查 `/plugins`，并执行一次 SDK `getServerInfo` 调用。

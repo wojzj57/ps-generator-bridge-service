@@ -14,7 +14,7 @@ the protocol contract. `generator` depends on `sdk` type-only.
 | -------------------- | -------------------------------- | --------------------------------------------------------------------------------------------- |
 | `packages/sdk`       | `@ps-generator-bridge/sdk`       | Isomorphic client + protocol contract (source of truth). Zero PS/Node coupling, browser-safe. |
 | `packages/generator` | `@ps-generator-bridge/generator` | In-PS Generator plugin + WebSocket service. Loaded by `generator-core`.                       |
-| `packages/testkit`   | `@ps-generator-bridge/testkit`   | Windows PS + `generator-core` smoke harness (CLI `ps-bridge-test`).                           |
+| `packages/cli`       | `@ps-generator-bridge/cli`       | Command-line tools, including Windows PS + `generator-core` smoke harness (CLI `ps-generator-bridge`). |
 
 ## Commands
 

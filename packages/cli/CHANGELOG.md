@@ -1,4 +1,4 @@
-# @ps-generator-bridge/testkit
+# @ps-generator-bridge/cli
 
 ## 0.1.3
 

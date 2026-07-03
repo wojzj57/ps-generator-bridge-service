@@ -21,8 +21,16 @@ _Avoid_: plugin（太泛）、backend、daemon
 _Avoid_: client（指代具体那个 `PsBridgeClient` 类时可用，但勿用它指代整个包）、api
 
 **发布单元（published package）**:
-本仓库中会发布到 npm 的 workspace 包。目前发布单元是 `@ps-generator-bridge/sdk`、`@ps-generator-bridge/generator`、`@ps-generator-bridge/testkit`；根包 `ps-generator-bridge-service` 只作为 monorepo 编排入口，不是发布单元。
+本仓库中会发布到 npm 的 workspace 包。发布单元包括 `@ps-generator-bridge/sdk`、`@ps-generator-bridge/generator`、`@ps-generator-bridge/cli`；根包 `ps-generator-bridge-service` 只作为 monorepo 编排入口，不是发布单元。
 _Avoid_: 把根包称为 npm 包、把 workspace 包和仓库混用
+
+**cli（命令行包）**:
+工作区包 `@ps-generator-bridge/cli`。面向本仓库的命令行入口，承载 Photoshop 启动路径验证等本地开发与运维命令；它是后续新增 CLI 能力的统一发布单元。
+_Avoid_: testkit（仅指旧 smoke harness 包）、scripts（根包脚本只是仓库编排入口）
+
+**smoke harness（冒烟验证套件）**:
+cli 中用于验证真实 Photoshop + generator-core 启动路径的一组命令。它只证明 bridge server 能被加载、发现插件并响应最小 SDK 调用，不代表完整 Photoshop 工作流自动化。
+_Avoid_: integration framework、Photoshop automation
 
 **Release Pipeline（发布流水线）**:
 从已合并的 Git 提交中推导版本变更，更新发布单元版本，构建产物，并把发布单元发布到 npm 的流程。它管理的是“仓库如何产生 npm 版本”，不是运行时 [server](#) 的能力。

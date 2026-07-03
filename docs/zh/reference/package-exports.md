@@ -52,12 +52,12 @@ import type { PluginEvents, JsxRunnerApi } from "@ps-generator-bridge/generator/
 
 SDK 插件子路径会为插件作者重新导出这些类型。
 
-## `@ps-generator-bridge/testkit`
+## `@ps-generator-bridge/cli`
 
 CLI binary：
 
 ```bash
-ps-bridge-test
+ps-generator-bridge
 ```
 
-用于 Windows Photoshop + `generator-core` 冒烟检查。
+用于命令行工具，包括 Windows Photoshop + `generator-core` 冒烟检查。该包不暴露可 import 的公共 API。

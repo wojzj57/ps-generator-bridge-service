@@ -77,7 +77,7 @@ async function withHarness(
 
 function ensureWindows(): void {
   if (process.platform !== "win32") {
-    throw new Error("ps-bridge-test only supports Windows in this version.");
+    throw new Error("ps-generator-bridge only supports Windows for run/dev in this version.");
   }
 }
 

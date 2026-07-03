@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { runDev, runHarness, setupGeneratorCore, type HarnessOptions } from "./core";
 
-type Command = "setup" | "run" | "dev";
+type Command = "setup-core" | "run" | "dev";
 
 interface Parsed {
   command: Command;
@@ -9,13 +9,13 @@ interface Parsed {
 }
 
 const USAGE = `Usage:
-  ps-bridge-test setup [--update]
-  ps-bridge-test run (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core]
-  ps-bridge-test dev (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core]`;
+  ps-generator-bridge setup-core [--update]
+  ps-generator-bridge run (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core]
+  ps-generator-bridge dev (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core]`;
 
 async function main(): Promise<void> {
   const parsed = parseArgs(process.argv.slice(2));
-  if (parsed.command === "setup") {
+  if (parsed.command === "setup-core") {
     await setupGeneratorCore({ update: parsed.options.updateCore ?? parsed.options.update });
     return;
   }
@@ -33,7 +33,7 @@ function parseArgs(args: string[]): Parsed {
   }
 
   const command = args.shift();
-  if (command !== "setup" && command !== "run" && command !== "dev") {
+  if (command !== "setup-core" && command !== "run" && command !== "dev") {
     throw usage(`Unknown command: ${command ?? "(missing)"}`);
   }
 
@@ -74,7 +74,7 @@ function parseArgs(args: string[]): Parsed {
     }
   }
 
-  if (command === "setup") return { command, options };
+  if (command === "setup-core") return { command, options };
   if (options.plugin && options.pluginsDir) {
     throw usage("--plugin and --plugins-dir are mutually exclusive");
   }

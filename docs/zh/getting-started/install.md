@@ -4,14 +4,14 @@ PS Generator Bridge 是一个 monorepo，包含三个发布包：
 
 - `@ps-generator-bridge/sdk`：同构客户端 SDK 和协议契约。
 - `@ps-generator-bridge/generator`：Photoshop Generator 插件和 WebSocket 服务。
-- `@ps-generator-bridge/testkit`：用于 Photoshop 和 `generator-core` 的 Windows 冒烟测试工具。
+- `@ps-generator-bridge/cli`：命令行工具，包括用于 Photoshop 和 `generator-core` 的 Windows 冒烟测试工具。
 
 ## 环境要求
 
 - Node.js 18 或更新版本。
 - 仓库开发使用 pnpm 11.5.0。
 - 真实 Photoshop 运行需要支持 Generator 的 Photoshop。
-- `@ps-generator-bridge/testkit` CLI 仅支持 Windows。
+- `@ps-generator-bridge/cli` 的 run/dev 冒烟命令仅支持 Windows。
 
 ## 仓库安装
 
@@ -57,5 +57,5 @@ pnpm format:check
 ```bash
 pnpm --filter @ps-generator-bridge/sdk test
 pnpm --filter @ps-generator-bridge/generator test
-pnpm --filter @ps-generator-bridge/testkit typecheck
+pnpm --filter @ps-generator-bridge/cli typecheck
 ```

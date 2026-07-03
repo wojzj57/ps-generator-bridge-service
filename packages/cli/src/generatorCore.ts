@@ -1,13 +1,14 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join, parse, resolve } from "node:path";
 
 const REPO = "https://github.com/adobe-photoshop/generator-core";
 
 export function generatorCoreDir(): string {
-  const root = process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local");
-  return join(root, "ps-bridge-test", "generator-core", "master");
+  const workspaceRoot = findWorkspaceRoot(process.cwd());
+  if (workspaceRoot) return join(workspaceRoot, "generator-core");
+  return join(tmpdir(), "ps-generator-bridge", "generator-core");
 }
 
 export async function ensureGeneratorCore(options: { update: boolean }): Promise<void> {
@@ -30,4 +31,14 @@ function run(command: string, args: string[], cwd: string | undefined): void {
     stdio: "inherit",
     shell: process.platform === "win32",
   });
+}
+
+function findWorkspaceRoot(start: string): string | undefined {
+  let current = resolve(start);
+  const root = parse(current).root;
+  while (true) {
+    if (existsSync(join(current, "pnpm-workspace.yaml"))) return current;
+    if (current === root) return undefined;
+    current = dirname(current);
+  }
 }
