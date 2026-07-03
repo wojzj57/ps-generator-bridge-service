@@ -1,5 +1,10 @@
 # `@ps-generator-bridge/generator`
 
+Online documentation:
+
+- English: https://wojzj57.github.io/ps-generator-bridge-service/getting-started/run-generator
+- Chinese: https://wojzj57.github.io/ps-generator-bridge-service/zh/getting-started/run-generator
+
 PS Generator Bridge 的 Photoshop Generator 插件和 WebSocket 服务。该包由 Adobe `generator-core` 在 Photoshop 内置 Node 运行时中加载，并把 Photoshop 操作暴露给 SDK 客户端。
 
 ## 安装

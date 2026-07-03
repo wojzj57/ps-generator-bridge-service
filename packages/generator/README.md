@@ -2,6 +2,11 @@
 
 Photoshop Generator plugin and WebSocket service for PS Generator Bridge. This package is loaded by Adobe `generator-core` inside Photoshop's bundled Node runtime and exposes Photoshop operations to SDK clients.
 
+Online documentation:
+
+- English: https://wojzj57.github.io/ps-generator-bridge-service/getting-started/run-generator
+- Chinese: https://wojzj57.github.io/ps-generator-bridge-service/zh/getting-started/run-generator
+
 Full public documentation lives in the repository docs:
 
 - [Run Generator](../../docs/getting-started/run-generator.md)

@@ -1,5 +1,10 @@
 # PS Generator Bridge Service
 
+[![Docs](https://img.shields.io/badge/docs-online-blue)](https://wojzj57.github.io/ps-generator-bridge-service/)
+
+Documentation: https://wojzj57.github.io/ps-generator-bridge-service/
+Chinese documentation: https://wojzj57.github.io/ps-generator-bridge-service/zh/getting-started/install
+
 PS Generator Bridge Service is a monorepo for exposing Photoshop Generator capabilities over a typed WebSocket protocol.
 
 - `@ps-generator-bridge/sdk` is the isomorphic client SDK and the source of truth for the protocol contract.
@@ -81,6 +86,8 @@ Structured runtime options such as `port` and `pluginsDir` should flow through `
 
 ## Documentation
 
+- Online documentation: https://wojzj57.github.io/ps-generator-bridge-service/
+- Chinese documentation: https://wojzj57.github.io/ps-generator-bridge-service/zh/getting-started/install
 - [docs/README.md](./docs/README.md) is the public documentation entry point for GitHub and GitHub Pages.
 - [docs/getting-started/install.md](./docs/getting-started/install.md) explains setup and prerequisites.
 - [docs/sdk/connection.md](./docs/sdk/connection.md) documents the SDK connection facade.

@@ -2,6 +2,11 @@
 
 Isomorphic TypeScript SDK for PS Generator Bridge. This package is browser-safe, works in Node >=18, and owns the protocol contract shared with the generator server.
 
+Online documentation:
+
+- English: https://wojzj57.github.io/ps-generator-bridge-service/sdk/connection
+- Chinese: https://wojzj57.github.io/ps-generator-bridge-service/zh/sdk/connection
+
 Full public documentation lives in the repository docs:
 
 - [Connection](../../docs/sdk/connection.md)

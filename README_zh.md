@@ -1,5 +1,10 @@
 # PS Generator Bridge Service
 
+[![Docs](https://img.shields.io/badge/docs-online-blue)](https://wojzj57.github.io/ps-generator-bridge-service/)
+
+Documentation: https://wojzj57.github.io/ps-generator-bridge-service/
+Chinese documentation: https://wojzj57.github.io/ps-generator-bridge-service/zh/getting-started/install
+
 PS Generator Bridge Service 是一个把 Photoshop Generator 能力通过类型化 WebSocket 协议暴露出来的 monorepo。
 
 - `@ps-generator-bridge/sdk` 是同构客户端 SDK，也是协议契约的唯一事实来源。

@@ -4,7 +4,7 @@
   "description": "Windows Photoshop + generator-core smoke harness for PS Generator Bridge plugins",
   "license": "MIT",
   "author": "wojzj57",
-  "homepage": "https://github.com/wojzj57/ps-generator-bridge-service#readme",
+  "homepage": "https://wojzj57.github.io/ps-generator-bridge-service/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/wojzj57/ps-generator-bridge-service.git",

@@ -4,7 +4,7 @@
   "description": "Isomorphic (browser + Node >=18) client SDK for the PS Generator Bridge server",
   "license": "MIT",
   "author": "wojzj57",
-  "homepage": "https://github.com/wojzj57/ps-generator-bridge-service#readme",
+  "homepage": "https://wojzj57.github.io/ps-generator-bridge-service/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/wojzj57/ps-generator-bridge-service.git",

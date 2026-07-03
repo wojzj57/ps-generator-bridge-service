@@ -1,5 +1,10 @@
 # `@ps-generator-bridge/testkit`
 
+Online documentation:
+
+- English: https://wojzj57.github.io/ps-generator-bridge-service/generator/photoshop-setup
+- Chinese: https://wojzj57.github.io/ps-generator-bridge-service/zh/generator/photoshop-setup
+
 PS Generator Bridge 插件的 Windows-only CLI 冒烟测试工具。它会用已发布的 generator 包启动 Adobe `generator-core`，验证 bridge 服务、插件发现，并通过 SDK 执行一次 `getServerInfo` 冒烟调用。
 
 ## 安装

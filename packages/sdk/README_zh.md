@@ -1,5 +1,10 @@
 # `@ps-generator-bridge/sdk`
 
+Online documentation:
+
+- English: https://wojzj57.github.io/ps-generator-bridge-service/sdk/connection
+- Chinese: https://wojzj57.github.io/ps-generator-bridge-service/zh/sdk/connection
+
 PS Generator Bridge 的同构 TypeScript SDK。该包可在浏览器和 Node >=18 中使用，并且是 generator 服务端共享协议契约的唯一事实来源。
 
 ## 安装
