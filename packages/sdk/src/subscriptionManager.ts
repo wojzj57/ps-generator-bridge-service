@@ -121,8 +121,10 @@ export class SubscriptionManager {
   private unsubscribe(type: string): void {
     this.activeSubscriptions.delete(type);
     this.pendingSubscriptions.delete(type);
-    void this.transport.invoke(ProtocolMethod.EventUnsubscribe, { type }).catch((error) =>
-      console.warn(`event unsubscribe failed for ${type}: ${(error as Error).message}`)
-    );
+    void this.transport
+      .invoke(ProtocolMethod.EventUnsubscribe, { type })
+      .catch((error) =>
+        console.warn(`event unsubscribe failed for ${type}: ${(error as Error).message}`)
+      );
   }
 }

@@ -1,5 +1,9 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
-import { Connection, DEFAULT_CONNECTION_URL, type ConnectionOptions } from "../src/publicConnection";
+import {
+  Connection,
+  DEFAULT_CONNECTION_URL,
+  type ConnectionOptions,
+} from "../src/publicConnection";
 import { ProtocolMethod, type RequestEnvelope } from "../src/protocol";
 import { FakeTransport } from "./fakeTransport";
 
@@ -9,10 +13,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function harness(
-  pluginIdOrOptions?: string | ConnectionOptions,
-  options: ConnectionOptions = {}
-) {
+function harness(pluginIdOrOptions?: string | ConnectionOptions, options: ConnectionOptions = {}) {
   const transports: FakeTransport[] = [];
   const baseOptions = {
     transportFactory: () => {
@@ -44,7 +45,10 @@ function respond(transport: FakeTransport, result: unknown): void {
   transport.emit(JSON.stringify({ id: req.id, ok: true, result }));
 }
 
-function responseJson(body: unknown, init: { status?: number; statusText?: string } = {}): Response {
+function responseJson(
+  body: unknown,
+  init: { status?: number; statusText?: string } = {}
+): Response {
   const status = init.status ?? 200;
   return {
     ok: status >= 200 && status < 300,
@@ -141,9 +145,7 @@ describe("public Connection", () => {
     const malformedShape = fetchHarness(responseJson({ plugins: [{ name: "paint" }] }));
 
     await expect(Connection.plugins({ fetch: fetchRejects })).rejects.toThrow(/offline/);
-    await expect(Connection.plugins({ fetch: httpFailure.fetchImpl })).rejects.toThrow(
-      /HTTP 500/
-    );
+    await expect(Connection.plugins({ fetch: httpFailure.fetchImpl })).rejects.toThrow(/HTTP 500/);
     await expect(Connection.plugins({ fetch: malformedJson.fetchImpl })).rejects.toThrow(
       /Malformed JSON/
     );

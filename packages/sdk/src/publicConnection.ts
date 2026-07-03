@@ -259,7 +259,9 @@ function buildHttpEndpoint(baseUrl: string, path: `/${string}`): string {
 function resolveFetch(fetchImpl?: typeof fetch): typeof fetch {
   const resolved = fetchImpl ?? globalThis.fetch;
   if (typeof resolved !== "function") {
-    throw new Error("Connection HTTP helpers require fetch; pass options.fetch to use this runtime.");
+    throw new Error(
+      "Connection HTTP helpers require fetch; pass options.fetch to use this runtime."
+    );
   }
   return resolved.bind(globalThis);
 }

@@ -5,7 +5,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function responseJson(body: unknown, init: { status?: number; statusText?: string } = {}): Response {
+function responseJson(
+  body: unknown,
+  init: { status?: number; statusText?: string } = {}
+): Response {
   const status = init.status ?? 200;
   return {
     ok: status >= 200 && status < 300,
