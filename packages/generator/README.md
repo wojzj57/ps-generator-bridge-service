@@ -68,7 +68,7 @@ The generator registers built-in protocol methods for:
 
 - server info and plugin discovery
 - JSX execution (`jsx:run`, `jsx:execute`)
-- Photoshop event subscription and unsubscription
+- endpoint-aware event subscription and unsubscription
 - action operations
 - layer inspection
 - document operations
@@ -83,7 +83,8 @@ External plugins are loaded from direct child folders of the plugin directory. E
 The host passed to each plugin exposes narrow capabilities:
 
 - `modules` for built-in layer, document, action, and image APIs
-- `events` for Photoshop event subscriptions
+- `events` for Photoshop, main, and plugin-local event subscriptions; plugin
+  authors publish plugin-local events with `events.emit(...)`
 - `jsx` scoped to the plugin's own `jsx` directory, with access to built-in JSX
 - optional `cos` upload support when configured
 

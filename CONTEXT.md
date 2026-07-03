@@ -39,6 +39,14 @@ _Avoid_: event（event 专指 server 单向推送，无应答）、command、mes
 server **主动单向**推给客户端的消息（连接建立时的 `connected`、未来 PS 状态变化等），无请求 id、无应答。[sdk](#) 可**订阅**某类 event。
 _Avoid_: notification（统一用 Event）、Request（有应答的才是 Request）、PS 的 generatorMenuChanged 等裸事件名（那是 generator-core ↔ PS 层，不是本协议的 Event）
 
+**主插件事件域**:
+[server](#) 自己发布的进程内事件范围。外部 [sdk](#) 连接与子插件可以订阅这些事件；子插件不能向这个范围发布事件。
+_Avoid_: 全局事件总线（容易暗示任意发布）、root bus
+
+**子插件事件域**:
+单个子插件自己发布的事件范围。子插件发布的事件只对该子插件自己的监听者和客户端可见，不会泄漏给主插件或其它子插件；子插件仍可订阅 [主插件事件域](#) 与 Photoshop 内置事件。
+_Avoid_: 共享插件事件、全局插件事件
+
 **clientId（客户端连接 id）**:
 标识一个**逻辑客户端连接**的稳定身份，**跨重连保持**——客户端首次连上由 server 在 `connected` 中回传、[Connection](#) 记住它，重连时经 `?id=` 回传，server 据此认出同一客户端。server 用它**登记每个客户端**并将 [Event](#) 定向推送。
 _Avoid_: 与**请求 id**（关联单次 [Request](#) 的 `id`）混用、sessionId（本项目无独立 session 概念）、socketId（绑物理 socket，clientId 是逻辑身份）

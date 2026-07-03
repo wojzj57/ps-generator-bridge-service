@@ -54,6 +54,11 @@ paint.on("paint:changed", (event) => {
 await paint.invoke("paint:createSession", { documentId: 1 });
 ```
 
+`Connection.on()`, `Connection.once()`, and `Connection.off()` mirror listeners to
+remote `event:subscribe` / `event:unsubscribe` requests. Root connections may
+subscribe to Photoshop events and main `#` events. Plugin endpoint connections
+may also subscribe to events emitted by that plugin.
+
 Node 18-21 do not provide a global `WebSocket`. Inject one when needed:
 
 ```ts
@@ -133,8 +138,15 @@ export default class MyPlugin extends BasePlugin {
   ping() {
     return { ok: true };
   }
+
+  changed(data: unknown) {
+    this.events.emit("myPlugin:changed", data);
+  }
 }
 ```
+
+Plugins publish client-visible events with `this.events.emit(...)`. Direct
+`broadcast` / `send` APIs are not part of the plugin authoring surface.
 
 The SDK plugin subpath must stay lightweight and platform-neutral. Do not import Fastify, `ws`, Photoshop Generator internals, COS SDK types, or other Node-only implementation details into the package root.
 
