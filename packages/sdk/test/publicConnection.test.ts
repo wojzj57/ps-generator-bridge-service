@@ -4,7 +4,7 @@ import {
   DEFAULT_CONNECTION_URL,
   type ConnectionOptions,
 } from "../src/publicConnection";
-import { ProtocolMethod, type RequestEnvelope } from "../src/protocol";
+import { MainEvent, ProtocolMethod, type RequestEnvelope } from "../src/protocol";
 import { FakeTransport } from "./fakeTransport";
 
 const flush = () => Promise.resolve();
@@ -296,7 +296,7 @@ describe("public Connection", () => {
   });
 
   it("subscribes main and plugin event names through the protocol", async () => {
-    for (const type of ["#ready", "paint:changed"]) {
+    for (const type of [MainEvent.Ready, "paint:changed"]) {
       const { conn, transports } = harness();
       const transport = transports[0]!;
       await connect(conn, transport);
@@ -578,5 +578,29 @@ describe("public Connection", () => {
     });
     respond(transport, { data: "https://cos/doc.png", bounds, width: 10, height: 10 });
     await expect(exportedDocument).resolves.toMatchObject({ data: "https://cos/doc.png" });
+  });
+
+  it("exposes selection module wrappers", async () => {
+    const { conn, transports } = harness();
+    const transport = transports[0]!;
+    await connect(conn, transport);
+
+    const area = conn.modules.selection.getArea();
+    await flush();
+    expect(lastRequest(transport)).toMatchObject({
+      method: ProtocolMethod.SelectionGetArea,
+      params: {},
+    });
+    respond(transport, { x: 1, y: 2, width: 3, height: 4 });
+    await expect(area).resolves.toEqual({ x: 1, y: 2, width: 3, height: 4 });
+
+    const path = conn.modules.selection.getPath({ expand: 2 });
+    await flush();
+    expect(lastRequest(transport)).toMatchObject({
+      method: ProtocolMethod.SelectionGetPath,
+      params: { expand: 2 },
+    });
+    respond(transport, { svg: "<svg></svg>", x: 1, y: 2, width: 3, height: 4 });
+    await expect(path).resolves.toMatchObject({ svg: "<svg></svg>" });
   });
 });

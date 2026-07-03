@@ -24,6 +24,8 @@ describe("Registry.dispatch", () => {
       ProtocolMethod.ImageExportLayer,
       ProtocolMethod.ImageGetPreview,
       ProtocolMethod.ImageExportDocument,
+      ProtocolMethod.SelectionGetArea,
+      ProtocolMethod.SelectionGetPath,
     ];
     expect(methods).toContain("action:autoCutout");
   });

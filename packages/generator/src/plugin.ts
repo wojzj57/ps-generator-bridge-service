@@ -6,9 +6,22 @@ import { bootstrap, type BasePlugin, type PluginHost } from "@ps-generator-bridg
 import { loadPlugins } from "./plugins";
 import { JsxRunner } from "./utils/jsxRunner";
 import { EventManager, RuntimeEventManager, type PluginEvents } from "./utils/eventManager";
-import { MODULES, ActionModule, DocumentModule, LayerModule, ImageModule } from "./modules";
+import { MainEvent, type MainEventMap, type MainEventName } from "@ps-generator-bridge/sdk";
+import {
+  MODULES,
+  ActionModule,
+  DocumentModule,
+  LayerModule,
+  ImageModule,
+  SelectionModule,
+} from "./modules";
 import { CosService } from "./services/cos";
 import { PLUGIN_NAME, PLUGIN_VERSION } from "./meta";
+
+type BuiltinModuleMainEventName = Exclude<
+  MainEventName,
+  typeof MainEvent.Ready | typeof MainEvent.Closing
+>;
 
 // The menu id is echoed back on "generatorMenuChanged", so it must be a stable,
 // alphanumeric token unique to this plugin.
@@ -58,6 +71,7 @@ export class PsBridgeHost implements PluginHost {
     document: DocumentModule;
     action: ActionModule;
     image: ImageModule;
+    selection: SelectionModule;
   };
   private plugins: BasePlugin[] = [];
   private readonly _jsx: JsxRunner;
@@ -77,16 +91,17 @@ export class PsBridgeHost implements PluginHost {
     public readonly logger: Logger,
     overrides?: JsxRunnerOverrides
   ) {
+    this._jsx = new JsxRunner(generator, logger, overrides?.polyfillsDir);
+    this._events = new EventManager(generator);
+    this._runtimeEvents = new RuntimeEventManager(this._events);
+    this._hostEvents = this._runtimeEvents.createPluginFacade("host");
     this.modules = {
       layer: new MODULES.layer(this),
       document: new MODULES.document(this),
       action: new MODULES.action(this),
       image: new MODULES.image(this),
+      selection: new MODULES.selection(this),
     };
-    this._jsx = new JsxRunner(generator, logger, overrides?.polyfillsDir);
-    this._events = new EventManager(generator);
-    this._runtimeEvents = new RuntimeEventManager(this._events);
-    this._hostEvents = this._runtimeEvents.createPluginFacade("host");
     this.cos = CosService.fromEnv(logger);
     logger.info(this.cos ? "CosService enabled" : "CosService disabled (env incomplete)");
   }
@@ -99,6 +114,13 @@ export class PsBridgeHost implements PluginHost {
   /** Host event facade. Plugins receive their own facade from `hostFor`. */
   get events(): PluginEvents {
     return this._hostEvents;
+  }
+
+  emitModuleEvent<K extends BuiltinModuleMainEventName>(
+    type: K,
+    payload: MainEventMap[K]
+  ): boolean {
+    return this._runtimeEvents.emitMain(type, payload);
   }
 
   /**
@@ -181,8 +203,9 @@ export class PsBridgeHost implements PluginHost {
     // constructors don't touch jsx — only decorated handlers do, and those fire
     // after `listen` — so priming here is early enough.
     await this._jsx.init();
+    await this.modules.selection.start();
     await server.listen();
-    this._runtimeEvents.emitMain("#ready", {
+    this._runtimeEvents.emitMain(MainEvent.Ready, {
       port: server.port,
       plugins: server.pluginManager.list(),
     });
@@ -209,7 +232,7 @@ export class PsBridgeHost implements PluginHost {
 
   /** Stop the WebSocket service (used by tests; PS teardown is process exit). */
   async close(): Promise<void> {
-    this._runtimeEvents.emitMain("#closing", { reason: "host-close" });
+    this._runtimeEvents.emitMain(MainEvent.Closing, { reason: "host-close" });
     for (const plugin of [...this.plugins].reverse()) {
       try {
         await plugin.onDispose?.();
@@ -217,6 +240,7 @@ export class PsBridgeHost implements PluginHost {
         this.logger.error(`plugin dispose failed: ${plugin.id}`, error);
       }
     }
+    this.modules.selection.dispose();
     await this.server?.close();
     this.server = undefined;
     this._runtimeEvents.dispose();

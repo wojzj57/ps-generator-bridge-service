@@ -3,6 +3,7 @@ import {
   serializeFrame,
   parseFrame,
   PROTOCOL_VERSION,
+  MainEvent,
   MAIN_EVENTS,
   ProtocolMethod,
   ErrorCode,
@@ -37,6 +38,8 @@ describe("protocol", () => {
     expect(ProtocolMethod.DocumentCurrent).toBe("document:current");
     expect(ProtocolMethod.DocumentExport).toBe("document:export");
     expect(ProtocolMethod.DocumentSave).toBe("document:save");
+    expect(ProtocolMethod.SelectionGetArea).toBe("selection:getArea");
+    expect(ProtocolMethod.SelectionGetPath).toBe("selection:getPath");
   });
 
   it("allows subscribing arbitrary string event names", () => {
@@ -44,11 +47,11 @@ describe("protocol", () => {
       type: "paint:changed",
     };
     const main: ProtocolMethods[typeof ProtocolMethod.EventUnsubscribe]["params"] = {
-      type: "#ready",
+      type: MainEvent.Ready,
     };
 
     expect(subscribe.type).toBe("paint:changed");
-    expect(main.type).toBe("#ready");
+    expect(main.type).toBe(MainEvent.Ready);
   });
 
   it("models main plugin events in ProtocolEvents", () => {
@@ -58,9 +61,21 @@ describe("protocol", () => {
     };
     const closing: ProtocolEvents["#closing"] = { reason: "host-close" };
 
-    expect(MAIN_EVENTS).toEqual(["#ready", "#closing"]);
+    expect(MainEvent.SelectionChanged).toBe("selection:changed");
+    expect(MAIN_EVENTS).toEqual([MainEvent.Ready, MainEvent.Closing, MainEvent.SelectionChanged]);
     expect(ready.plugins[0]?.id).toBe("paint");
     expect(closing.reason).toBe("host-close");
+  });
+
+  it("models selection change events", () => {
+    const area: ProtocolEvents["selection:changed"] = {
+      x: 1,
+      y: 2,
+      width: 3,
+      height: 4,
+    };
+
+    expect(area.width).toBe(3);
   });
 
   it("keeps plugin-specific error codes out of the server-level catalog", () => {

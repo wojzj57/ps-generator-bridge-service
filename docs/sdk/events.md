@@ -29,12 +29,12 @@ Active subscriptions replay after reconnect. If a subscription request was pendi
 Root endpoint connections may subscribe to:
 
 - Photoshop events
-- main `#` events such as `#ready` and `#closing`
+- main events such as `#ready`, `#closing`, and built-in module events
 
 Plugin endpoint connections may subscribe to:
 
 - Photoshop events
-- main `#` events
+- main events
 - plugin-local event names emitted by that plugin
 
 Root endpoint connections cannot subscribe to plugin-local event names. The server rejects those subscriptions with a protocol error.
@@ -65,7 +65,7 @@ connection.on("imageChanged", (event) => {
 
 ## Main Events
 
-Main events are server-owned process events:
+Main events are server-owned events exposed by the SDK protocol. They include host lifecycle events and built-in module events:
 
 ```ts
 connection.on("#ready", (event) => {
@@ -74,6 +74,10 @@ connection.on("#ready", (event) => {
 
 connection.on("#closing", (event) => {
   console.log(event.reason);
+});
+
+connection.on("selection:changed", (area) => {
+  console.log(area);
 });
 ```
 

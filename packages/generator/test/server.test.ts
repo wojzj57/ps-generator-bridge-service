@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import WebSocket from "ws";
-import { ProtocolMethod } from "@ps-generator-bridge/sdk";
+import { MainEvent, ProtocolMethod } from "@ps-generator-bridge/sdk";
 import { createServer, type PsBridgeServer } from "../src/server";
 import { BasePlugin, ws, api, bootstrap, type PluginHost } from "@ps-generator-bridge/sdk/plugin";
 import { EventManager, RuntimeEventManager } from "../src/utils/eventManager";
@@ -457,20 +457,30 @@ describe("root /ws server", () => {
     const pluginMain = await requestOnce(plugin.ws, {
       id: "9",
       method: ProtocolMethod.EventSubscribe,
-      params: { type: "#ready" },
+      params: { type: MainEvent.Ready },
     });
     expect(pluginMain).toEqual({ id: "9", ok: true, result: { ok: true } });
-    const gotPluginReady = nextEvent(plugin.ws, "#ready");
-    events.emitMain("#ready", { port: s.port, plugins: [{ id: "echo" }] });
+    const gotPluginReady = nextEvent(plugin.ws, MainEvent.Ready);
+    events.emitMain(MainEvent.Ready, { port: s.port, plugins: [{ id: "echo" }] });
     expect((await gotPluginReady).data).toEqual({ port: s.port, plugins: [{ id: "echo" }] });
 
     const root = await connectRoot(s.port);
     const rootMain = await requestOnce(root.ws, {
       id: "10",
       method: ProtocolMethod.EventSubscribe,
-      params: { type: "#ready" },
+      params: { type: MainEvent.Ready },
     });
     expect(rootMain).toEqual({ id: "10", ok: true, result: { ok: true } });
+
+    const rootSelection = await requestOnce(root.ws, {
+      id: "10b",
+      method: ProtocolMethod.EventSubscribe,
+      params: { type: MainEvent.SelectionChanged },
+    });
+    expect(rootSelection).toEqual({ id: "10b", ok: true, result: { ok: true } });
+    const gotSelection = nextEvent(root.ws, MainEvent.SelectionChanged);
+    events.emitMain(MainEvent.SelectionChanged, { x: 1, y: 2, width: 3, height: 4 });
+    expect((await gotSelection).data).toEqual({ x: 1, y: 2, width: 3, height: 4 });
 
     const rootPluginEvent = await requestOnce(root.ws, {
       id: "11",

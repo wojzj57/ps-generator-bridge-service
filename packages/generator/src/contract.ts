@@ -12,6 +12,7 @@ export type { LayerModuleApi, PsLayer } from "./modules/layer";
 export type { DocumentModuleApi, PsDocument } from "./modules/document";
 export type { ActionModuleApi } from "./modules/action";
 export type { ImageModuleApi, ImageResult, LayerSpec } from "./modules/image";
+export type { SelectionModuleApi, SelectionPathData } from "./modules/selection";
 export type { CosServiceApi } from "./services/cos";
 export type { JsxRunnerApi } from "./utils/jsxRunner";
 export type {

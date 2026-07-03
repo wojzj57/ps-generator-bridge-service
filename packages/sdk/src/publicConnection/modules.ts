@@ -51,5 +51,11 @@ export class PublicModules {
     ) => this.invoke(ProtocolMethod.ImageExportDocument, params),
   };
 
+  readonly selection = {
+    getArea: () => this.invoke(ProtocolMethod.SelectionGetArea, {}),
+    getPath: (params?: ProtocolMethods[typeof ProtocolMethod.SelectionGetPath]["params"]) =>
+      this.invoke(ProtocolMethod.SelectionGetPath, params),
+  };
+
   constructor(private readonly invoke: Invoker) {}
 }

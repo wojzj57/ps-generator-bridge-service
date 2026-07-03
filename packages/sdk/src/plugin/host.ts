@@ -4,6 +4,7 @@ import type {
   DocumentModuleApi,
   ActionModuleApi,
   ImageModuleApi,
+  SelectionModuleApi,
   CosServiceApi,
   PluginEvents,
 } from "@ps-generator-bridge/generator/contract";
@@ -22,6 +23,7 @@ export interface PluginHost {
     document: DocumentModuleApi;
     action: ActionModuleApi;
     image: ImageModuleApi;
+    selection: SelectionModuleApi;
   };
   /** Plugin event facade: listen to PS/main/local events and emit local events. */
   readonly events: PluginEvents;

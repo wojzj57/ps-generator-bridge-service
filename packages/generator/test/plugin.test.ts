@@ -2,9 +2,10 @@ import { mkdtemp, mkdir, writeFile, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, it, expect, afterEach } from "vitest";
+import { MainEvent } from "@ps-generator-bridge/sdk";
 import { PsBridgeHost } from "../src/plugin";
 import { BaseModule } from "../src/modules/base";
-import { LayerModule, DocumentModule, ActionModule } from "../src/modules";
+import { LayerModule, DocumentModule, ActionModule, SelectionModule } from "../src/modules";
 import { JsxRunner } from "../src/utils/jsxRunner";
 import type { PluginHost } from "@ps-generator-bridge/sdk/plugin";
 import type { Logger } from "../src/utils/logger";
@@ -67,6 +68,14 @@ describe("PsBridgeHost", () => {
     expect(plugin.modules.layer).toBeInstanceOf(LayerModule);
     expect(plugin.modules.document).toBeInstanceOf(DocumentModule);
     expect(plugin.modules.action).toBeInstanceOf(ActionModule);
+    expect(plugin.modules.selection).toBeInstanceOf(SelectionModule);
+
+    const initialized = plugin!;
+    if (false) {
+      initialized.emitModuleEvent(MainEvent.SelectionChanged, null);
+      // @ts-expect-error lifecycle main events are emitted by the host, not feature modules.
+      initialized.emitModuleEvent(MainEvent.Ready, { port: 1, plugins: [] });
+    }
   });
 
   it("loads and registers plugins from the configured pluginsDir", async () => {

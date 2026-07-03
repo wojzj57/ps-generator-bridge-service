@@ -3,6 +3,8 @@ import type {
   LayerSpec,
   PsDocument,
   PsLayer,
+  PsRect,
+  SelectionPathData,
   ServerInfo,
   WsImageResult,
 } from "./models";
@@ -29,6 +31,8 @@ export const ProtocolMethod = {
   ImageExportLayer: "image:exportLayer",
   ImageGetPreview: "image:getPreview",
   ImageExportDocument: "image:exportDocument",
+  SelectionGetArea: "selection:getArea",
+  SelectionGetPath: "selection:getPath",
 } as const;
 export type ProtocolMethod = (typeof ProtocolMethod)[keyof typeof ProtocolMethod];
 
@@ -113,6 +117,14 @@ export interface ProtocolMethods {
   [ProtocolMethod.ImageExportDocument]: {
     params: { documentId?: number; settings?: Record<string, unknown> };
     result: WsImageResult;
+  };
+  [ProtocolMethod.SelectionGetArea]: {
+    params: Record<string, never>;
+    result: PsRect | null;
+  };
+  [ProtocolMethod.SelectionGetPath]: {
+    params?: { expand?: number };
+    result: SelectionPathData | null;
   };
 }
 

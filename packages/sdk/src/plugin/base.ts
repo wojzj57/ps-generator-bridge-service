@@ -1,5 +1,10 @@
 import type { PluginHost } from "./host";
-import type { JsxRunnerApi, PluginEvents } from "@ps-generator-bridge/generator/contract";
+import type {
+  JsxRunnerApi,
+  PhotoshopEventMap,
+  PluginEvents,
+} from "@ps-generator-bridge/generator/contract";
+import type { MainEventMap, MainEventName, PhotoshopEventName } from "../protocol";
 import { PsPhotoshopProxy } from "../photoshop";
 
 // A *global* brand so "extends BasePlugin" can be detected across
@@ -66,6 +71,48 @@ export abstract class BasePlugin {
    */
   protected get events(): PluginEvents {
     return this.plugin.events;
+  }
+
+  protected on<K extends PhotoshopEventName>(
+    event: K,
+    listener: (payload: PhotoshopEventMap[K]) => void
+  ): this;
+  protected on<K extends MainEventName>(
+    event: K,
+    listener: (payload: MainEventMap[K]) => void
+  ): this;
+  protected on(type: string, listener: (payload: unknown) => void): this;
+  protected on(type: string, listener: (payload: unknown) => void): this {
+    this.events.on(type, listener);
+    return this;
+  }
+
+  protected once<K extends PhotoshopEventName>(
+    event: K,
+    listener: (payload: PhotoshopEventMap[K]) => void
+  ): this;
+  protected once<K extends MainEventName>(
+    event: K,
+    listener: (payload: MainEventMap[K]) => void
+  ): this;
+  protected once(type: string, listener: (payload: unknown) => void): this;
+  protected once(type: string, listener: (payload: unknown) => void): this {
+    this.events.once(type, listener);
+    return this;
+  }
+
+  protected off<K extends PhotoshopEventName>(
+    event: K,
+    listener: (payload: PhotoshopEventMap[K]) => void
+  ): this;
+  protected off<K extends MainEventName>(
+    event: K,
+    listener: (payload: MainEventMap[K]) => void
+  ): this;
+  protected off(type: string, listener: (payload: unknown) => void): this;
+  protected off(type: string, listener: (payload: unknown) => void): this {
+    this.events.off(type, listener);
+    return this;
   }
 
   /**

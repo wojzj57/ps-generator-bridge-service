@@ -52,6 +52,14 @@ export interface WsImageResult {
   height: number;
 }
 
+export interface SelectionPathData {
+  svg: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface PsBounds {
   left: number;
   right: number;

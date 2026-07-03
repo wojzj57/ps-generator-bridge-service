@@ -1,5 +1,6 @@
 import type { PsGenerator } from "../src/types/generator";
 import type { JsxProgressMessage } from "../src/utils/jsxRunner";
+import { EventEmitter } from "node:events";
 interface MenuItem {
   name: string;
   displayName: string;
@@ -52,6 +53,7 @@ export class FakeGenerator {
   readonly jsxCalls: JsxCall[] = [];
   readonly jsxStringCalls: JsxStringCall[] = [];
   readonly jsxFileCalls: FakeJsxFileCall[] = [];
+  readonly _photoshop = new EventEmitter();
   psVersion = "26.0.0";
 
   /**

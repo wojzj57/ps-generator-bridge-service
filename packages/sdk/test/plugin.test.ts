@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { MainEvent } from "../src/protocol";
 import {
   BasePlugin,
   ws,
@@ -12,6 +13,10 @@ import {
 
 // A minimal PluginHost stand-in: the devkit tests exercise BasePlugin and
 // the decorators, neither of which reaches the host, so a bare cast suffices.
+const eventOn = vi.fn(() => fakeHost.events);
+const eventOnce = vi.fn(() => fakeHost.events);
+const eventOff = vi.fn(() => fakeHost.events);
+
 const fakeHost = {
   jsx: {
     run: () => Promise.resolve(),
@@ -19,13 +24,13 @@ const fakeHost = {
     executeBuiltin: () => Promise.resolve(),
   },
   events: {
-    on: () => fakeHost.events,
-    once: () => fakeHost.events,
-    off: () => fakeHost.events,
+    on: eventOn,
+    once: eventOnce,
+    off: eventOff,
     emit: () => true,
     dispose: () => undefined,
   },
-  modules: { layer: {}, document: {}, action: {} },
+  modules: { layer: {}, document: {}, action: {}, image: {}, selection: {} },
 } as unknown as PluginHost;
 
 class TestPlugin extends BasePlugin {
@@ -76,6 +81,22 @@ describe("BasePlugin", () => {
     s.onConnect("a");
     s.onDisconnect("a");
     expect(s.seen).toEqual(["+a", "-a"]);
+  });
+
+  it("lets subclasses listen to main events with this.on", () => {
+    class Listener extends BasePlugin {
+      static readonly id = "listener";
+      listen(): void {
+        this.on(MainEvent.SelectionChanged, (area) => {
+          area?.width;
+        });
+      }
+    }
+
+    const listener = new Listener("listener", fakeHost);
+    listener.listen();
+
+    expect(eventOn).toHaveBeenCalledWith(MainEvent.SelectionChanged, expect.any(Function));
   });
 });
 

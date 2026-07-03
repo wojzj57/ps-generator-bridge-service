@@ -4,11 +4,13 @@ import { ActionModule } from "./action";
 import { DocumentModule } from "./document";
 import { LayerModule } from "./layer";
 import { ImageModule } from "./image";
+import { SelectionModule } from "./selection";
 
 export { ActionModule } from "./action";
 export { DocumentModule } from "./document";
 export { LayerModule } from "./layer";
 export { ImageModule } from "./image";
+export { SelectionModule } from "./selection";
 export type { BaseModule } from "./base";
 
 /** A module class: constructible from the owning plugin (it calls super(name, plugin)). */
@@ -28,4 +30,5 @@ export const MODULES = {
   document: DocumentModule,
   action: ActionModule,
   image: ImageModule,
+  selection: SelectionModule,
 } satisfies Record<string, ModuleClass>;

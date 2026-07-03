@@ -17,6 +17,7 @@ export { PsBridgeError, isPsBridgeError, isRetryableBridgeError } from "./errors
 export {
   PROTOCOL_VERSION,
   ProtocolMethod,
+  MainEvent,
   MAIN_EVENTS,
   ErrorCode,
   parseFrame,
@@ -52,4 +53,5 @@ export type {
   PsLayer,
   PsDocument,
   WsImageResult,
+  SelectionPathData,
 } from "./protocol";

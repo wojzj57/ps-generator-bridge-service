@@ -1,17 +1,34 @@
-import type { ImageChangedEvent, PluginInfo } from "./models";
+import type { ImageChangedEvent, PluginInfo, PsRect } from "./models";
+
+/**
+ * Main event names shared by the sdk type surface and generator runtime.
+ * Host lifecycle events and built-in module events live here; plugin-local
+ * events remain open string names owned by each plugin package.
+ */
+export const MainEvent = {
+  Ready: "#ready",
+  Closing: "#closing",
+  SelectionChanged: "selection:changed",
+} as const;
+export type MainEvent = (typeof MainEvent)[keyof typeof MainEvent];
 
 /** Host-owned and built-in module events available through plugin `this.on` and remote `Connection.on`. */
 export interface MainEventMap {
-  "#ready": {
+  [MainEvent.Ready]: {
     port: number;
     plugins: PluginInfo[];
   };
-  "#closing": {
+  [MainEvent.Closing]: {
     reason: "host-close" | "process-exit";
   };
+  [MainEvent.SelectionChanged]: PsRect | null;
 }
 
-export const MAIN_EVENTS = ["#ready", "#closing"] as const;
+type AssertNever<T extends never> = T;
+type _MainEventMapCoversMainEvents = AssertNever<Exclude<MainEvent, keyof MainEventMap>>;
+type _MainEventsCoverMainEventMap = AssertNever<Exclude<keyof MainEventMap, MainEvent>>;
+
+export const MAIN_EVENTS = Object.freeze(Object.values(MainEvent)) as readonly MainEvent[];
 
 export interface PhotoshopEventMap {
   workspaceChanged: string;
