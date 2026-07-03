@@ -40,6 +40,7 @@ pnpm typecheck
 pnpm test
 pnpm format
 pnpm pack:check
+pnpm docs:build
 ```
 
 也可以按包执行：
@@ -63,7 +64,7 @@ pnpm --filter @ps-generator-bridge/testkit typecheck
 `generator` 包通过 CommonJS `main.js` 入口被 `generator-core` 加载。初始化时会：
 
 1. 注册 Photoshop Generator 菜单项。
-2. 在 `127.0.0.1` 启动 Fastify WebSocket 服务，默认端口为 `7700`。
+2. 在 `127.0.0.1` 启动 Fastify HTTP/WebSocket 服务，默认端口为 `7700`。
 3. 从 `pluginsDir` 或 `PS_BRIDGE_PLUGINS_DIR` 加载可选外部插件。
 4. 注册 document、layer、action、image、JSX、event 等内置能力。
 
@@ -81,10 +82,11 @@ SDK 默认使用 `ws://127.0.0.1:7700` 作为服务 base URL，并连接到 `/ws
 
 ## 文档
 
+- [docs/zh/README.md](./docs/zh/README.md) 是 GitHub 和 GitHub Pages 的中文公开文档入口。
+- [docs/zh/getting-started/install.md](./docs/zh/getting-started/install.md) 说明安装和前置条件。
+- [docs/zh/sdk/connection.md](./docs/zh/sdk/connection.md) 说明 SDK 连接门面。
+- [docs/zh/plugins/authoring.md](./docs/zh/plugins/authoring.md) 说明外部插件开发。
+- [docs/zh/reference/protocol.md](./docs/zh/reference/protocol.md) 说明公开协议契约。
 - [CONTEXT.md](./CONTEXT.md) 定义项目术语。
-- [packages/sdk/README.md](./packages/sdk/README.md) 说明客户端和协议包。
-- [packages/generator/README.md](./packages/generator/README.md) 说明 Photoshop Generator 宿主。
-- [packages/testkit/README.md](./packages/testkit/README.md) 说明冒烟测试工具。
-- [docs/adr](./docs/adr) 记录架构决策。
 
-英文文档见 [README.md](./README.md)。
+English documentation is available in [README.md](./README.md).

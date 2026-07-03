@@ -1,0 +1,31 @@
+# 环境变量参考
+
+环境变量是部署期覆盖项。结构化运行参数通常应通过 `PluginConfig` 传入。
+
+| 变量                        | 必需   | 作用                            | 默认值                   |
+| --------------------------- | ------ | ------------------------------- | ------------------------ |
+| `PS_BRIDGE_PORT`            | 否     | 有效时覆盖 generator 服务端口。 | `7700`                   |
+| `PS_BRIDGE_PLUGINS_DIR`     | 否     | 直接子目录为插件包的目录。      | package-local `plugins/` |
+| `PS_BRIDGE_COS_SECRET_ID`   | 仅 COS | 腾讯云 COS secret id。          | 无                       |
+| `PS_BRIDGE_COS_SECRET_KEY`  | 仅 COS | 腾讯云 COS secret key。         | 无                       |
+| `PS_BRIDGE_COS_BUCKET`      | 仅 COS | 腾讯云 COS bucket。             | 无                       |
+| `PS_BRIDGE_COS_REGION`      | 仅 COS | 腾讯云 COS region。             | 无                       |
+| `PS_BRIDGE_COS_KEY_PREFIX`  | 否     | COS 上传对象 key 前缀。         | `ps-bridge/exports`      |
+| `PS_BRIDGE_COS_URL_EXPIRES` | 否     | 签名 URL 有效期秒数。           | `315360000`              |
+
+## COS 启用条件
+
+只有下面四个变量都存在且非空时，COS 上传支持才会启用：
+
+```text
+PS_BRIDGE_COS_SECRET_ID
+PS_BRIDGE_COS_SECRET_KEY
+PS_BRIDGE_COS_BUCKET
+PS_BRIDGE_COS_REGION
+```
+
+未启用 COS 时，图片结果使用内联 data URL。
+
+## 无效端口
+
+`PS_BRIDGE_PORT` 必须是 1 到 65535 之间的整数。无效值会被忽略并记录 warning。

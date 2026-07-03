@@ -1,4 +1,4 @@
-# PS Generator Bridge Service — AI Agent guide
+# PS Generator Bridge Service - AI Agent guide
 
 > Progressive-disclosure entry point for coding agents. Read this first, then jump to the deeper docs.
 
@@ -18,9 +18,10 @@ the protocol contract. `generator` depends on `sdk` type-only.
 
 ## Commands
 
-- `pnpm install` — install workspace deps.
-- `pnpm setup` — clone Adobe `generator-core` into `./generator-core` (gitignored; required to run in PS).
-- `pnpm build` / `pnpm typecheck` / `pnpm test` — across all packages (`pnpm -r`).
+- `pnpm install` - install workspace deps.
+- `pnpm setup` - clone Adobe `generator-core` into `./generator-core` (gitignored; required to run in PS).
+- `pnpm build` / `pnpm typecheck` / `pnpm test` - across all packages (`pnpm -r`).
+- `pnpm docs:dev` / `pnpm docs:build` / `pnpm docs:preview` - public VitePress docs under `docs/`.
 
 ## Conventions (do not break)
 
@@ -29,14 +30,21 @@ the protocol contract. `generator` depends on `sdk` type-only.
 2. **SDK stays Node-free / browser-safe**: never leak server, fastify, COS-SDK, or other Node-only
    types into `packages/sdk`. Cross the boundary with narrow type-only contracts (see `contract.ts`).
 3. **`Symbol.for("ps-generator-bridge.*")` brand keys** are a cross-bundle handshake with external
-   plugins — changing them breaks plugin interop.
+   plugins; changing them breaks plugin interop.
 4. **Config vs env**: secrets and deployment knobs go through `PS_BRIDGE_*` env vars; structured run
    params (`port`, `pluginsDir`) come via `PluginConfig` and env only overrides.
 5. **Tests** are TypeScript via injected seams (`FakeGenerator`, `FakeTransport`); no real Photoshop
    needed for unit tests.
 
+## Documentation boundaries
+
+- `docs/` is the public documentation source for GitHub and GitHub Pages.
+- `notes/` is a local-only private development knowledge base and is ignored by git.
+- Agents must not read or rely on `notes/` unless the user explicitly asks them to.
+- Public documentation must be based on repository source, tests, package README files, and user-provided requirements, not private notes by default.
+
 ## Deeper docs
 
-- `CONTEXT.md` — the glossary (ubiquitous language).
-- `docs/rfcs/` — architecture decision records (protocol, plugin model, image/COS, rebrand).
-- `packages/generator/TESTING.md` — what is in/out of unit-test scope.
+- `docs/README.md` - the public documentation entry point for GitHub and GitHub Pages.
+- `CONTEXT.md` - the glossary (ubiquitous language).
+- `packages/generator/TESTING.md` - what is in/out of unit-test scope.

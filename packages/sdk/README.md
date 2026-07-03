@@ -2,6 +2,13 @@
 
 Isomorphic TypeScript SDK for PS Generator Bridge. This package is browser-safe, works in Node >=18, and owns the protocol contract shared with the generator server.
 
+Full public documentation lives in the repository docs:
+
+- [Connection](../../docs/sdk/connection.md)
+- [Events](../../docs/sdk/events.md)
+- [Modules](../../docs/sdk/modules.md)
+- [Protocol Reference](../../docs/reference/protocol.md)
+
 ## Install
 
 ```bash
@@ -42,6 +49,14 @@ const status = await Connection.status();
 const plugins = await Connection.plugins();
 ```
 
+Open the LightBox Photoshop entry page only when the bridge server is not healthy:
+
+```ts
+import { openPhotoshopOnLightBox } from "@ps-generator-bridge/sdk";
+
+await openPhotoshopOnLightBox();
+```
+
 Create plugin endpoint connections by plugin id when you need plugin-private methods or events:
 
 ```ts
@@ -78,6 +93,7 @@ const connection = new Connection({
 - `connection.endpoint` reports whether the connection targets the root endpoint or a plugin endpoint.
 - `connection.clientId` exposes the server-assigned client id after the handshake.
 - `Connection.status()` queries `/health`; `Connection.plugins()` queries `/plugins`.
+- `openPhotoshopOnLightBox()` checks `/health` and opens the LightBox Photoshop entry page only when the bridge server is not healthy.
 - `connection.on()`, `connection.once()`, and `connection.off()` subscribe and unsubscribe server events through the protocol.
 - Plugin-private APIs stay on the plugin endpoint connection through `connection.invoke(...)`.
 - `connection.jsx` executes remote protocol-exposed JSX methods. Plugin authors should continue to use plugin-scoped helpers from their `BasePlugin` context.

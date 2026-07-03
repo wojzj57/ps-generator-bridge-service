@@ -81,10 +81,12 @@ Structured runtime options such as `port` and `pluginsDir` should flow through `
 
 ## Documentation
 
+- [docs/README.md](./docs/README.md) is the public documentation entry point for GitHub and GitHub Pages.
+- [docs/getting-started/install.md](./docs/getting-started/install.md) explains setup and prerequisites.
+- [docs/sdk/connection.md](./docs/sdk/connection.md) documents the SDK connection facade.
+- [docs/plugins/authoring.md](./docs/plugins/authoring.md) documents external plugin authoring.
+- [docs/reference/protocol.md](./docs/reference/protocol.md) documents the public protocol contract.
 - [CONTEXT.md](./CONTEXT.md) defines the project vocabulary.
-- [packages/sdk/README.md](./packages/sdk/README.md) documents the client and protocol package.
-- [packages/generator/README.md](./packages/generator/README.md) documents the Photoshop Generator host.
-- [packages/testkit/README.md](./packages/testkit/README.md) documents the smoke harness.
-- [docs/adr](./docs/adr) records architectural decisions.
 
 Chinese documentation is available in [README_zh.md](./README_zh.md).
+The VitePress docs also include [Simplified Chinese](./docs/zh/README.md).

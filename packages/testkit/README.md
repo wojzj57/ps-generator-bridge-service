@@ -2,6 +2,11 @@
 
 Windows-only CLI smoke harness for PS Generator Bridge plugins. It starts Adobe `generator-core` against the published generator package, verifies the bridge server, checks plugin discovery, and performs an SDK `getServerInfo` smoke call.
 
+Related public docs:
+
+- [Photoshop Setup](../../docs/generator/photoshop-setup.md)
+- [Troubleshooting](../../docs/generator/troubleshooting.md)
+
 ## Install
 
 ```bash

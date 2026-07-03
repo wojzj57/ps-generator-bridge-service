@@ -1,3 +1,0 @@
-# Use Changesets for npm releases
-
-This monorepo publishes three npm packages, not the private root package: `@ps-generator-bridge/sdk`, `@ps-generator-bridge/generator`, and `@ps-generator-bridge/testkit`. We will use Changesets with a unified version across the three published packages, a GitHub Actions version PR on `main`, a PR changeset check that can be skipped with the `no-release` label, full publish gates (`format:check`, `typecheck`, `test`, `build`, and published-package dry-run checks), and npm Trusted Publishing/OIDC instead of a long-lived `NPM_TOKEN`. This keeps protocol-coupled packages easy to reason about while preserving an explicit human-reviewed version boundary before publishing.
