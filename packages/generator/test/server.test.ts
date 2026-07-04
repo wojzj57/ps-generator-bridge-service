@@ -178,6 +178,15 @@ describe("per-plugin server (RFC 0004)", () => {
     expect(await response.json()).toEqual({ status: "ok" });
   });
 
+  it("allows browser clients from any origin to fetch /health", async () => {
+    const s = await start();
+    const origin = "http://localhost:6010";
+    const response = await fetch(`http://127.0.0.1:${s.port}/health`, {
+      headers: { Origin: origin },
+    });
+    expect(response.headers.get("access-control-allow-origin")).toBe(origin);
+  });
+
   it("GET /plugins lists registered plugins", async () => {
     const s = await start(echo());
     const response = await fetch(`http://127.0.0.1:${s.port}/plugins`);

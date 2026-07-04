@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import websocket from "@fastify/websocket";
+import cors from "@fastify/cors";
 import { randomUUID } from "node:crypto";
 import type { WebSocket } from "ws";
 import { parseFrame, serializeFrame } from "@ps-generator-bridge/sdk";
@@ -61,6 +62,7 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
   // Fastify's own pino logger is disabled: server logs flow through the bridge
   // logger, keeping one log format (ADR 0003).
   const app = Fastify({ logger: false });
+  app.register(cors, { origin: true });
   let boundPort = 0;
 
   const runtimeEvents =
