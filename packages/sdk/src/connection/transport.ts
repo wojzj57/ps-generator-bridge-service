@@ -26,6 +26,7 @@ export function createWebSocketTransport(url: string, WebSocketImpl?: typeof Web
   const ws = new Ctor(url);
 
   let opened = false;
+  let closeRequested = false;
   let resolveReady!: () => void;
   let rejectReady!: (err: unknown) => void;
   const readyPromise = new Promise<void>((resolve, reject) => {
@@ -38,6 +39,7 @@ export function createWebSocketTransport(url: string, WebSocketImpl?: typeof Web
   ws.addEventListener("open", () => {
     opened = true;
     resolveReady();
+    if (closeRequested) ws.close();
   });
   ws.addEventListener("error", () => {
     if (!opened) rejectReady(new Error(`WebSocket connection to ${url} failed`));
@@ -52,7 +54,12 @@ export function createWebSocketTransport(url: string, WebSocketImpl?: typeof Web
     onClose: (listener) => {
       closeListener = listener;
     },
-    close: () => ws.close(),
+    close: () => {
+      if (closeRequested) return;
+      closeRequested = true;
+      if (ws.readyState === Ctor.CONNECTING) return;
+      if (ws.readyState === Ctor.OPEN || ws.readyState === Ctor.CLOSING) ws.close();
+    },
   };
 }
 
