@@ -4,10 +4,10 @@
     {
       "label": "build-server",
       "type": "shell",
-      "command": "pnpm --filter @lightbox-ps-service/generator build",
+      "command": "pnpm --filter @ps-generator-bridge/generator build",
       "problemMatcher": [],
       "presentation": {
-        "reveal": "silent",
+        "reveal": "always",
         "panel": "shared"
       }
     }
