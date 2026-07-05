@@ -26,6 +26,7 @@ export class PublicModules {
       this.invoke(ProtocolMethod.LayerGetInfoById, { layerID, options }),
     getLayerInfoByIndex: (layerIndex: number, options?: { getChildren: boolean }) =>
       this.invoke(ProtocolMethod.LayerGetInfoByIndex, { layerIndex, options }),
+    getCurrentPreview: () => this.invoke(ProtocolMethod.LayerGetCurrentPreview, {}),
   };
 
   readonly document = {
@@ -52,6 +53,7 @@ export class PublicModules {
   };
 
   readonly selection = {
+    watch: () => this.invoke(ProtocolMethod.SelectionWatch, {}),
     getArea: () => this.invoke(ProtocolMethod.SelectionGetArea, {}),
     getPath: (params?: ProtocolMethods[typeof ProtocolMethod.SelectionGetPath]["params"]) =>
       this.invoke(ProtocolMethod.SelectionGetPath, params),

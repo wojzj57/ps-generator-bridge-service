@@ -45,7 +45,7 @@ export function registerBuiltins(registry: Registry, plugins: () => PluginInfo[]
     if (!context.session) throw badRequest("event subscription session is not available");
     const { type } = params as { type?: unknown };
     if (typeof type !== "string") throw badRequest("type is required");
-    context.session.subscribe(type);
+    await context.session.subscribe(type);
     return { ok: true };
   });
   registry.registerMethod(ProtocolMethod.EventUnsubscribe, async (params, ctx) => {

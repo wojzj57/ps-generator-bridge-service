@@ -4,9 +4,11 @@ import type { PsBridgeHost } from "../../plugin";
 import type { PsGenerator } from "../../types/generator";
 import type { PsBounds, PsPixmap } from "../../types/ps";
 import { Pixmap } from "../../utils/pixmap";
-import { ws } from "@ps-generator-bridge/sdk/plugin";
+import { useLogger, ws } from "@ps-generator-bridge/sdk/plugin";
 import { ProtocolMethod, type LayerSpec, type WsImageResult } from "@ps-generator-bridge/sdk";
 import { bridgeError } from "../../errors";
+
+const log = useLogger("image");
 
 // `LayerSpec` is owned by the protocol (RFC 0008); re-export it so the
 // plugin-facing contract barrel (src/contract.ts) keeps surfacing it from here.
@@ -52,6 +54,9 @@ export interface ImageModuleApi {
 export class ImageModule extends BaseModule implements ImageModuleApi {
   constructor(plugin: PsBridgeHost) {
     super("image", plugin);
+    this.plugin.events.on("imageChanged", (data) => {
+      log.debug("image changed", data);
+    });
   }
 
   /**
@@ -352,8 +357,8 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
     }
     throw bridgeError.jsxFailed(
       `Unexpected response from PS in getLayerPixmap: js=${JSON.stringify(js)}, ` +
-        `pixmap=${pixmapBuffer ? "truthy" : "falsy"}, ` +
-        `iccExpected=${params.getICCProfileData}`
+      `pixmap=${pixmapBuffer ? "truthy" : "falsy"}, ` +
+      `iccExpected=${params.getICCProfileData}`
     );
   }
 

@@ -65,11 +65,12 @@ export function setGeneratorLogger(logger?: Logger): void {
 }
 
 export function useLogger(name = "ps-bridge"): Logger {
-  return {
+  const logger: BridgeLogger = {
     [BRIDGE_LOGGER_KEY]: true,
     debug: (message, ...args) => emit("debug", name, message, args),
     info: (message, ...args) => emit("info", name, message, args),
     warn: (message, ...args) => emit("warn", name, message, args),
     error: (message, ...args) => emit("error", name, message, args),
-  } satisfies BridgeLogger;
+  };
+  return logger;
 }

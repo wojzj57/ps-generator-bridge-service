@@ -8,7 +8,7 @@
 // Re-export `type`-only: nothing here carries a runtime value across the
 // boundary (the SDK imports it all with `import type`).
 
-export type { LayerModuleApi, PsLayer } from "./modules/layer";
+export type { LayerModuleApi, PsLayer, LayerPreviewPayload } from "./modules/layer";
 export type { DocumentModuleApi, PsDocument } from "./modules/document";
 export type { ActionModuleApi } from "./modules/action";
 export type { ImageModuleApi, ImageResult, LayerSpec } from "./modules/image";

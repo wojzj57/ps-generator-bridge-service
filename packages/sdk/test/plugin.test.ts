@@ -4,11 +4,13 @@ import {
   BasePlugin,
   ws,
   api,
+  subscribable,
   bootstrap,
   type AssemblyTarget,
   type PluginHost,
   type MethodHandler,
   type ApiRouteSpec,
+  type SubscribableProducer,
 } from "../src/plugin";
 
 // A minimal PluginHost stand-in: the devkit tests exercise BasePlugin and
@@ -24,6 +26,8 @@ const fakeHost = {
     executeBuiltin: () => Promise.resolve(),
   },
   events: {
+    subscribe: () => Promise.resolve(() => undefined),
+    ensureSubscribable: () => Promise.resolve(),
     on: eventOn,
     once: eventOnce,
     off: eventOff,
@@ -44,6 +48,11 @@ class TestPlugin extends BasePlugin {
   @api("/thing")
   async thing(): Promise<{ ok: true }> {
     return { ok: true };
+  }
+
+  @subscribable("test:changed")
+  changed(): () => void {
+    return () => undefined;
   }
 }
 
@@ -105,26 +114,31 @@ describe("decorators + bootstrap", () => {
     target: AssemblyTarget;
     methods: Map<string, MethodHandler>;
     apis: ApiRouteSpec[];
+    subscribables: Map<string, SubscribableProducer>;
   } {
     const methods = new Map<string, MethodHandler>();
     const apis: ApiRouteSpec[] = [];
+    const subscribables = new Map<string, SubscribableProducer>();
     return {
       target: {
         registerMethod: (n, h) => methods.set(n, h),
         registerApi: (r) => apis.push(r),
+        registerSubscribable: (t, p) => subscribables.set(t, p),
       },
       methods,
       apis,
+      subscribables,
     };
   }
 
   it("collects @ws/@api metadata and registers bound handlers with the target", () => {
-    const { target, methods, apis } = mockTarget();
+    const { target, methods, apis, subscribables } = mockTarget();
     const s = new TestPlugin("test", fakeHost);
     bootstrap(s, target);
 
     expect(methods.has("test:echo")).toBe(true);
     expect(apis).toEqual([expect.objectContaining({ method: "GET", url: "/thing" })]);
+    expect(subscribables.has("test:changed")).toBe(true);
 
     // Handler is bound to the instance.
     expect(methods.get("test:echo")!({ hi: 1 }, undefined)).toEqual({ hi: 1 });

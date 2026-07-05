@@ -1,29 +1,28 @@
 import { MainEvent, ProtocolMethod } from "@ps-generator-bridge/sdk";
-import { useLogger, ws } from "@ps-generator-bridge/sdk/plugin";
+import { subscribable, ws } from "@ps-generator-bridge/sdk/plugin";
 import { BaseModule } from "../base";
 import type { PsBridgeHost } from "../../plugin";
 import type { PsRect } from "../../types/ps";
+import type { SubscribableContext } from "@ps-generator-bridge/sdk/plugin";
 
 const SELECTION_ACTION_EVENTS = ["setd", "SbtF", "AddT", "move"] as const;
 const CHANGE_COOLDOWN_MS = 500;
-
-const log = useLogger("selection");
 
 type SelectionActionEvent = (typeof SELECTION_ACTION_EVENTS)[number];
 
 type SubPathItem =
   | {
-      kind: "C";
-      in?: { x: number; y: number };
-      out?: { x: number; y: number };
-      x: number;
-      y: number;
-    }
+    kind: "C";
+    in?: { x: number; y: number };
+    out?: { x: number; y: number };
+    x: number;
+    y: number;
+  }
   | {
-      kind: "P";
-      x: number;
-      y: number;
-    };
+    kind: "P";
+    x: number;
+    y: number;
+  };
 
 type PathItem = SubPathItem[][];
 
@@ -46,6 +45,7 @@ interface PhotoshopMessageBus {
 }
 
 export interface SelectionModuleApi {
+  watchSelection(): Promise<{ ok: true }>;
   getArea(): Promise<PsRect | null>;
   getPath(params?: { expand?: number }): Promise<SelectionPathData | null>;
 }
@@ -56,42 +56,25 @@ export interface SelectionModuleApi {
  * reports selection-tool action events.
  */
 export class SelectionModule extends BaseModule implements SelectionModuleApi {
-  private readonly onPhotoshopMessage = (messageId: number, value: unknown): void => {
-    void messageId;
-    this.handlePhotoshopMessage(value);
-  };
-
   private messageBus: PhotoshopMessageBus | undefined;
+  private activeWatchDisposer: (() => void) | undefined;
   private cooldown = false;
-  private started = false;
 
   constructor(plugin: PsBridgeHost) {
     super("selection", plugin);
   }
 
-  async start(): Promise<void> {
-    if (this.started) return;
-    this.started = true;
-    try {
-      await this.plugin.jsx.execute("Selection/registerEvent", {
-        events: [...SELECTION_ACTION_EVENTS],
-      });
-    } catch (error) {
-      log.warn("selection event registration failed", error);
-    }
-    this.messageBus = getPhotoshopMessageBus(this.plugin.generator);
-    this.messageBus?.on("message", this.onPhotoshopMessage);
+  dispose(): void {
+    this.activeWatchDisposer?.();
+    this.activeWatchDisposer = undefined;
+    this.messageBus = undefined;
+    this.cooldown = false;
   }
 
-  dispose(): void {
-    if (!this.messageBus) return;
-    if (this.messageBus.off) {
-      this.messageBus.off("message", this.onPhotoshopMessage);
-    } else {
-      this.messageBus.removeListener?.("message", this.onPhotoshopMessage);
-    }
-    this.messageBus = undefined;
-    this.started = false;
+  @ws(ProtocolMethod.SelectionWatch)
+  async watchSelection(): Promise<{ ok: true }> {
+    await this.plugin.events.ensureSubscribable(MainEvent.SelectionChanged);
+    return { ok: true };
   }
 
   @ws(ProtocolMethod.SelectionGetArea)
@@ -123,21 +106,53 @@ export class SelectionModule extends BaseModule implements SelectionModuleApi {
     return this.pathToSvg(result.path);
   }
 
-  private handlePhotoshopMessage(value: unknown): void {
+  @subscribable(MainEvent.SelectionChanged)
+  private async selectionChangedProducer(
+    context: SubscribableContext<PsRect | null>
+  ): Promise<() => void> {
+    await this.plugin.jsx.execute("Selection/registerEvent", {
+      events: [...SELECTION_ACTION_EVENTS],
+    });
+    const messageBus = getPhotoshopMessageBus(this.plugin.generator);
+    this.messageBus = messageBus;
+    const onPhotoshopMessage = (messageId: number, value: unknown): void => {
+      void messageId;
+      this.handlePhotoshopMessage(value, context.emit);
+    };
+    messageBus?.on("message", onPhotoshopMessage);
+
+    let disposed = false;
+    const dispose = () => {
+      if (disposed) return;
+      disposed = true;
+      if (messageBus?.off) {
+        messageBus.off("message", onPhotoshopMessage);
+      } else {
+        messageBus?.removeListener?.("message", onPhotoshopMessage);
+      }
+      if (this.messageBus === messageBus) this.messageBus = undefined;
+      if (this.activeWatchDisposer === dispose) this.activeWatchDisposer = undefined;
+      this.cooldown = false;
+    };
+    this.activeWatchDisposer = dispose;
+    return dispose;
+  }
+
+  private handlePhotoshopMessage(value: unknown, emit: (payload: PsRect | null) => void): void {
     if (typeof value !== "string") return;
     if (value !== "" && !isSelectionActionEvent(value)) return;
     if (this.cooldown) return;
 
     this.cooldown = true;
-    void this.emitSelectionChanged();
+    void this.emitSelectionChanged(emit);
     setTimeout(() => {
       this.cooldown = false;
     }, CHANGE_COOLDOWN_MS);
   }
 
-  private async emitSelectionChanged(): Promise<void> {
+  private async emitSelectionChanged(emit: (payload: PsRect | null) => void): Promise<void> {
     const area = await this.getArea();
-    this.plugin.emitModuleEvent(MainEvent.SelectionChanged, area);
+    emit(area);
   }
 
   private pathToSvg(pathCollection: PathItem): SelectionPathData | null {

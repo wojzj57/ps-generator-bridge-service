@@ -1,4 +1,4 @@
-import type { HttpMethod, ApiRouteSpec, AssemblyTarget } from "./types";
+import type { HttpMethod, ApiRouteSpec, AssemblyTarget, SubscribableProducer } from "./types";
 
 // Standard TC39 decorators stash metadata on the class under Symbol.metadata.
 // Node (and PS's Node 18) lacks the well-known symbol at runtime, so we polyfill
@@ -32,7 +32,13 @@ interface ApiHandlerMeta {
   methodKey: string;
 }
 
-type HandlerMeta = WsHandlerMeta | ApiHandlerMeta;
+interface SubscribableHandlerMeta {
+  kind: "subscribable";
+  type: string;
+  methodKey: string;
+}
+
+type HandlerMeta = WsHandlerMeta | ApiHandlerMeta | SubscribableHandlerMeta;
 
 type MetadataLike = Record<string | symbol, unknown>;
 
@@ -79,6 +85,17 @@ export function api(pathOrRoute: string | { method?: HttpMethod | HttpMethod[]; 
   };
 }
 
+/** Mark a method as a ref-counted Event producer. */
+export function subscribable(type: string) {
+  return function (_value: unknown, context: ClassMethodDecoratorContext): void {
+    pushHandler(context.metadata as MetadataLike, {
+      kind: "subscribable",
+      type,
+      methodKey: String(context.name),
+    });
+  };
+}
+
 /**
  * Second stage of decorator registration (ADR 0006 / 0009): scan a module or
  * plugin instance's collected metadata and register each decorated method
@@ -105,8 +122,10 @@ export function bootstrap(instance: object, target: AssemblyTarget): void {
     const bound = (fn as (...args: unknown[]) => unknown).bind(instance);
     if (meta.kind === "ws") {
       target.registerMethod(meta.name, bound);
-    } else {
+    } else if (meta.kind === "api") {
       target.registerApi({ method: meta.method, url: meta.url, handler: bound });
+    } else {
+      target.registerSubscribable(meta.type, bound as SubscribableProducer);
     }
   }
 }

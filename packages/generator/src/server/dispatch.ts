@@ -13,7 +13,7 @@ import { toProtocolError } from "../errors";
 export interface ConnectionSession {
   readonly clientId: string;
   readonly scope: EventEndpointScope;
-  subscribe(type: string): void;
+  subscribe(type: string): Promise<void>;
   unsubscribe(type: string): void;
 }
 

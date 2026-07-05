@@ -35,11 +35,13 @@ describe("protocol", () => {
     expect(ProtocolMethod.ActionAutoCutout).toBe("action:autoCutout");
     expect(ProtocolMethod.ActionRemoveBackground).toBe("action:removeBackground");
     expect(ProtocolMethod.LayerGetInfo).toBe("layer:getInfo");
+    expect(ProtocolMethod.LayerGetCurrentPreview).toBe("layer:getCurrentPreview");
     expect(ProtocolMethod.DocumentCurrent).toBe("document:current");
     expect(ProtocolMethod.DocumentExport).toBe("document:export");
     expect(ProtocolMethod.DocumentSave).toBe("document:save");
     expect(ProtocolMethod.SelectionGetArea).toBe("selection:getArea");
     expect(ProtocolMethod.SelectionGetPath).toBe("selection:getPath");
+    expect(ProtocolMethod.SelectionWatch).toBe("selection:change");
   });
 
   it("allows subscribing arbitrary string event names", () => {
@@ -62,7 +64,13 @@ describe("protocol", () => {
     const closing: ProtocolEvents["#closing"] = { reason: "host-close" };
 
     expect(MainEvent.SelectionChanged).toBe("selection:changed");
-    expect(MAIN_EVENTS).toEqual([MainEvent.Ready, MainEvent.Closing, MainEvent.SelectionChanged]);
+    expect(MainEvent.LayerPreviewChange).toBe("layer:previewChange");
+    expect(MAIN_EVENTS).toEqual([
+      MainEvent.Ready,
+      MainEvent.Closing,
+      MainEvent.SelectionChanged,
+      MainEvent.LayerPreviewChange,
+    ]);
     expect(ready.plugins[0]?.id).toBe("paint");
     expect(closing.reason).toBe("host-close");
   });
@@ -76,6 +84,19 @@ describe("protocol", () => {
     };
 
     expect(area.width).toBe(3);
+  });
+
+  it("models layer preview change events", () => {
+    const preview: ProtocolEvents["layer:previewChange"] = {
+      id: 7,
+      name: "Layer",
+      index: 1,
+      width: 12,
+      height: 8,
+      data: "data:image/png;base64,abc",
+    };
+
+    expect(preview.height).toBe(8);
   });
 
   it("keeps plugin-specific error codes out of the server-level catalog", () => {

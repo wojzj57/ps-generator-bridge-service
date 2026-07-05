@@ -47,6 +47,7 @@ export type {
   ImageChangedEvent,
   ImageChangedLayer,
   Bounds,
+  LayerPreviewPayload,
   LayerSpec,
   PsBounds,
   PsRect,

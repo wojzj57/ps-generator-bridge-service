@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import { MAIN_EVENTS, type MainEventMap, type MainEventName } from "@ps-generator-bridge/sdk";
+import type { SubscribableDisposer, SubscribableProducer } from "@ps-generator-bridge/sdk/plugin";
 import { bridgeError } from "../errors";
 import type { PsGenerator } from "../types/generator";
 import type { ClientStore } from "./clientStore";
@@ -111,6 +112,16 @@ export interface PhotoshopEvents {
 export type RuntimeEventListener = (payload: unknown) => void;
 
 export interface PluginEvents {
+  subscribe<K extends keyof PhotoshopEventMap>(
+    event: K,
+    listener: PhotoshopEventListener<K>
+  ): Promise<() => void>;
+  subscribe<K extends MainEventName>(
+    event: K,
+    listener: (payload: MainEventMap[K]) => void
+  ): Promise<() => void>;
+  subscribe(type: string, listener: RuntimeEventListener): Promise<() => void>;
+  ensureSubscribable(type: string): Promise<void>;
   on<K extends keyof PhotoshopEventMap>(event: K, listener: PhotoshopEventListener<K>): this;
   on<K extends MainEventName>(event: K, listener: (payload: MainEventMap[K]) => void): this;
   on(type: string, listener: RuntimeEventListener): this;
@@ -257,6 +268,15 @@ export interface RemoteEventSubscription {
   type: string;
 }
 
+export type RemoteEventWatcher = () => Promise<void> | void;
+
+interface SubscribableState {
+  refCount: number;
+  started: boolean;
+  starting?: Promise<void>;
+  dispose?: SubscribableDisposer;
+}
+
 export class EventScope {
   private readonly emitter = new EventEmitter();
 
@@ -287,8 +307,24 @@ export class EventScope {
 export class RuntimeEventManager {
   readonly mainScope = new EventScope();
   private readonly pluginScopes = new Map<string, EventScope>();
+  private readonly remoteWatchers = new Map<string, RemoteEventWatcher>();
+  private readonly subscribables = new Map<string, SubscribableProducer>();
+  private readonly subscribableStates = new Map<string, SubscribableState>();
+  private readonly warmupReleases = new Map<string, () => void>();
+  private readonly warmupStarts = new Map<string, Promise<void>>();
 
   constructor(readonly generatorEvents: EventManager) {}
+
+  registerRemoteWatcher(type: string, watcher: RemoteEventWatcher): void {
+    this.remoteWatchers.set(type, watcher);
+  }
+
+  registerSubscribable(type: string, producer: SubscribableProducer): void {
+    if (this.subscribables.has(type)) {
+      throw new Error(`subscribable already registered: ${type}`);
+    }
+    this.subscribables.set(type, producer);
+  }
 
   createPluginScope(pluginId: string): EventScope {
     const existing = this.pluginScopes.get(pluginId);
@@ -307,8 +343,22 @@ export class RuntimeEventManager {
     return new PluginEventFacade(this, pluginId);
   }
 
-  subscribeRemote(options: RemoteEventSubscription): void {
-    options.clients.subscribe(options.clientId, options.type, () => this.bindRemote(options));
+  async subscribeRemote(options: RemoteEventSubscription): Promise<void> {
+    await this.remoteWatchers.get(options.type)?.();
+    const target = this.resolveRemoteTarget(options.scope, options.type);
+    const release = await this.retainSubscribable(options.type);
+    let subscribed = false;
+    try {
+      subscribed = options.clients.subscribe(options.clientId, options.type, () => {
+        const unbind = this.bindRemote(options, target);
+        return () => {
+          unbind();
+          release();
+        };
+      });
+    } finally {
+      if (!subscribed) release();
+    }
   }
 
   unsubscribeRemote(options: RemoteEventSubscription): void {
@@ -323,6 +373,26 @@ export class RuntimeEventManager {
     return this.createPluginScope(pluginId).emit(type, payload);
   }
 
+  async ensureSubscribable(type: string): Promise<void> {
+    if (this.warmupReleases.has(type)) return;
+    const pending = this.warmupStarts.get(type);
+    if (pending) return pending;
+
+    const start = this.retainSubscribable(type).then((release) => {
+      if (this.warmupReleases.has(type)) {
+        release();
+        return;
+      }
+      this.warmupReleases.set(type, release);
+    });
+    this.warmupStarts.set(type, start);
+    try {
+      await start;
+    } finally {
+      this.warmupStarts.delete(type);
+    }
+  }
+
   disposePlugin(pluginId: string): void {
     const scope = this.pluginScopes.get(pluginId);
     scope?.dispose();
@@ -330,10 +400,35 @@ export class RuntimeEventManager {
   }
 
   dispose(): void {
+    for (const release of this.warmupReleases.values()) release();
+    this.warmupReleases.clear();
+    this.warmupStarts.clear();
+    for (const [type, state] of this.subscribableStates) {
+      state.refCount = 0;
+      this.stopSubscribable(type, state);
+    }
+    this.subscribableStates.clear();
     this.mainScope.dispose();
     for (const scope of this.pluginScopes.values()) scope.dispose();
     this.pluginScopes.clear();
     this.generatorEvents.dispose();
+  }
+
+  async subscribePluginListener(
+    type: string,
+    pluginId: string,
+    listener: RuntimeEventListener
+  ): Promise<() => void> {
+    const target = this.resolvePluginSubscriptionTarget(pluginId, type);
+    const release = await this.retainSubscribable(type);
+    onRuntimeTarget(target, type, listener);
+    let disposed = false;
+    return () => {
+      if (disposed) return;
+      disposed = true;
+      offRuntimeTarget(target, type, listener);
+      release();
+    };
   }
 
   bindPluginListener(type: string, pluginId: string, listener: RuntimeEventListener): () => void {
@@ -346,12 +441,85 @@ export class RuntimeEventManager {
     offRuntimeTarget(this.resolvePluginSubscriptionTarget(pluginId, type), type, listener);
   }
 
-  private bindRemote(options: RemoteEventSubscription): () => void {
-    const target = this.resolveRemoteTarget(options.scope, options.type);
+  private bindRemote(
+    options: RemoteEventSubscription,
+    target: EventScope | EventManager
+  ): () => void {
     const listener = (payload: unknown) =>
       options.clients.emit(options.clientId, options.type, payload);
     onRuntimeTarget(target, options.type, listener);
     return () => offRuntimeTarget(target, options.type, listener);
+  }
+
+  private async retainSubscribable(type: string): Promise<() => void> {
+    const producer = this.subscribables.get(type);
+    if (!producer) return () => {};
+
+    let state = this.subscribableStates.get(type);
+    if (!state) {
+      state = { refCount: 0, started: false };
+      this.subscribableStates.set(type, state);
+    }
+    state.refCount += 1;
+
+    try {
+      await this.startSubscribable(type, producer, state);
+    } catch (error) {
+      state.refCount -= 1;
+      if (state.refCount === 0) this.subscribableStates.delete(type);
+      throw error;
+    }
+
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.releaseSubscribable(type);
+    };
+  }
+
+  private async startSubscribable(
+    type: string,
+    producer: SubscribableProducer,
+    state: SubscribableState
+  ): Promise<void> {
+    if (state.started) return;
+    if (state.starting) return state.starting;
+
+    state.starting = Promise.resolve(
+      producer({
+        emit: (payload) => {
+          this.mainScope.emit(type, payload);
+        },
+      })
+    )
+      .then((dispose) => {
+        state.dispose = typeof dispose === "function" ? dispose : undefined;
+        state.started = true;
+      })
+      .finally(() => {
+        state.starting = undefined;
+      });
+    return state.starting;
+  }
+
+  private releaseSubscribable(type: string): void {
+    const state = this.subscribableStates.get(type);
+    if (!state) return;
+    state.refCount = Math.max(0, state.refCount - 1);
+    if (state.refCount !== 0) return;
+    this.stopSubscribable(type, state);
+  }
+
+  private stopSubscribable(type: string, state: SubscribableState): void {
+    if (state.refCount !== 0) return;
+    this.subscribableStates.delete(type);
+    const dispose = state.dispose;
+    state.dispose = undefined;
+    state.started = false;
+    if (dispose) {
+      void Promise.resolve(dispose()).catch(() => {});
+    }
   }
 
   private resolveRemoteTarget(scope: EventEndpointScope, type: string): EventScope | EventManager {
@@ -392,6 +560,19 @@ export class PluginEventFacade implements PluginEvents {
     private readonly runtime: RuntimeEventManager,
     private readonly pluginId: string
   ) {}
+
+  async subscribe(type: string, listener: RuntimeEventListener): Promise<() => void> {
+    const dispose = await this.runtime.subscribePluginListener(type, this.pluginId, listener);
+    this.addDisposer(type, listener, dispose);
+    return () => {
+      const registered = this.removeDisposer(type, listener);
+      (registered ?? dispose)();
+    };
+  }
+
+  ensureSubscribable(type: string): Promise<void> {
+    return this.runtime.ensureSubscribable(type);
+  }
 
   on(type: string, listener: RuntimeEventListener): this {
     this.addDisposer(

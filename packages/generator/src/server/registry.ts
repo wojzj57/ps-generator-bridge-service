@@ -1,9 +1,15 @@
 import type { HTTPMethods, RouteHandlerMethod } from "fastify";
 import { isRequest, type ResponseEnvelope } from "@ps-generator-bridge/sdk";
-import type { AssemblyTarget, MethodHandler, ApiRouteSpec } from "@ps-generator-bridge/sdk/plugin";
+import type {
+  AssemblyTarget,
+  MethodHandler,
+  ApiRouteSpec,
+  SubscribableProducer,
+} from "@ps-generator-bridge/sdk/plugin";
 import { unknownMethodResponse, type HandlerContext } from "./dispatch";
 import type { FastifyInstance } from "fastify";
 import { MethodTable } from "./methodTable";
+import type { RuntimeEventManager } from "../utils/eventManager";
 
 /**
  * Assembly seam between modules/builtins and the server (ADR 0006 / RFC 0004).
@@ -27,7 +33,10 @@ export class Registry implements AssemblyTarget {
    */
   reservedSegments: Set<string> = new Set();
 
-  constructor(private readonly app: FastifyInstance) {}
+  constructor(
+    private readonly app: FastifyInstance,
+    private readonly runtimeEvents?: RuntimeEventManager
+  ) {}
 
   /** Register (or replace) a WS Request handler. Runtime-capable. */
   registerMethod(method: string, handler: MethodHandler): void {
@@ -49,6 +58,13 @@ export class Registry implements AssemblyTarget {
       url: route.url,
       handler: route.handler as RouteHandlerMethod,
     });
+  }
+
+  registerSubscribable(type: string, producer: SubscribableProducer): void {
+    if (!this.runtimeEvents) {
+      throw new Error(`@subscribable '${type}' requires a runtime event manager`);
+    }
+    this.runtimeEvents.registerSubscribable(type, producer);
   }
 
   /**

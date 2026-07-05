@@ -28,6 +28,16 @@ export interface ApiRouteSpec {
   handler: ApiHandler;
 }
 
+export type SubscribableDisposer = () => void | Promise<void>;
+
+export interface SubscribableContext<T = unknown> {
+  emit(payload: T): void;
+}
+
+export type SubscribableProducer<T = unknown> = (
+  context: SubscribableContext<T>
+) => void | SubscribableDisposer | Promise<void | SubscribableDisposer>;
+
 /**
  * Abstract assembly target (ADR 0006 / RFC 0003): the second-stage bootstrap
  * registers scanned @ws/@api metadata against this. The server provides two
@@ -38,4 +48,5 @@ export interface ApiRouteSpec {
 export interface AssemblyTarget {
   registerMethod(name: string, handler: MethodHandler): void;
   registerApi(route: ApiRouteSpec): void;
+  registerSubscribable(type: string, producer: SubscribableProducer): void;
 }

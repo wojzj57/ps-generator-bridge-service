@@ -14,7 +14,7 @@
 
 // Runtime authoring kit (stays in the SDK).
 export { BasePlugin, isBasePluginClass } from "./base";
-export { ws, api, bootstrap } from "./decorators";
+export { ws, api, subscribable, bootstrap } from "./decorators";
 export { setGeneratorLogger, useLogger } from "./logger";
 export type { Logger, LogLevel } from "./logger";
 
@@ -45,10 +45,20 @@ export type {
   PhotoshopEventListener,
   ImageChangedEvent,
   ImageChangedLayer,
+  LayerPreviewPayload,
   Bounds,
 } from "@ps-generator-bridge/generator/contract";
 
-export type { AssemblyTarget, MethodHandler, ApiHandler, ApiRouteSpec, HttpMethod } from "./types";
+export type {
+  AssemblyTarget,
+  MethodHandler,
+  ApiHandler,
+  ApiRouteSpec,
+  HttpMethod,
+  SubscribableContext,
+  SubscribableDisposer,
+  SubscribableProducer,
+} from "./types";
 
 // Photoshop DOM proxy reached through `this.photoshop` on a plugin. The proxy
 // classes are exported as types only (authors get instances from the base

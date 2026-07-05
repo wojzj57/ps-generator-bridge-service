@@ -27,6 +27,15 @@ export interface PsLayer {
   children?: PsLayer[];
 }
 
+export type LayerPreviewPayload = {
+  id: number;
+  name: string;
+  index: number;
+  width: number;
+  height: number;
+  data: string;
+} | null;
+
 export interface PsDocument {
   id: number;
   name: string;

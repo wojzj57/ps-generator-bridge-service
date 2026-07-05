@@ -536,6 +536,22 @@ describe("public Connection", () => {
     });
     respond(transport, { id: 7, index: 1, name: "Layer", type: 1, visible: true });
     await expect(layer).resolves.toMatchObject({ id: 7 });
+
+    const preview = conn.modules.layer.getCurrentPreview();
+    await flush();
+    expect(lastRequest(transport)).toMatchObject({
+      method: ProtocolMethod.LayerGetCurrentPreview,
+      params: {},
+    });
+    respond(transport, {
+      id: 7,
+      name: "Layer",
+      index: 1,
+      width: 12,
+      height: 8,
+      data: "data:image/png;base64,abc",
+    });
+    await expect(preview).resolves.toMatchObject({ width: 12, height: 8 });
   });
 
   it("exposes image module wrappers", async () => {
@@ -584,6 +600,15 @@ describe("public Connection", () => {
     const { conn, transports } = harness();
     const transport = transports[0]!;
     await connect(conn, transport);
+
+    const watch = conn.modules.selection.watch();
+    await flush();
+    expect(lastRequest(transport)).toMatchObject({
+      method: ProtocolMethod.SelectionWatch,
+      params: {},
+    });
+    respond(transport, { ok: true });
+    await expect(watch).resolves.toEqual({ ok: true });
 
     const area = conn.modules.selection.getArea();
     await flush();

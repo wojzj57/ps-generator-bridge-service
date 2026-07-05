@@ -18,6 +18,7 @@ describe("Registry.dispatch", () => {
       ProtocolMethod.ActionAutoCutout,
       ProtocolMethod.ActionRemoveBackground,
       ProtocolMethod.LayerGetInfo,
+      ProtocolMethod.LayerGetCurrentPreview,
       ProtocolMethod.DocumentCurrent,
       ProtocolMethod.DocumentExport,
       ProtocolMethod.DocumentSave,
@@ -26,6 +27,7 @@ describe("Registry.dispatch", () => {
       ProtocolMethod.ImageExportDocument,
       ProtocolMethod.SelectionGetArea,
       ProtocolMethod.SelectionGetPath,
+      ProtocolMethod.SelectionWatch,
     ];
     expect(methods).toContain("action:autoCutout");
   });

@@ -1,5 +1,10 @@
 import type { ResponseEnvelope } from "@ps-generator-bridge/sdk";
-import type { AssemblyTarget, MethodHandler, ApiRouteSpec } from "@ps-generator-bridge/sdk/plugin";
+import type {
+  AssemblyTarget,
+  MethodHandler,
+  ApiRouteSpec,
+  SubscribableProducer,
+} from "@ps-generator-bridge/sdk/plugin";
 import { unknownMethodResponse, type HandlerContext } from "../server/dispatch";
 import { MethodTable } from "../server/methodTable";
 
@@ -25,6 +30,10 @@ export class ScopedRegistry implements AssemblyTarget {
 
   registerApi(route: ApiRouteSpec): void {
     this.apiRoutes.push(route);
+  }
+
+  registerSubscribable(type: string, _producer: SubscribableProducer): void {
+    throw new Error(`plugin @subscribable is not supported yet: ${type}`);
   }
 
   /** The `@api` routes bootstrap collected, for the assembler to flush to fastify. */

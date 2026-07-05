@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { ImageModule } from "../src/modules/image";
 import { JsxRunner } from "../src/utils/jsxRunner";
 import { LayerModule } from "../src/modules";
+import { EventManager, RuntimeEventManager } from "../src/utils/eventManager";
 import type { Logger } from "@ps-generator-bridge/sdk/plugin";
 import type { PsBridgeHost } from "../src/plugin";
 import { FakeGenerator, fakeGenerator } from "./fakeGenerator";
@@ -19,7 +20,8 @@ const silentLogger: Logger = { debug() {}, info() {}, warn() {}, error() {} };
 function setup(currentDocument: { id: number } | null = { id: 1 }) {
   const generator = fakeGenerator();
   const jsx = new JsxRunner(generator, silentLogger);
-  const plugin = { generator, jsx } as unknown as PsBridgeHost;
+  const events = new RuntimeEventManager(new EventManager(generator)).createPluginFacade("host");
+  const plugin = { generator, jsx, events } as unknown as PsBridgeHost;
   (plugin as { modules: PsBridgeHost["modules"] }).modules = {
     layer: new LayerModule(plugin),
     document: { currentDocument },

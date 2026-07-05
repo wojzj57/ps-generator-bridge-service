@@ -4,6 +4,7 @@ import { MainEvent, ProtocolMethod } from "@ps-generator-bridge/sdk";
 import { bootstrap } from "@ps-generator-bridge/sdk/plugin";
 import { SelectionModule } from "../src/modules/selection";
 import { Registry } from "../src/server/registry";
+import { EventManager, RuntimeEventManager } from "../src/utils/eventManager";
 import { JsxRunner } from "../src/utils/jsxRunner";
 import type { Logger } from "@ps-generator-bridge/sdk/plugin";
 import type { PsBridgeHost } from "../src/plugin";
@@ -16,20 +17,22 @@ function setup(generator: PsGenerator): {
   app: FastifyInstance;
   registry: Registry;
   module: SelectionModule;
-  emitModuleEvent: ReturnType<typeof vi.fn>;
+  runtimeEvents: RuntimeEventManager;
 } {
   const app = Fastify({ logger: false });
-  const registry = new Registry(app);
+  const runtimeEvents = new RuntimeEventManager(new EventManager(generator));
+  const registry = new Registry(app, runtimeEvents);
   const emitModuleEvent = vi.fn();
   const plugin = {
     generator,
     jsx: new JsxRunner(generator, silentLogger),
+    events: runtimeEvents.createPluginFacade("host"),
     emitModuleEvent,
     logger: silentLogger,
   } as unknown as PsBridgeHost;
   const module = new SelectionModule(plugin);
   bootstrap(module, registry);
-  return { app, registry, module, emitModuleEvent };
+  return { app, registry, module, runtimeEvents };
 }
 
 describe("SelectionModule", () => {
@@ -86,26 +89,52 @@ describe("SelectionModule", () => {
     expect(generator.jsxStringCalls.at(-1)?.script).toContain('"expand":3');
   });
 
-  it("publishes selection:changed from Photoshop action messages", async () => {
+  it("watches selection changes through the explicit ws method", async () => {
     const generator = fakeGenerator();
     generator.onEvaluateJSXString = (script) => {
       if (script.includes("networkEventSubscribe")) return undefined;
       return "1 px, 2 px, 11 px, 22 px";
     };
-    const { app, module, emitModuleEvent } = setup(generator);
+    const { app, registry, runtimeEvents } = setup(generator);
+    const seen: unknown[] = [];
+    runtimeEvents.mainScope.on(MainEvent.SelectionChanged, (payload) => seen.push(payload));
 
-    await module.start();
+    const watched = await registry.dispatch(
+      { id: "watch", method: ProtocolMethod.SelectionWatch, params: {} },
+      { generator }
+    );
     generator._photoshop.emit("message", 1, "setd");
-    await waitFor(() => emitModuleEvent.mock.calls.length > 0);
-    module.dispose();
+    await waitFor(() => seen.length > 0);
+    runtimeEvents.dispose();
     await app.close();
 
-    expect(emitModuleEvent).toHaveBeenCalledWith(MainEvent.SelectionChanged, {
+    expect(watched).toEqual({ id: "watch", ok: true, result: { ok: true } });
+    expect(seen[0]).toEqual({
       x: 1,
       y: 2,
       width: 10,
       height: 20,
     });
+  });
+
+  it("registers selection watch only once and retries after a failure", async () => {
+    const generator = fakeGenerator();
+    let attempts = 0;
+    generator.onEvaluateJSXString = (script) => {
+      if (!script.includes("networkEventSubscribe")) return null;
+      attempts += 1;
+      if (attempts === 1) throw new Error("register failed");
+      return undefined;
+    };
+    const { app, module, runtimeEvents } = setup(generator);
+
+    await expect(module.watchSelection()).rejects.toThrow("register failed");
+    await expect(module.watchSelection()).resolves.toEqual({ ok: true });
+    await expect(module.watchSelection()).resolves.toEqual({ ok: true });
+    runtimeEvents.dispose();
+    await app.close();
+
+    expect(attempts).toBe(2);
   });
 });
 

@@ -1,5 +1,6 @@
 import type { SubscribableEventName } from "./events";
 import type {
+  LayerPreviewPayload,
   LayerSpec,
   PsDocument,
   PsLayer,
@@ -25,6 +26,7 @@ export const ProtocolMethod = {
   LayerGetInfo: "layer:getInfo",
   LayerGetInfoById: "layer:getInfoById",
   LayerGetInfoByIndex: "layer:getInfoByIndex",
+  LayerGetCurrentPreview: "layer:getCurrentPreview",
   DocumentCurrent: "document:current",
   DocumentExport: "document:export",
   DocumentSave: "document:save",
@@ -33,6 +35,7 @@ export const ProtocolMethod = {
   ImageExportDocument: "image:exportDocument",
   SelectionGetArea: "selection:getArea",
   SelectionGetPath: "selection:getPath",
+  SelectionWatch: "selection:change",
 } as const;
 export type ProtocolMethod = (typeof ProtocolMethod)[keyof typeof ProtocolMethod];
 
@@ -89,6 +92,10 @@ export interface ProtocolMethods {
     params: { layerIndex: number; options?: { getChildren: boolean } };
     result: PsLayer;
   };
+  [ProtocolMethod.LayerGetCurrentPreview]: {
+    params: Record<string, never>;
+    result: LayerPreviewPayload;
+  };
   [ProtocolMethod.DocumentCurrent]: {
     params: Record<string, never>;
     result: PsDocument;
@@ -125,6 +132,10 @@ export interface ProtocolMethods {
   [ProtocolMethod.SelectionGetPath]: {
     params?: { expand?: number };
     result: SelectionPathData | null;
+  };
+  [ProtocolMethod.SelectionWatch]: {
+    params: Record<string, never>;
+    result: { ok: true };
   };
 }
 

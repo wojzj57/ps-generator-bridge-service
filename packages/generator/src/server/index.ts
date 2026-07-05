@@ -68,7 +68,7 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
   const runtimeEvents =
     options.runtimeEvents ?? new RuntimeEventManager(events ?? new EventManager(generator));
   const pluginManager = new PluginManager(app, runtimeEvents);
-  const registry = new Registry(app);
+  const registry = new Registry(app, runtimeEvents);
   registerBuiltins(registry, () => pluginManager.list());
   const rootClients = new ClientStore();
 
@@ -231,7 +231,7 @@ function createEventSession(options: {
     clientId: options.clientId,
     scope: options.scope,
     subscribe: (type) => {
-      options.events.subscribeRemote({
+      return options.events.subscribeRemote({
         scope: options.scope,
         clientId: options.clientId,
         clients: options.clients,

@@ -95,7 +95,8 @@ export class PsBridgeHost implements PluginHost {
   private constructor(
     public readonly generator: PsGenerator,
     public readonly config: PluginConfig,
-    overrides?: JsxRunnerOverrides
+    overrides?: JsxRunnerOverrides,
+    private readonly hostLogger: Logger = log
   ) {
     this._jsx = new JsxRunner(generator, log, overrides?.polyfillsDir);
     this._events = new EventManager(generator);
@@ -154,7 +155,7 @@ export class PsBridgeHost implements PluginHost {
     overrides?: JsxRunnerOverrides
   ): Promise<PsBridgeHost> {
     setGeneratorLogger(logger);
-    const host = new PsBridgeHost(generator, config, overrides);
+    const host = new PsBridgeHost(generator, config, overrides, logger);
     await host.onInit();
     return host;
   }
@@ -171,7 +172,7 @@ export class PsBridgeHost implements PluginHost {
       jsx: this._jsx,
       events: this._events,
       runtimeEvents: this._runtimeEvents,
-      logger: log,
+      logger: this.hostLogger,
     });
     this.server = server;
     // Plugins are loaded entirely from `pluginsDir`: scan its direct child
@@ -192,7 +193,7 @@ export class PsBridgeHost implements PluginHost {
       knownIds: new Set(),
       logger: log,
     });
-    for (const s of skipped) log.warn(`plugin skipped: ${s.path} - ${s.reason}`);
+    for (const s of skipped) log.warn(`plugin skipped: ${s.path} — ${s.reason}`);
     this.plugins = loaded.map((l) => l.plugin);
     // Register every plugin (scoped table + per-plugin ClientStore + bus +
     // /ws/{id} dispatch + prefixed @api) before module bootstrap, so plugin ids
@@ -210,7 +211,6 @@ export class PsBridgeHost implements PluginHost {
     // constructors don't touch jsx — only decorated handlers do, and those fire
     // after `listen` — so priming here is early enough.
     await this._jsx.init();
-    await this.modules.selection.start();
     await server.listen();
     this._runtimeEvents.emitMain(MainEvent.Ready, {
       port: server.port,

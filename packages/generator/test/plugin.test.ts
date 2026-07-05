@@ -39,6 +39,17 @@ describe("PsBridgeHost", () => {
     expect(generator.listeners.has("generatorMenuChanged")).toBe(true);
   });
 
+  it("does not start the selection watcher during host init", async () => {
+    const generator = fakeGenerator();
+    plugin = await PsBridgeHost.init(generator, { port: 0 }, silentLogger, {
+      polyfillsDir: SOURCE_POLYFILLS,
+    });
+
+    expect(
+      generator.jsxStringCalls.some((call) => call.script.includes("networkEventSubscribe"))
+    ).toBe(false);
+  });
+
   it("alerts only when its own menu item is clicked", async () => {
     const generator = fakeGenerator();
     plugin = await PsBridgeHost.init(generator, { port: 0 }, silentLogger, {
