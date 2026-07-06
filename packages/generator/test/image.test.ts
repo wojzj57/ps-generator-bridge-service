@@ -286,10 +286,9 @@ describe("ImageModule.getPreview", () => {
 
     await image.getPreview({ layerSpec: 7 });
 
-    // getScale(900,600) = 1 / min(floor(900/300), floor(600/300)) = 1 / min(3,2) = 0.5
     const params = generator.jsxFileCalls[0]?.params as Record<string, unknown>;
-    expect(params.scaleX).toBe(0.5);
-    expect(params.scaleY).toBe(0.5);
+    expect(params.scaleX).toBeCloseTo(1 / 3);
+    expect(params.scaleY).toBeCloseTo(1 / 3);
     expect(params.includeClipped).toBe(false);
     expect(params.includeClipBase).toBe(false);
     expect(params.includeAdjustors).toBe(false);
@@ -308,6 +307,18 @@ describe("ImageModule.getPreview", () => {
     const params = generator.jsxFileCalls[0]?.params as Record<string, unknown>;
     expect(params.scaleX).toBe(1);
     expect(params.scaleY).toBe(1);
+  });
+
+  it("scales by the longest edge for narrow strip layers", async () => {
+    const { generator, image } = setup();
+    safeLayerInfo(generator, { rect: { x: 0, y: 0, width: 3000, height: 100 } });
+    emitHappy(generator);
+
+    await image.getPreview({ layerSpec: 2 });
+
+    const params = generator.jsxFileCalls[0]?.params as Record<string, unknown>;
+    expect(params.scaleX).toBe(0.1);
+    expect(params.scaleY).toBe(0.1);
   });
 
   it("throws on invalid layer info", async () => {

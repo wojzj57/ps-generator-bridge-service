@@ -499,9 +499,8 @@ export interface ImageResult {
  * Port of LightAi's `getScale` (index.ts:748-752).
  */
 const getScale = (width: number, height: number): number => {
-  const xScale = Math.floor(width / 300) || 1;
-  const yScale = Math.floor(height / 300) || 1;
-  return 1 / Math.min(xScale, yScale);
+  const longestEdge = Math.max(width, height);
+  return longestEdge > 300 ? 300 / longestEdge : 1;
 };
 
 const JSX_CHANNEL_TIMEOUT_MS = 30_000;
