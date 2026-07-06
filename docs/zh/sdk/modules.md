@@ -28,7 +28,18 @@ const byId = await connection.modules.layer.getLayerInfoByID(7, {
 const byIndex = await connection.modules.layer.getLayerInfoByIndex(1, {
   getChildren: false,
 });
+
+const preview = await connection.modules.layer.getCurrentPreview();
+
+const imported = await connection.modules.layer.importImage({
+  image: "data:image/png;base64,...",
+  name: "Placed artwork",
+  position: { x: 120, y: 80 },
+  size: { width: 512, height: 512 },
+});
 ```
+
+`importImage()` 接收 data URI、原始 base64 图片数据、HTTP(S) URL、`file://` URI 或本地文件路径。可选放置字段可以设置图层名称、位置、尺寸、当前 work path mask，或相对目标图层插入。
 
 ## Action
 
@@ -45,6 +56,12 @@ const layerImage = await connection.modules.image.exportLayer({
   documentId: 1,
   layerSpec: 7,
   settings: { scaleX: 0.5 },
+});
+
+const layerWithPath = await connection.modules.image.exportLayerWithSelectedPath({
+  documentId: 1,
+  layerSpec: 7,
+  expand: 4,
 });
 
 const preview = await connection.modules.image.getPreview({
@@ -69,6 +86,22 @@ Image 方法返回 `WsImageResult`：
 ```
 
 当 generator 配置了 COS 上传时，`data` 也可以是 HTTPS URL，而不是内联 data URL。
+
+`exportLayerWithSelectedPath()` 会把当前选择路径合成到导出的 layer 图片上。如果没有选择路径，它返回普通 layer 导出结果。
+
+## Selection
+
+```ts
+await connection.modules.selection.watch();
+
+const area = await connection.modules.selection.getArea();
+
+const path = await connection.modules.selection.getPath({
+  expand: 4,
+});
+```
+
+`getArea()` 返回当前矩形选区 bounds 或 `null`。`getPath()` 返回当前选择路径的 SVG path 元数据或 `null`。
 
 ## 自定义和插件方法
 

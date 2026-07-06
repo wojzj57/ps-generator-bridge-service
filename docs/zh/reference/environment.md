@@ -6,6 +6,7 @@
 | --------------------------- | ------ | ------------------------------- | ------------------------ |
 | `PS_BRIDGE_PORT`            | 否     | 有效时覆盖 generator 服务端口。 | `7700`                   |
 | `PS_BRIDGE_PLUGINS_DIR`     | 否     | 直接子目录为插件包的目录。      | package-local `plugins/` |
+| `PS_BRIDGE_LOG_DIR`         | 否     | generator 运行日志目录。        | package-local `logs/`    |
 | `PS_BRIDGE_COS_SECRET_ID`   | 仅 COS | 腾讯云 COS secret id。          | 无                       |
 | `PS_BRIDGE_COS_SECRET_KEY`  | 仅 COS | 腾讯云 COS secret key。         | 无                       |
 | `PS_BRIDGE_COS_BUCKET`      | 仅 COS | 腾讯云 COS bucket。             | 无                       |

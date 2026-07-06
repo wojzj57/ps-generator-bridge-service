@@ -32,6 +32,7 @@ export interface PluginConfig {
 | --------------------------- | --------------------------------------------- |
 | `PS_BRIDGE_PORT`            | 有效时覆盖配置端口。                          |
 | `PS_BRIDGE_PLUGINS_DIR`     | 未提供 `pluginsDir` 时，覆盖默认插件目录。    |
+| `PS_BRIDGE_LOG_DIR`         | bundle 加载前覆盖 generator 运行日志目录。    |
 | `PS_BRIDGE_COS_SECRET_ID`   | COS 上传支持所需。                            |
 | `PS_BRIDGE_COS_SECRET_KEY`  | COS 上传支持所需。                            |
 | `PS_BRIDGE_COS_BUCKET`      | COS 上传支持所需。                            |

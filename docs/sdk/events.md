@@ -79,7 +79,21 @@ connection.on("#closing", (event) => {
 connection.on("selection:changed", (area) => {
   console.log(area);
 });
+
+connection.on("layer:previewChange", (preview) => {
+  console.log(preview?.id, preview?.width, preview?.height);
+});
+
+connection.on("layer:selectionChange", (layers) => {
+  console.log(layers?.map((layer) => layer.id));
+});
 ```
+
+Built-in module event names include:
+
+- `selection:changed`
+- `layer:previewChange`
+- `layer:selectionChange`
 
 ## Plugin Events
 

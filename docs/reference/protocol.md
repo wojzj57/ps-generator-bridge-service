@@ -1,6 +1,6 @@
 # Protocol Reference
 
-The SDK package owns the protocol contract in `packages/sdk/src/protocol.ts`.
+The SDK package owns the protocol contract in `packages/sdk/src/protocol/`.
 
 ## Version
 
@@ -60,12 +60,18 @@ Events have no `id` and no direct response.
 | `layer:getInfo`           | Inspect layer information.                                         |
 | `layer:getInfoById`       | Inspect layer by id.                                               |
 | `layer:getInfoByIndex`    | Inspect layer by index.                                            |
+| `layer:getCurrentPreview` | Get the current selected layer preview payload.                    |
+| `layer:importImage`       | Import an image source into Photoshop as a layer.                  |
 | `document:current`        | Get current document information.                                  |
 | `document:export`         | Export document.                                                   |
 | `document:save`           | Save document.                                                     |
 | `image:exportLayer`       | Export a layer image result.                                       |
+| `image:exportLayerWithSelectedPath` | Export a layer image with the current selection path overlay. |
 | `image:getPreview`        | Get a layer preview image result.                                  |
 | `image:exportDocument`    | Export a document image result.                                    |
+| `selection:getArea`       | Get the current rectangular selection area, or `null`.             |
+| `selection:getPath`       | Get the current selection path as SVG metadata, or `null`.         |
+| `selection:change`        | Register the generator-side selection change watcher.              |
 
 Plugin-specific methods are open string names and are invoked through `connection.invoke(...)` on plugin endpoint connections.
 
@@ -95,6 +101,12 @@ interface PluginInfo {
 "#closing": {
   reason: "host-close" | "process-exit";
 }
+
+"selection:changed": PsRect | null;
+
+"layer:previewChange": LayerPreviewPayload;
+
+"layer:selectionChange": PsLayer[] | null;
 ```
 
 ## Error Shape

@@ -28,7 +28,18 @@ const byId = await connection.modules.layer.getLayerInfoByID(7, {
 const byIndex = await connection.modules.layer.getLayerInfoByIndex(1, {
   getChildren: false,
 });
+
+const preview = await connection.modules.layer.getCurrentPreview();
+
+const imported = await connection.modules.layer.importImage({
+  image: "data:image/png;base64,...",
+  name: "Placed artwork",
+  position: { x: 120, y: 80 },
+  size: { width: 512, height: 512 },
+});
 ```
+
+`importImage()` accepts a data URI, raw base64 image data, an HTTP(S) URL, a `file://` URI, or a local file path. Optional placement fields can name the layer, position it, resize it, apply the current work path as a mask, or insert relative to a target layer.
 
 ## Action
 
@@ -45,6 +56,12 @@ const layerImage = await connection.modules.image.exportLayer({
   documentId: 1,
   layerSpec: 7,
   settings: { scaleX: 0.5 },
+});
+
+const layerWithPath = await connection.modules.image.exportLayerWithSelectedPath({
+  documentId: 1,
+  layerSpec: 7,
+  expand: 4,
 });
 
 const preview = await connection.modules.image.getPreview({
@@ -69,6 +86,22 @@ Image methods return `WsImageResult`:
 ```
 
 When COS upload is configured on the generator, `data` can be an HTTPS URL instead of an inline data URL.
+
+`exportLayerWithSelectedPath()` composites the current selection path over the exported layer image. If there is no selection path, it returns the plain layer export.
+
+## Selection
+
+```ts
+await connection.modules.selection.watch();
+
+const area = await connection.modules.selection.getArea();
+
+const path = await connection.modules.selection.getPath({
+  expand: 4,
+});
+```
+
+`getArea()` returns the current rectangular selection bounds or `null`. `getPath()` returns SVG path metadata for the current selection path or `null`.
 
 ## Custom and Plugin Methods
 

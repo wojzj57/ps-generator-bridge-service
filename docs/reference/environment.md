@@ -6,6 +6,7 @@ Environment variables are deployment-time overrides. Structured runtime paramete
 | --------------------------- | -------- | ---------------------------------------------------- | ------------------------ |
 | `PS_BRIDGE_PORT`            | No       | Overrides the generator service port when valid.     | `7700`                   |
 | `PS_BRIDGE_PLUGINS_DIR`     | No       | Directory whose direct children are plugin packages. | package-local `plugins/` |
+| `PS_BRIDGE_LOG_DIR`         | No       | Directory for generator runtime logs.                | package-local `logs/`    |
 | `PS_BRIDGE_COS_SECRET_ID`   | COS only | Tencent Cloud COS secret id.                         | none                     |
 | `PS_BRIDGE_COS_SECRET_KEY`  | COS only | Tencent Cloud COS secret key.                        | none                     |
 | `PS_BRIDGE_COS_BUCKET`      | COS only | Tencent Cloud COS bucket.                            | none                     |

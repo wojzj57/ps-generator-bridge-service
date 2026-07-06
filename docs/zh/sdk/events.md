@@ -29,12 +29,12 @@ connection.off("imageChanged", listener);
 Root endpoint 连接可以订阅：
 
 - Photoshop 事件
-- 主 `#` 事件，例如 `#ready` 和 `#closing`
+- 主事件，例如 `#ready`、`#closing` 和内置模块事件
 
 插件 endpoint 连接可以订阅：
 
 - Photoshop 事件
-- 主 `#` 事件
+- 主事件
 - 当前插件发出的插件本地事件名
 
 Root endpoint 连接不能订阅插件本地事件名。服务端会用协议错误拒绝这类订阅。
@@ -65,7 +65,7 @@ connection.on("imageChanged", (event) => {
 
 ## 主事件
 
-主事件是服务端拥有的进程事件：
+主事件是 SDK 协议暴露的服务端事件，包含 host 生命周期事件和内置模块事件：
 
 ```ts
 connection.on("#ready", (event) => {
@@ -75,7 +75,25 @@ connection.on("#ready", (event) => {
 connection.on("#closing", (event) => {
   console.log(event.reason);
 });
+
+connection.on("selection:changed", (area) => {
+  console.log(area);
+});
+
+connection.on("layer:previewChange", (preview) => {
+  console.log(preview?.id, preview?.width, preview?.height);
+});
+
+connection.on("layer:selectionChange", (layers) => {
+  console.log(layers?.map((layer) => layer.id));
+});
 ```
+
+内置模块事件名包括：
+
+- `selection:changed`
+- `layer:previewChange`
+- `layer:selectionChange`
 
 ## 插件事件
 

@@ -1,6 +1,6 @@
 # 协议参考
 
-SDK 包在 `packages/sdk/src/protocol.ts` 中拥有协议契约。
+SDK 包在 `packages/sdk/src/protocol/` 中拥有协议契约。
 
 ## 版本
 
@@ -60,12 +60,18 @@ Event 没有 `id`，也没有直接响应。
 | `layer:getInfo`           | 检查 layer 信息。                               |
 | `layer:getInfoById`       | 按 id 检查 layer。                              |
 | `layer:getInfoByIndex`    | 按 index 检查 layer。                           |
+| `layer:getCurrentPreview` | 获取当前选中 layer 的预览 payload。             |
+| `layer:importImage`       | 将图片源导入 Photoshop 为 layer。               |
 | `document:current`        | 获取当前文档信息。                              |
 | `document:export`         | 导出文档。                                      |
 | `document:save`           | 保存文档。                                      |
 | `image:exportLayer`       | 导出 layer 图片结果。                           |
+| `image:exportLayerWithSelectedPath` | 导出带当前选择路径叠加层的 layer 图片。 |
 | `image:getPreview`        | 获取 layer 预览图片结果。                       |
 | `image:exportDocument`    | 导出 document 图片结果。                        |
+| `selection:getArea`       | 获取当前矩形选区区域，或返回 `null`。           |
+| `selection:getPath`       | 获取当前选择路径的 SVG 元数据，或返回 `null`。  |
+| `selection:change`        | 注册 generator 侧选择变化 watcher。             |
 
 插件专属方法是开放字符串名，通过插件 endpoint 连接上的 `connection.invoke(...)` 调用。
 
@@ -95,6 +101,12 @@ interface PluginInfo {
 "#closing": {
   reason: "host-close" | "process-exit";
 }
+
+"selection:changed": PsRect | null;
+
+"layer:previewChange": LayerPreviewPayload;
+
+"layer:selectionChange": PsLayer[] | null;
 ```
 
 ## 错误形状

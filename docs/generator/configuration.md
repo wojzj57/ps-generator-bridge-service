@@ -32,6 +32,7 @@ Environment variables are deployment knobs:
 | --------------------------- | ------------------------------------------------------------------------- |
 | `PS_BRIDGE_PORT`            | Overrides the configured port when valid.                                 |
 | `PS_BRIDGE_PLUGINS_DIR`     | Overrides the default plugin directory when `pluginsDir` is not provided. |
+| `PS_BRIDGE_LOG_DIR`         | Overrides the generator runtime log directory before the bundle loads.    |
 | `PS_BRIDGE_COS_SECRET_ID`   | Required for COS upload support.                                          |
 | `PS_BRIDGE_COS_SECRET_KEY`  | Required for COS upload support.                                          |
 | `PS_BRIDGE_COS_BUCKET`      | Required for COS upload support.                                          |
