@@ -1,4 +1,10 @@
-import type { ImageChangedEvent, LayerPreviewPayload, PluginInfo, PsRect } from "./models";
+import type {
+  ImageChangedEvent,
+  LayerPreviewPayload,
+  LayerSelectionChangePayload,
+  PluginInfo,
+  PsRect,
+} from "./models";
 
 /**
  * Main event names shared by the sdk type surface and generator runtime.
@@ -10,6 +16,7 @@ export const MainEvent = {
   Closing: "#closing",
   SelectionChanged: "selection:changed",
   LayerPreviewChange: "layer:previewChange",
+  LayerSelectionChange: "layer:selectionChange",
 } as const;
 export type MainEvent = (typeof MainEvent)[keyof typeof MainEvent];
 
@@ -24,6 +31,7 @@ export interface MainEventMap {
   };
   [MainEvent.SelectionChanged]: PsRect | null;
   [MainEvent.LayerPreviewChange]: LayerPreviewPayload;
+  [MainEvent.LayerSelectionChange]: LayerSelectionChangePayload;
 }
 
 type AssertNever<T extends never> = T;

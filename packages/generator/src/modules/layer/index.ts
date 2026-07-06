@@ -3,6 +3,7 @@ import {
   ProtocolMethod,
   type ImageChangedEvent,
   type LayerPreviewPayload,
+  type LayerSelectionChangePayload,
 } from "@ps-generator-bridge/sdk";
 import {
   subscribable,
@@ -19,6 +20,7 @@ const log = useLogger("layer");
 const PREVIEW_CHANGE_DEBOUNCE_MS = 300;
 
 export type { LayerPreviewPayload };
+export type { LayerSelectionChangePayload };
 
 export class PsLayer {
   declare public id: number;
@@ -169,6 +171,24 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
     };
   }
 
+  @subscribable(MainEvent.LayerSelectionChange)
+  private layerSelectionChangeProducer(
+    context: SubscribableContext<LayerSelectionChangePayload>
+  ): () => void {
+    const onImageChanged = (event: ImageChangedEvent): void => {
+      if (!Array.isArray(event.selection)) return;
+      void this.emitLayerSelectionChange(event.selection, context.emit);
+    };
+    this.plugin.events.on("imageChanged", onImageChanged);
+
+    let disposed = false;
+    return () => {
+      if (disposed) return;
+      disposed = true;
+      this.plugin.events.off("imageChanged", onImageChanged);
+    };
+  }
+
   private handleImageChanged(
     event: ImageChangedEvent,
     emit: (payload: LayerPreviewPayload) => void
@@ -202,6 +222,30 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
       this.previewCache = null;
     }
     this.schedulePreviewChange(emit);
+  }
+
+  private async emitLayerSelectionChange(
+    selection: number[],
+    emit: (payload: LayerSelectionChangePayload) => void
+  ): Promise<void> {
+    if (selection.length === 0) {
+      emit(null);
+      return;
+    }
+
+    const layers: PsLayer[] = [];
+    for (const layerIndex of selection) {
+      try {
+        layers.push(
+          await this.plugin.jsx.executeSafe<PsLayer>("Layer/getLayerInfo", {
+            layerIndex,
+          })
+        );
+      } catch (error) {
+        log.warn("selected layer lookup failed", error);
+      }
+    }
+    emit(layers);
   }
 
   private async handlePixelChange(

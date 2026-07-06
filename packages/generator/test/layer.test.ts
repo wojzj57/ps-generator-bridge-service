@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import Fastify, { type FastifyInstance } from "fastify";
-import { MainEvent, ProtocolMethod, type LayerPreviewPayload } from "@ps-generator-bridge/sdk";
+import {
+  MainEvent,
+  ProtocolMethod,
+  type LayerPreviewPayload,
+  type LayerSelectionChangePayload,
+} from "@ps-generator-bridge/sdk";
 import { bootstrap } from "@ps-generator-bridge/sdk/plugin";
 import { LayerModule } from "../src/modules/layer";
 import { Registry } from "../src/server/registry";
@@ -196,5 +201,70 @@ describe("LayerModule current preview", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("LayerModule selection change", () => {
+  it("publishes layer:selectionChange with layer info for each selected index", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = (script) => {
+      if (script.includes('"layerIndex":2')) return layer({ id: 20, index: 2, name: "Second" });
+      if (script.includes('"layerIndex":5')) return layer({ id: 50, index: 5, name: "Fifth" });
+      return layer({ id: 7, index: 1, name: "Layer" });
+    };
+    const { app, runtimeEvents } = setup(generator);
+    const seen: LayerSelectionChangePayload[] = [];
+    runtimeEvents.mainScope.on(MainEvent.LayerSelectionChange, (payload) =>
+      seen.push(payload as LayerSelectionChangePayload)
+    );
+
+    await runtimeEvents.ensureSubscribable(MainEvent.LayerSelectionChange);
+    generator.emit("imageChanged", {
+      version: "1.6.1",
+      timeStamp: 1,
+      count: 1,
+      id: 59,
+      selection: [2, 5],
+      metaDataOnly: true,
+    });
+    await vi.waitFor(() => {
+      expect(seen).toHaveLength(1);
+    });
+    runtimeEvents.dispose();
+    await app.close();
+
+    expect(seen[0]).toMatchObject([
+      { id: 20, index: 2, name: "Second" },
+      { id: 50, index: 5, name: "Fifth" },
+    ]);
+    expect(generator.jsxStringCalls).toHaveLength(2);
+    expect(generator.jsxStringCalls[0]?.script).toContain('"layerIndex":2');
+    expect(generator.jsxStringCalls[1]?.script).toContain('"layerIndex":5');
+  });
+
+  it("publishes null for empty layer selection changes", async () => {
+    const generator = fakeGenerator();
+    const { app, runtimeEvents } = setup(generator);
+    const seen: LayerSelectionChangePayload[] = [];
+    runtimeEvents.mainScope.on(MainEvent.LayerSelectionChange, (payload) =>
+      seen.push(payload as LayerSelectionChangePayload)
+    );
+
+    await runtimeEvents.ensureSubscribable(MainEvent.LayerSelectionChange);
+    generator.emit("imageChanged", {
+      version: "1.6.1",
+      timeStamp: 1,
+      count: 1,
+      id: 59,
+      selection: [],
+      metaDataOnly: true,
+    });
+    await vi.waitFor(() => {
+      expect(seen).toEqual([null]);
+    });
+    runtimeEvents.dispose();
+    await app.close();
+
+    expect(generator.jsxStringCalls).toHaveLength(0);
   });
 });

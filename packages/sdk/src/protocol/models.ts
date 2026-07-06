@@ -36,6 +36,8 @@ export type LayerPreviewPayload = {
   data: string;
 } | null;
 
+export type LayerSelectionChangePayload = PsLayer[] | null;
+
 export interface PsDocument {
   id: number;
   name: string;

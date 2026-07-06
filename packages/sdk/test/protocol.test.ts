@@ -65,11 +65,13 @@ describe("protocol", () => {
 
     expect(MainEvent.SelectionChanged).toBe("selection:changed");
     expect(MainEvent.LayerPreviewChange).toBe("layer:previewChange");
+    expect(MainEvent.LayerSelectionChange).toBe("layer:selectionChange");
     expect(MAIN_EVENTS).toEqual([
       MainEvent.Ready,
       MainEvent.Closing,
       MainEvent.SelectionChanged,
       MainEvent.LayerPreviewChange,
+      MainEvent.LayerSelectionChange,
     ]);
     expect(ready.plugins[0]?.id).toBe("paint");
     expect(closing.reason).toBe("host-close");
@@ -97,6 +99,25 @@ describe("protocol", () => {
     };
 
     expect(preview.height).toBe(8);
+  });
+
+  it("models layer selection change events", () => {
+    const selected: ProtocolEvents["layer:selectionChange"] = [
+      {
+        id: 7,
+        index: 1,
+        name: "Layer",
+        type: 1,
+        visible: true,
+        clip: false,
+        rect: { x: 0, y: 0, width: 12, height: 8 },
+        bounds: { left: 0, top: 0, right: 12, bottom: 8 },
+      },
+    ];
+    const empty: ProtocolEvents["layer:selectionChange"] = null;
+
+    expect(selected[0]?.id).toBe(7);
+    expect(empty).toBeNull();
   });
 
   it("keeps plugin-specific error codes out of the server-level catalog", () => {
