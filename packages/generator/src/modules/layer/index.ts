@@ -401,7 +401,8 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
     }
 
     try {
-      this.currentLayer = await this.getLayerInfoByIndex(index);
+      const layerIndex = this.toPhotoshopLayerIndex(index);
+      this.currentLayer = await this.getLayerInfoByIndex(layerIndex);
     } catch (error) {
       log.warn("selected layer lookup failed", error);
       this.currentLayer = undefined;
@@ -420,11 +421,11 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
     }
 
     const layers: PsLayer[] = [];
-    for (const layerIndex of selection) {
+    for (const index of selection) {
       try {
         layers.push(
           await this.plugin.jsx.executeSafe<PsLayer>("Layer/getLayerInfo", {
-            layerIndex,
+            layerIndex: this.toPhotoshopLayerIndex(index),
           })
         );
       } catch (error) {
@@ -432,6 +433,10 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
       }
     }
     emit(layers);
+  }
+
+  private toPhotoshopLayerIndex(index: number): number {
+    return index + 1;
   }
 
   private async handlePixelChange(

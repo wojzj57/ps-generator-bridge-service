@@ -145,11 +145,16 @@ describe("LayerModule current preview", () => {
     expect(imageGetPreview).not.toHaveBeenCalled();
   });
 
-  it("publishes layer:previewChange from the first selected layer index after debounce", async () => {
+  it("publishes layer:previewChange from the first selected layer after mapping index to layerIndex", async () => {
     vi.useFakeTimers();
     try {
       const generator = fakeGenerator();
-      generator.onEvaluateJSXString = () => layer({ id: 9, index: 1, name: "Selected" });
+      generator.onEvaluateJSXString = (script) => {
+        if (script.includes('"layerIndex":2')) {
+          return layer({ id: 9, index: 2, name: "Selected" });
+        }
+        return layer({ id: 7, index: 1, name: "Layer" });
+      };
       const { app, runtimeEvents, imageGetPreview } = setup(generator);
       const seen: LayerPreviewPayload[] = [];
       runtimeEvents.mainScope.on(MainEvent.LayerPreviewChange, (payload) =>
@@ -178,12 +183,12 @@ describe("LayerModule current preview", () => {
       expect(seen[0]).toMatchObject({
         id: 9,
         name: "Selected",
-        index: 1,
+        index: 2,
         width: 12,
         height: 8,
         data: "data:image/png;base64,cG5n",
       });
-      expect(generator.jsxStringCalls[0]?.script).toContain('"layerIndex":1');
+      expect(generator.jsxStringCalls[0]?.script).toContain('"layerIndex":2');
       expect(imageGetPreview).toHaveBeenCalledWith({ layerSpec: 9 });
     } finally {
       vi.useRealTimers();
@@ -420,11 +425,11 @@ describe("LayerModule image import", () => {
 });
 
 describe("LayerModule selection change", () => {
-  it("publishes layer:selectionChange with layer info for each selected index", async () => {
+  it("publishes layer:selectionChange with layer info after mapping indices to layerIndex", async () => {
     const generator = fakeGenerator();
     generator.onEvaluateJSXString = (script) => {
-      if (script.includes('"layerIndex":2')) return layer({ id: 20, index: 2, name: "Second" });
-      if (script.includes('"layerIndex":5')) return layer({ id: 50, index: 5, name: "Fifth" });
+      if (script.includes('"layerIndex":3')) return layer({ id: 20, index: 3, name: "Second" });
+      if (script.includes('"layerIndex":6')) return layer({ id: 50, index: 6, name: "Fifth" });
       return layer({ id: 7, index: 1, name: "Layer" });
     };
     const { app, runtimeEvents } = setup(generator);
@@ -449,12 +454,12 @@ describe("LayerModule selection change", () => {
     await app.close();
 
     expect(seen[0]).toMatchObject([
-      { id: 20, index: 2, name: "Second" },
-      { id: 50, index: 5, name: "Fifth" },
+      { id: 20, index: 3, name: "Second" },
+      { id: 50, index: 6, name: "Fifth" },
     ]);
     expect(generator.jsxStringCalls).toHaveLength(2);
-    expect(generator.jsxStringCalls[0]?.script).toContain('"layerIndex":2');
-    expect(generator.jsxStringCalls[1]?.script).toContain('"layerIndex":5');
+    expect(generator.jsxStringCalls[0]?.script).toContain('"layerIndex":3');
+    expect(generator.jsxStringCalls[1]?.script).toContain('"layerIndex":6');
   });
 
   it("publishes null for empty layer selection changes", async () => {

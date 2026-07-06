@@ -129,6 +129,10 @@ export interface ImageChangedEvent {
   file?: string;
   closed?: boolean;
   metaDataOnly?: boolean;
+  /**
+   * Selected layer indices from Generator imageChanged events.
+   * Add 1 before using as a Photoshop layerIndex.
+   */
   selection?: number[];
   layers?: ImageChangedLayer[];
 }

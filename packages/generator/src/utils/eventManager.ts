@@ -56,7 +56,10 @@ export interface ImageChangedEvent {
   closed?: boolean;
   /** True when only metadata changed (no pixel/layer body). */
   metaDataOnly?: boolean;
-  /** Selected layer indices; empty array when the selection is cleared. */
+  /**
+   * Selected layer indices; empty array when cleared.
+   * Add 1 before using as a Photoshop layerIndex.
+   */
   selection?: number[];
   /** Layers touched by this change (pixel edits, bounds, removals). */
   layers?: ImageChangedLayer[];
