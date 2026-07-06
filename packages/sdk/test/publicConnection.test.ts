@@ -160,6 +160,52 @@ describe("public Connection", () => {
     await expect(Connection.plugins()).rejects.toThrow(/pass options\.fetch/);
   });
 
+  it("pluginHealth fetches /plugins/{id}/health and returns plugin health", async () => {
+    const health = {
+      id: "paint",
+      status: "loaded",
+      clients: 2,
+      loadedAt: 123,
+      checks: { runtime: "ok" },
+    };
+    const { fetchImpl, urls } = fetchHarness(responseJson(health));
+
+    await expect(Connection.pluginHealth("paint tool", { fetch: fetchImpl })).resolves.toEqual(
+      health
+    );
+    expect(urls).toEqual(["http://127.0.0.1:7700/plugins/paint%20tool/health"]);
+  });
+
+  it("pluginHealth uses injected fetch and converts HTTP helper protocols", async () => {
+    const { fetchImpl, urls } = fetchHarness(
+      responseJson({ id: "paint", status: "loaded", clients: 0 })
+    );
+
+    await Connection.pluginHealth("paint", { url: "https://host:7700/base/", fetch: fetchImpl });
+    await Connection.pluginHealth("paint", { url: "ws://socket:7700", fetch: fetchImpl });
+
+    expect(urls).toEqual([
+      "https://host:7700/base/plugins/paint/health",
+      "http://socket:7700/plugins/paint/health",
+    ]);
+  });
+
+  it("pluginHealth throws ordinary errors for HTTP and malformed response failures", async () => {
+    const httpFailure = fetchHarness(responseJson({}, { status: 404 }));
+    const malformedJson = fetchHarness(responseJsonError(new Error("bad json")));
+    const malformedShape = fetchHarness(responseJson({ id: "paint", status: "loaded" }));
+
+    await expect(
+      Connection.pluginHealth("paint", { fetch: httpFailure.fetchImpl })
+    ).rejects.toThrow(/HTTP 404/);
+    await expect(
+      Connection.pluginHealth("paint", { fetch: malformedJson.fetchImpl })
+    ).rejects.toThrow(/Malformed JSON/);
+    await expect(
+      Connection.pluginHealth("paint", { fetch: malformedShape.fetchImpl })
+    ).rejects.toThrow(/Malformed response/);
+  });
+
   it("defaults to the root /ws endpoint and does not expose event facade", async () => {
     let capturedUrl = "";
     const conn = new Connection({

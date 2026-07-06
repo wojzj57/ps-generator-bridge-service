@@ -36,6 +36,8 @@ export interface LoadedPlugin {
 export interface SkippedPlugin {
   /** Folder name under pluginsDir, for readable logs. */
   path: string;
+  /** Stable diagnostic id. Uses static plugin id when available, else folder name. */
+  id: string;
   code: string;
   reason: string;
 }
@@ -87,7 +89,12 @@ export async function loadPlugins(options: LoadOptions): Promise<LoadResult> {
       taken.add(outcome.id);
       log.info(`plugin loaded: ${name} (${outcome.id})`);
     } else {
-      skipped.push({ path: name, code: ErrorCode.PluginLoadFailed, reason: outcome.reason });
+      skipped.push({
+        path: name,
+        id: outcome.id ?? name,
+        code: ErrorCode.PluginLoadFailed,
+        reason: outcome.reason,
+      });
       log.warn(`plugin skipped: ${name} — ${outcome.reason}`);
     }
   }
@@ -96,7 +103,7 @@ export async function loadPlugins(options: LoadOptions): Promise<LoadResult> {
 
 type Outcome =
   | { kind: "loaded"; id: string; plugin: BasePlugin; path: string }
-  | { kind: "skipped"; reason: string };
+  | { kind: "skipped"; id?: string; reason: string };
 
 async function loadOne(
   dir: string,
@@ -158,14 +165,14 @@ async function loadOne(
     return { kind: "skipped", reason: `illegal id '${id}' (must match [A-Za-z0-9_-]+)` };
   }
   if (taken.has(id)) {
-    return { kind: "skipped", reason: `duplicate id '${id}'` };
+    return { kind: "skipped", id, reason: `duplicate id '${id}'` };
   }
   try {
     const host = hostFor(dir, id);
     const plugin = new (S as new (id: string, host: PluginHost) => BasePlugin)(id, host);
     return { kind: "loaded", id, plugin, path: entry };
   } catch (err) {
-    return { kind: "skipped", reason: `construct failed: ${(err as Error).message}` };
+    return { kind: "skipped", id, reason: `construct failed: ${(err as Error).message}` };
   }
 }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import WebSocket from "ws";
-import { MainEvent, ProtocolMethod } from "@ps-generator-bridge/sdk";
+import { ErrorCode, MainEvent, ProtocolMethod } from "@ps-generator-bridge/sdk";
 import { createServer, type PsBridgeServer } from "../src/server";
 import { BasePlugin, ws, api, bootstrap, type PluginHost } from "@ps-generator-bridge/sdk/plugin";
 import { EventManager, RuntimeEventManager } from "../src/utils/eventManager";
@@ -191,6 +191,61 @@ describe("per-plugin server (RFC 0004)", () => {
     const s = await start(echo());
     const response = await fetch(`http://127.0.0.1:${s.port}/plugins`);
     expect(await response.json()).toEqual({ plugins: [{ id: "echo" }] });
+  });
+
+  it("GET /plugins/{id}/health reports loaded plugin health and client count", async () => {
+    const s = await start(echo());
+    await connect(s.port, "echo");
+
+    const response = await fetch(`http://127.0.0.1:${s.port}/plugins/echo/health`);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      id: "echo",
+      status: "loaded",
+      clients: 1,
+      checks: { runtime: "ok" },
+    });
+    expect(typeof body.loadedAt).toBe("number");
+  });
+
+  it("GET /plugins/{id}/health reports failed plugin diagnostics", async () => {
+    const s = await start();
+    s.pluginManager.recordFailure({
+      id: "broken",
+      lastError: {
+        code: ErrorCode.PluginLoadFailed,
+        message: "plugin load failed: broken",
+        details: { pluginId: "broken", reason: "boom" },
+        source: "plugin",
+      },
+    });
+
+    const response = await fetch(`http://127.0.0.1:${s.port}/plugins/broken/health`);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      id: "broken",
+      status: "failed",
+      clients: 0,
+      lastError: {
+        code: ErrorCode.PluginLoadFailed,
+        message: "plugin load failed: broken",
+        details: { pluginId: "broken", reason: "boom" },
+        source: "plugin",
+      },
+      checks: { load: "failed" },
+    });
+  });
+
+  it("GET /plugins/{id}/health returns PLUGIN_NOT_FOUND for unknown plugins", async () => {
+    const s = await start(echo());
+
+    const response = await fetch(`http://127.0.0.1:${s.port}/plugins/nope/health`);
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      code: ErrorCode.PluginNotFound,
+      pluginId: "nope",
+    });
   });
 
   it("sends a connected handshake with a generated clientId on /ws/{id}", async () => {

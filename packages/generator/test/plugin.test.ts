@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, writeFile, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, it, expect, afterEach } from "vitest";
-import { MainEvent } from "@ps-generator-bridge/sdk";
+import { ErrorCode, MainEvent } from "@ps-generator-bridge/sdk";
 import { PsBridgeHost } from "../src/plugin";
 import { BaseModule } from "../src/modules/base";
 import { LayerModule, DocumentModule, ActionModule, SelectionModule } from "../src/modules";
@@ -122,6 +122,29 @@ module.exports = GoodPlugin;
     });
 
     expect(infos.some((m) => m.includes("plugin loaded: good (good)"))).toBe(true);
+  });
+
+  it("records skipped plugin diagnostics for HTTP health checks", async () => {
+    const dir = await realpath(await mkdtemp(join(tmpdir(), "host-plugins-")));
+    await mkdir(join(dir, "bad"), { recursive: true });
+
+    plugin = await PsBridgeHost.init(fakeGenerator(), { port: 0, pluginsDir: dir }, silentLogger, {
+      polyfillsDir: SOURCE_POLYFILLS,
+    });
+    const port = (plugin as unknown as { server: { port: number } }).server.port;
+
+    const response = await fetch(`http://127.0.0.1:${port}/plugins/bad/health`);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      id: "bad",
+      status: "failed",
+      clients: 0,
+      lastError: {
+        code: ErrorCode.PluginLoadFailed,
+        details: { pluginId: "bad" },
+      },
+      checks: { load: "failed" },
+    });
   });
 });
 

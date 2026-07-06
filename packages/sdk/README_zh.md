@@ -45,6 +45,7 @@ connection.close();
 ```ts
 const status = await Connection.status();
 const plugins = await Connection.plugins();
+const paintHealth = await Connection.pluginHealth("paint");
 ```
 
 需要调用插件私有方法或监听插件事件时，按插件 id 创建 endpoint 连接：
@@ -77,7 +78,7 @@ const connection = new Connection({
 - `new Connection()` 连接默认 root 服务 URL，`new Connection(options)` 接收 root 服务 URL，`new Connection(pluginId)` 连接插件 endpoint，`new Connection(pluginId, options)` 同时指定两者。
 - `connection.endpoint` 表示当前连接指向 root endpoint 还是插件 endpoint。
 - `connection.clientId` 在握手后暴露服务端分配的 client id。
-- `Connection.status()` 查询 `/health`；`Connection.plugins()` 查询 `/plugins`。
+- `Connection.status()` 查询 `/health`；`Connection.plugins()` 查询 `/plugins`；`Connection.pluginHealth(id)` 查询 `/plugins/{id}/health`。
 - `connection.on()`、`connection.once()`、`connection.off()` 通过协议订阅和取消订阅服务端事件。
 - 插件私有 API 通过插件 endpoint 连接上的 `connection.invoke(...)` 调用。
 - `connection.jsx` 执行协议暴露的远程 JSX 方法。插件作者仍应使用 `BasePlugin` 上下文提供的插件作用域 helper。

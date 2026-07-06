@@ -34,6 +34,13 @@ const plugins = await Connection.plugins();
 console.log(plugins);
 ```
 
+Check a specific plugin's load diagnostics:
+
+```ts
+const health = await Connection.pluginHealth("paint");
+console.log(health.status, health.lastError);
+```
+
 ## Plugin Event Not Delivered
 
 Check these conditions:

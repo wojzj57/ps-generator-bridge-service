@@ -34,6 +34,13 @@ const plugins = await Connection.plugins();
 console.log(plugins);
 ```
 
+检查某个插件的加载诊断：
+
+```ts
+const health = await Connection.pluginHealth("paint");
+console.log(health.status, health.lastError);
+```
+
 ## 插件事件没有送达
 
 检查这些条件：

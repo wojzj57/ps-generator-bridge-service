@@ -88,7 +88,11 @@ Plugin discovery is static:
 
 ```ts
 const plugins = await Connection.plugins();
+const paintHealth = await Connection.pluginHealth("paint");
 ```
+
+`Connection.pluginHealth(id)` queries `GET /plugins/{id}/health`. It returns
+loaded plugin client counts and load-time diagnostics for failed plugins.
 
 LightBox Photoshop startup is exposed as a standalone helper, not a `Connection`
 method:

@@ -74,6 +74,16 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
 
   app.get("/health", async () => ({ status: "ok" }));
   app.get("/plugins", async () => ({ plugins: pluginManager.list() }));
+  app.get("/plugins/:id/health", async (req, reply) => {
+    const id = (req.params as { id: string }).id;
+    const health = pluginManager.health(id);
+    if (!health) {
+      return reply
+        .code(404)
+        .send({ ...bridgeError.pluginNotFound(id).toProtocolError(), pluginId: id });
+    }
+    return health;
+  });
 
   // websocket must register before the /ws route; the nested plugin guarantees
   // that boot order without awaiting (this function stays synchronous).

@@ -52,6 +52,7 @@ Use static HTTP helpers for service-level discovery:
 ```ts
 const status = await Connection.status();
 const plugins = await Connection.plugins();
+const paintHealth = await Connection.pluginHealth("paint");
 ```
 
 Open the LightBox Photoshop entry page only when the bridge server is not healthy:
@@ -97,7 +98,7 @@ const connection = new Connection({
 - `new Connection()` connects to the default root service URL, `new Connection(options)` accepts a root service URL, `new Connection(pluginId)` connects to a plugin endpoint, and `new Connection(pluginId, options)` combines both.
 - `connection.endpoint` reports whether the connection targets the root endpoint or a plugin endpoint.
 - `connection.clientId` exposes the server-assigned client id after the handshake.
-- `Connection.status()` queries `/health`; `Connection.plugins()` queries `/plugins`.
+- `Connection.status()` queries `/health`; `Connection.plugins()` queries `/plugins`; `Connection.pluginHealth(id)` queries `/plugins/{id}/health`.
 - `openPhotoshopOnLightBox()` checks `/health` and opens the LightBox Photoshop entry page only when the bridge server is not healthy.
 - `connection.on()`, `connection.once()`, and `connection.off()` subscribe and unsubscribe server events through the protocol.
 - Plugin-private APIs stay on the plugin endpoint connection through `connection.invoke(...)`.

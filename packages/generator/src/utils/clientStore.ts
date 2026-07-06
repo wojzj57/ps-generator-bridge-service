@@ -23,6 +23,10 @@ export interface ClientSubscription {
 export class ClientStore {
   private readonly clients = new Map<string, ClientEntry>();
 
+  get count(): number {
+    return this.clients.size;
+  }
+
   /**
    * Register `socket` under `clientId`. If an entry already exists (a reconnect
    * whose old socket is still half-open), the new connection takes over: the old

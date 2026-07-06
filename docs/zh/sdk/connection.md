@@ -88,6 +88,7 @@ connection.close();
 
 ```ts
 const plugins = await Connection.plugins();
+const paintHealth = await Connection.pluginHealth("paint");
 ```
 
 LightBox Photoshop 启动能力是独立 helper，不是 `Connection` 方法：

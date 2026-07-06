@@ -48,32 +48,40 @@ Events have no `id` and no direct response.
 
 ## Built-in Methods
 
-| Method                    | Purpose                                                            |
-| ------------------------- | ------------------------------------------------------------------ |
-| `getServerInfo`           | Server identity, Photoshop version when available, loaded plugins. |
-| `jsx:run`                 | Run an inline JSX script.                                          |
-| `jsx:execute`             | Execute a named JSX resource with params.                          |
-| `event:subscribe`         | Subscribe the logical client to an event type.                     |
-| `event:unsubscribe`       | Remove that event subscription.                                    |
-| `action:autoCutout`       | Run auto cutout action.                                            |
-| `action:removeBackground` | Run remove background action.                                      |
-| `layer:getInfo`           | Inspect layer information.                                         |
-| `layer:getInfoById`       | Inspect layer by id.                                               |
-| `layer:getInfoByIndex`    | Inspect layer by index.                                            |
-| `layer:getCurrentPreview` | Get the current selected layer preview payload.                    |
-| `layer:importImage`       | Validate and import an image source into Photoshop as a layer.     |
-| `document:current`        | Get current document information.                                  |
-| `document:export`         | Export document.                                                   |
-| `document:save`           | Save document.                                                     |
-| `image:exportLayer`       | Export a layer image result.                                       |
-| `image:exportLayerWithSelectedPath` | Export a layer image with the current selection path overlay. |
-| `image:getPreview`        | Get a layer preview image result.                                  |
-| `image:exportDocument`    | Export a document image result.                                    |
-| `selection:getArea`       | Get the current rectangular selection area, or `null`.             |
-| `selection:getPath`       | Get the current selection path as SVG metadata, or `null`.         |
-| `selection:change`        | Register the generator-side selection change watcher.              |
+| Method                              | Purpose                                                            |
+| ----------------------------------- | ------------------------------------------------------------------ |
+| `getServerInfo`                     | Server identity, Photoshop version when available, loaded plugins. |
+| `jsx:run`                           | Run an inline JSX script.                                          |
+| `jsx:execute`                       | Execute a named JSX resource with params.                          |
+| `event:subscribe`                   | Subscribe the logical client to an event type.                     |
+| `event:unsubscribe`                 | Remove that event subscription.                                    |
+| `action:autoCutout`                 | Run auto cutout action.                                            |
+| `action:removeBackground`           | Run remove background action.                                      |
+| `layer:getInfo`                     | Inspect layer information.                                         |
+| `layer:getInfoById`                 | Inspect layer by id.                                               |
+| `layer:getInfoByIndex`              | Inspect layer by index.                                            |
+| `layer:getCurrentPreview`           | Get the current selected layer preview payload.                    |
+| `layer:importImage`                 | Validate and import an image source into Photoshop as a layer.     |
+| `document:current`                  | Get current document information.                                  |
+| `document:export`                   | Export document.                                                   |
+| `document:save`                     | Save document.                                                     |
+| `image:exportLayer`                 | Export a layer image result.                                       |
+| `image:exportLayerWithSelectedPath` | Export a layer image with the current selection path overlay.      |
+| `image:getPreview`                  | Get a layer preview image result.                                  |
+| `image:exportDocument`              | Export a document image result.                                    |
+| `selection:getArea`                 | Get the current rectangular selection area, or `null`.             |
+| `selection:getPath`                 | Get the current selection path as SVG metadata, or `null`.         |
+| `selection:change`                  | Register the generator-side selection change watcher.              |
 
 Plugin-specific methods are open string names and are invoked through `connection.invoke(...)` on plugin endpoint connections.
+
+## HTTP APIs
+
+| Endpoint                   | Purpose                                                |
+| -------------------------- | ------------------------------------------------------ |
+| `GET /health`              | Service liveness probe.                                |
+| `GET /plugins`             | Loaded plugin discovery.                               |
+| `GET /plugins/{id}/health` | Loaded plugin runtime status or failed load diagnosis. |
 
 ## Server Info
 
@@ -87,6 +95,19 @@ interface ServerInfo {
 
 interface PluginInfo {
   id: string;
+}
+
+type PluginStatus = "loaded" | "failed";
+
+type PluginHealthCheck = "ok" | "failed" | "skipped";
+
+interface PluginHealth {
+  id: string;
+  status: PluginStatus;
+  clients: number;
+  loadedAt?: number;
+  lastError?: ProtocolError;
+  checks?: Record<string, PluginHealthCheck>;
 }
 ```
 

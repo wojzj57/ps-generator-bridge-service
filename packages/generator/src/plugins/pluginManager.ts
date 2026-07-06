@@ -1,4 +1,5 @@
 import type { FastifyInstance, HTTPMethods, RouteHandlerMethod } from "fastify";
+import type { PluginHealth, ProtocolError } from "@ps-generator-bridge/sdk";
 import type { BasePlugin } from "@ps-generator-bridge/sdk/plugin";
 import { bootstrap } from "@ps-generator-bridge/sdk/plugin";
 import { ClientStore } from "../utils/clientStore";
@@ -10,11 +11,17 @@ export interface PluginEntry {
   plugin: BasePlugin;
   scoped: ScopedRegistry;
   clients: ClientStore;
+  loadedAt: number;
 }
 
 /** One entry in the `GET /plugins` discovery list (RFC 0004). */
 export interface PluginInfo {
   id: string;
+}
+
+export interface PluginFailure {
+  id: string;
+  lastError: ProtocolError;
 }
 
 /**
@@ -30,6 +37,7 @@ export interface PluginInfo {
  */
 export class PluginManager {
   private readonly plugins = new Map<string, PluginEntry>();
+  private readonly failures = new Map<string, PluginFailure>();
 
   constructor(
     private readonly app: FastifyInstance,
@@ -49,6 +57,37 @@ export class PluginManager {
   /** Look up a loaded plugin by id (used by the `/ws/:pluginId` route). */
   get(id: string): PluginEntry | undefined {
     return this.plugins.get(id);
+  }
+
+  health(id: string): PluginHealth | undefined {
+    const entry = this.plugins.get(id);
+    if (entry) {
+      return {
+        id,
+        status: "loaded",
+        clients: entry.clients.count,
+        loadedAt: entry.loadedAt,
+        checks: { runtime: "ok" },
+      };
+    }
+
+    const failure = this.failures.get(id);
+    if (failure) {
+      return {
+        id,
+        status: "failed",
+        clients: 0,
+        lastError: failure.lastError,
+        checks: { load: "failed" },
+      };
+    }
+
+    return undefined;
+  }
+
+  recordFailure(failure: PluginFailure): void {
+    if (this.plugins.has(failure.id)) return;
+    this.failures.set(failure.id, failure);
   }
 
   /**
@@ -78,8 +117,9 @@ export class PluginManager {
       });
     }
 
-    const entry: PluginEntry = { plugin, scoped, clients };
+    const entry: PluginEntry = { plugin, scoped, clients, loadedAt: Date.now() };
     this.plugins.set(id, entry);
+    this.failures.delete(id);
     return entry;
   }
 }

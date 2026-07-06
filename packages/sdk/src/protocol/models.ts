@@ -1,3 +1,5 @@
+import type { ProtocolError } from "./errors";
+
 /**
  * A layer spec: either a layer id, or an index range plus the indices of layers
  * to hide (the form Photoshop's `getLayerPixmap.jsx` accepts). Modeled here as a
@@ -104,6 +106,19 @@ export interface ServerInfo {
 
 export interface PluginInfo {
   id: string;
+}
+
+export type PluginStatus = "loaded" | "failed";
+
+export type PluginHealthCheck = "ok" | "failed" | "skipped";
+
+export interface PluginHealth {
+  id: string;
+  status: PluginStatus;
+  clients: number;
+  loadedAt?: number;
+  lastError?: ProtocolError;
+  checks?: Record<string, PluginHealthCheck>;
 }
 
 export interface Bounds {

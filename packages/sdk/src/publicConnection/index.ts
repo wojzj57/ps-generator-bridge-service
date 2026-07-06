@@ -4,6 +4,7 @@ import {
   type MethodName,
   type PhotoshopEventMap,
   type PhotoshopEventName,
+  type PluginHealth,
   type PluginInfo,
   type ProtocolEvents,
   type ProtocolMethods,
@@ -21,15 +22,12 @@ import {
 } from "./endpoints";
 import {
   getConnectionStatus,
+  getPluginHealth,
   getPlugins,
   type ConnectionHttpOptions,
   type ConnectionStatus,
 } from "./http";
-import {
-  PublicJsxRunner,
-  PublicModules,
-  type Invoker,
-} from "./modules";
+import { PublicJsxRunner, PublicModules, type Invoker } from "./modules";
 
 export { DEFAULT_CONNECTION_URL };
 export type { ConnectionEndpoint, ConnectionHttpOptions, ConnectionOptions, ConnectionStatus };
@@ -58,6 +56,10 @@ export class Connection {
 
   static plugins(options: ConnectionHttpOptions = {}): Promise<PluginInfo[]> {
     return getPlugins(options);
+  }
+
+  static pluginHealth(id: string, options: ConnectionHttpOptions = {}): Promise<PluginHealth> {
+    return getPluginHealth(id, options);
   }
 
   constructor();

@@ -1,4 +1,4 @@
-import type { PluginInfo } from "../protocol";
+import type { PluginHealth, PluginInfo, ProtocolError } from "../protocol";
 import { buildHttpEndpoint, DEFAULT_CONNECTION_URL } from "./endpoints";
 
 export interface ConnectionHttpOptions {
@@ -42,6 +42,25 @@ export async function getPlugins(options: ConnectionHttpOptions = {}): Promise<P
   return body.plugins;
 }
 
+export async function getPluginHealth(
+  id: string,
+  options: ConnectionHttpOptions = {}
+): Promise<PluginHealth> {
+  const path = `/plugins/${encodeURIComponent(id)}/health` as `/${string}`;
+  const url = buildHttpEndpoint(options.url ?? DEFAULT_CONNECTION_URL, path);
+  const response = await fetchHttp(url, options.fetch);
+  if (!response.ok) throw httpStatusError(url, response);
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (error) {
+    throw new Error(`Malformed JSON from ${url}: ${formatError(error)}`);
+  }
+  if (!isPluginHealth(body)) throw new Error(`Malformed response from ${url}`);
+  return body;
+}
+
 function resolveFetch(fetchImpl?: typeof fetch): typeof fetch {
   const resolved = fetchImpl ?? globalThis.fetch;
   if (typeof resolved !== "function") {
@@ -80,6 +99,31 @@ function isPluginsResponse(value: unknown): value is { plugins: PluginInfo[] } {
 function isPluginInfo(value: unknown): value is PluginInfo {
   if (typeof value !== "object" || value === null) return false;
   return typeof (value as Record<string, unknown>).id === "string";
+}
+
+function isPluginHealth(value: unknown): value is PluginHealth {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  if (typeof record.id !== "string") return false;
+  if (record.status !== "loaded" && record.status !== "failed") return false;
+  if (typeof record.clients !== "number") return false;
+  if (record.loadedAt !== undefined && typeof record.loadedAt !== "number") return false;
+  if (record.lastError !== undefined && !isProtocolError(record.lastError)) return false;
+  if (record.checks !== undefined && !isHealthChecks(record.checks)) return false;
+  return true;
+}
+
+function isProtocolError(value: unknown): value is ProtocolError {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.code === "string" && typeof record.message === "string";
+}
+
+function isHealthChecks(value: unknown): value is PluginHealth["checks"] {
+  if (typeof value !== "object" || value === null) return false;
+  return Object.values(value as Record<string, unknown>).every(
+    (check) => check === "ok" || check === "failed" || check === "skipped"
+  );
 }
 
 function formatError(error: unknown): string {

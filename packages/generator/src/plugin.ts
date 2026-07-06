@@ -23,6 +23,7 @@ import {
 } from "./modules";
 import { CosService } from "./services/cos";
 import { PLUGIN_NAME, PLUGIN_VERSION } from "./meta";
+import { bridgeError } from "./errors";
 
 type BuiltinModuleMainEventName = Exclude<
   MainEventName,
@@ -201,7 +202,13 @@ export class PsBridgeHost implements PluginHost {
       knownIds: new Set(),
       logger: log,
     });
-    for (const s of skipped) log.warn(`plugin skipped: ${s.path} — ${s.reason}`);
+    for (const s of skipped) {
+      log.warn(`plugin skipped: ${s.path} — ${s.reason}`);
+      server.pluginManager.recordFailure({
+        id: s.id,
+        lastError: bridgeError.pluginLoadFailed(s.id, s.reason).toProtocolError(),
+      });
+    }
     this.plugins = loaded.map((l) => l.plugin);
     // Register every plugin (scoped table + per-plugin ClientStore + bus +
     // /ws/{id} dispatch + prefixed @api) before module bootstrap, so plugin ids
