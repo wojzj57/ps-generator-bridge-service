@@ -1,9 +1,20 @@
 # PS Generator Bridge Service
 
-[![Docs](https://img.shields.io/badge/docs-online-blue)](https://wojzj57.github.io/ps-generator-bridge-service/)
+<p align="center">
+  <a href="https://wojzj57.github.io/ps-generator-bridge-service/"><img alt="Docs" src="https://img.shields.io/badge/docs-EN-blue" /></a>
+  <a href="https://wojzj57.github.io/ps-generator-bridge-service/zh/getting-started/install"><img alt="Docs ZH" src="https://img.shields.io/badge/docs-ZH-blue" /></a>
+  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
+  <a href="https://nodejs.org/"><img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-green.svg" /></a>
+  <a href="https://pnpm.io/"><img alt="pnpm" src="https://img.shields.io/badge/pnpm-11.5.0-orange.svg" /></a>
+</p>
 
-Documentation: https://wojzj57.github.io/ps-generator-bridge-service/
-Chinese documentation: https://wojzj57.github.io/ps-generator-bridge-service/zh/getting-started/install
+<p align="center">
+  <a href="https://www.npmjs.com/package/@ps-generator-bridge/generator"><img alt="npm generator" src="https://img.shields.io/npm/v/@ps-generator-bridge/generator?label=generator" /></a>
+  <a href="https://www.npmjs.com/package/@ps-generator-bridge/sdk"><img alt="npm sdk" src="https://img.shields.io/npm/v/@ps-generator-bridge/sdk?label=sdk" /></a>
+  <a href="https://www.npmjs.com/package/@ps-generator-bridge/cli"><img alt="npm cli" src="https://img.shields.io/npm/v/@ps-generator-bridge/cli?label=cli" /></a>
+</p>
+
+Documentation: [English](https://wojzj57.github.io/ps-generator-bridge-service/) · [简体中文](https://wojzj57.github.io/ps-generator-bridge-service/zh/getting-started/install)
 
 PS Generator Bridge Service is a monorepo for exposing Photoshop Generator capabilities over a typed WebSocket protocol.
 
@@ -11,7 +22,7 @@ PS Generator Bridge Service is a monorepo for exposing Photoshop Generator capab
 - `@ps-generator-bridge/generator` is the Photoshop Generator plugin loaded by Adobe `generator-core`.
 - `@ps-generator-bridge/cli` provides command-line tools, including a Windows smoke harness for real Photoshop and `generator-core`.
 
-The generator package depends on the SDK contract type-only. Keep protocol changes in `packages/sdk/src/protocol.ts` first, then implement the server behavior in `packages/generator`.
+The generator package depends on the SDK contract type-only. Keep protocol changes in `packages/sdk/src/protocol/` and `ProtocolMethods` first, then implement the server behavior in `packages/generator`.
 
 ## Packages
 
@@ -57,7 +68,7 @@ pnpm --filter @ps-generator-bridge/cli typecheck
 
 ## Development Flow
 
-1. Model protocol capabilities in `packages/sdk/src/protocol.ts`.
+1. Model protocol capabilities in `packages/sdk/src/protocol/` and `ProtocolMethods`.
 2. Expose client-facing helpers in the SDK when the method should be public.
 3. Implement server handlers in `packages/generator` modules or built-ins.
 4. Add unit tests with injected seams (`FakeTransport`, `FakeGenerator`) before relying on real Photoshop.
@@ -90,9 +101,15 @@ Structured runtime options such as `port` and `pluginsDir` should flow through `
 - Chinese documentation: https://wojzj57.github.io/ps-generator-bridge-service/zh/getting-started/install
 - [docs/README.md](./docs/README.md) is the public documentation entry point for GitHub and GitHub Pages.
 - [docs/getting-started/install.md](./docs/getting-started/install.md) explains setup and prerequisites.
-- [docs/sdk/connection.md](./docs/sdk/connection.md) documents the SDK connection facade.
+- [docs/getting-started/run-generator.md](./docs/getting-started/run-generator.md) explains how to run the generator.
+- [docs/getting-started/connect-sdk.md](./docs/getting-started/connect-sdk.md) explains how to connect with the SDK.
+- [docs/generator/configuration.md](./docs/generator/configuration.md) documents generator configuration.
+- [docs/generator/photoshop-setup.md](./docs/generator/photoshop-setup.md) documents Photoshop setup.
+- [docs/generator/troubleshooting.md](./docs/generator/troubleshooting.md) covers troubleshooting.
 - [docs/plugins/authoring.md](./docs/plugins/authoring.md) documents external plugin authoring.
 - [docs/reference/protocol.md](./docs/reference/protocol.md) documents the public protocol contract.
+- [docs/reference/environment.md](./docs/reference/environment.md) documents environment variables.
+- [docs/reference/package-exports.md](./docs/reference/package-exports.md) documents package export boundaries.
 - [CONTEXT.md](./CONTEXT.md) defines the project vocabulary.
 
 Chinese documentation is available in [README_zh.md](./README_zh.md).
