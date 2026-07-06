@@ -24,6 +24,7 @@ describe("Registry.dispatch", () => {
       ProtocolMethod.DocumentExport,
       ProtocolMethod.DocumentSave,
       ProtocolMethod.ImageExportLayer,
+      ProtocolMethod.ImageExportLayerWithSelectedPath,
       ProtocolMethod.ImageGetPreview,
       ProtocolMethod.ImageExportDocument,
       ProtocolMethod.SelectionGetArea,

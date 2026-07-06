@@ -44,6 +44,11 @@ export interface ImageModuleApi {
     layerSpec: LayerSpec;
     settings?: Record<string, unknown>;
   }): Promise<ImageResult>;
+  exportLayerWithSelectedPath(options: {
+    documentId?: number;
+    layerSpec: number;
+    expand?: number;
+  }): Promise<ImageResult>;
   getPreview(options: { documentId?: number; layerSpec: number }): Promise<ImageResult>;
   exportDocument(options: {
     documentId?: number;
@@ -80,6 +85,44 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
       bounds: pixmap.bounds,
       width: pixmap.width,
       height: pixmap.height,
+    };
+  }
+
+  async exportLayerWithSelectedPath(options: {
+    documentId?: number;
+    layerSpec: number;
+    expand?: number;
+  }): Promise<ImageResult> {
+    const result = await this.exportImage({
+      documentId: options.documentId,
+      layerSpec: options.layerSpec,
+    });
+    const selection = await this.plugin.modules.selection.getPath({
+      expand: Math.max(0, options.expand ?? 10),
+    });
+    if (!selection) return result;
+
+    const layer = await this.plugin.modules.layer.getLayerInfoByID(options.layerSpec);
+    if (!layer?.rect) {
+      throw bridgeError.layerNotFound(options.layerSpec, {
+        reason: "Invalid layer info for selected-path export",
+      });
+    }
+
+    const buffer = await sharp(result.buffer)
+      .composite([
+        {
+          input: Buffer.from(selection.svg),
+          left: Math.round(selection.x - layer.rect.x),
+          top: Math.round(selection.y - layer.rect.y),
+        },
+      ])
+      .png()
+      .toBuffer();
+
+    return {
+      ...result,
+      buffer,
     };
   }
 
@@ -153,6 +196,17 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
     settings?: PsGenerator.GetPixmapSettings;
   }): Promise<WsImageResult> {
     const result = await this.exportImage(options);
+    const name = this.plugin.cos ? await this.resolveLayerName(options.layerSpec) : undefined;
+    return this.toWsResult(result, { upload: true }, name);
+  }
+
+  @ws(ProtocolMethod.ImageExportLayerWithSelectedPath)
+  async exportLayerWithSelectedPathWs(options: {
+    documentId?: number;
+    layerSpec: number;
+    expand?: number;
+  }): Promise<WsImageResult> {
+    const result = await this.exportLayerWithSelectedPath(options);
     const name = this.plugin.cos ? await this.resolveLayerName(options.layerSpec) : undefined;
     return this.toWsResult(result, { upload: true }, name);
   }

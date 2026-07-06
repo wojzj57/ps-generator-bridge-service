@@ -1,6 +1,8 @@
 import { join } from "node:path";
 import { describe, it, expect, vi } from "vitest";
+import sharp from "sharp";
 import { ImageModule } from "../src/modules/image";
+import type { SelectionPathData } from "../src/modules/selection";
 import { JsxRunner } from "../src/utils/jsxRunner";
 import { LayerModule } from "../src/modules";
 import { EventManager, RuntimeEventManager } from "../src/utils/eventManager";
@@ -22,11 +24,17 @@ function setup(currentDocument: { id: number } | null = { id: 1 }) {
   const jsx = new JsxRunner(generator, silentLogger);
   const events = new RuntimeEventManager(new EventManager(generator)).createPluginFacade("host");
   const plugin = { generator, jsx, events } as unknown as PsBridgeHost;
+  const selection = {
+    watchSelection: vi.fn(async () => ({ ok: true })),
+    getArea: vi.fn(async () => null),
+    getPath: vi.fn(async (): Promise<SelectionPathData | null> => null),
+  };
   (plugin as { modules: PsBridgeHost["modules"] }).modules = {
     layer: new LayerModule(plugin),
     document: { currentDocument },
+    selection,
   } as unknown as PsBridgeHost["modules"];
-  return { generator, plugin, image: new ImageModule(plugin) };
+  return { generator, plugin, image: new ImageModule(plugin), selection };
 }
 
 /**
@@ -213,6 +221,60 @@ describe("ImageModule.exportDocument", () => {
   it("throws when no document is open and no documentId given", async () => {
     const { image } = setup(null);
     await expect(image.exportDocument({})).rejects.toThrow("No document opened");
+  });
+});
+
+describe("ImageModule.exportLayerWithSelectedPath", () => {
+  it("exports the layer unchanged when there is no selected path", async () => {
+    const { generator, image, selection } = setup();
+    emitHappy(generator);
+
+    const result = await image.exportLayerWithSelectedPath({ layerSpec: 5 });
+
+    expect(result.width).toBe(2);
+    expect(result.height).toBe(2);
+    expect(result.bounds).toEqual(BOUNDS);
+    expect(selection.getPath).toHaveBeenCalledWith({ expand: 10 });
+    expect(generator.jsxStringCalls).toHaveLength(0);
+  });
+
+  it("composites the selected path SVG onto the exported layer without changing geometry", async () => {
+    const { generator, image, selection } = setup();
+    emitHappy(generator, { left: 10, top: 20, right: 14, bottom: 24 }, makePixmapBuffer(4, 4, 4));
+    safeLayerInfo(generator, {
+      id: 7,
+      name: "Layer",
+      rect: { x: 10, y: 20, width: 4, height: 4 },
+      bounds: { left: 10, top: 20, right: 14, bottom: 24 },
+    });
+    selection.getPath.mockResolvedValue({
+      svg: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2" viewBox="11 21 2 2"><rect x="11" y="21" width="2" height="2" fill="#ff0000"/></svg>',
+      x: 11,
+      y: 21,
+      width: 2,
+      height: 2,
+    });
+
+    const result = await image.exportLayerWithSelectedPath({
+      documentId: 1,
+      layerSpec: 7,
+      expand: 3,
+    });
+
+    expect(result.width).toBe(4);
+    expect(result.height).toBe(4);
+    expect(result.bounds).toEqual({ left: 10, top: 20, right: 14, bottom: 24 });
+    expect(selection.getPath).toHaveBeenCalledWith({ expand: 3 });
+    expect(generator.jsxStringCalls[0]?.script).toContain('var params = {"layerID":7};');
+
+    const pixel = await sharp(result.buffer)
+      .ensureAlpha()
+      .raw()
+      .extract({ left: 1, top: 1, width: 1, height: 1 })
+      .toBuffer();
+    expect(pixel[0]).toBeGreaterThan(200);
+    expect(pixel[1]).toBeLessThan(80);
+    expect(pixel[2]).toBeLessThan(80);
   });
 });
 

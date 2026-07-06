@@ -40,6 +40,9 @@ describe("protocol", () => {
     expect(ProtocolMethod.DocumentCurrent).toBe("document:current");
     expect(ProtocolMethod.DocumentExport).toBe("document:export");
     expect(ProtocolMethod.DocumentSave).toBe("document:save");
+    expect(ProtocolMethod.ImageExportLayerWithSelectedPath).toBe(
+      "image:exportLayerWithSelectedPath"
+    );
     expect(ProtocolMethod.SelectionGetArea).toBe("selection:getArea");
     expect(ProtocolMethod.SelectionGetPath).toBe("selection:getPath");
     expect(ProtocolMethod.SelectionWatch).toBe("selection:change");

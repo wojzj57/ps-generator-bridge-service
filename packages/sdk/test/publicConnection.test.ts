@@ -586,6 +586,21 @@ describe("public Connection", () => {
     respond(transport, { data: "data:image/png;base64,abc", bounds, width: 10, height: 10 });
     await expect(exportedLayer).resolves.toMatchObject({ data: "data:image/png;base64,abc" });
 
+    const exportedLayerWithPath = conn.modules.image.exportLayerWithSelectedPath({
+      documentId: 1,
+      layerSpec: 7,
+      expand: 12,
+    });
+    await flush();
+    expect(lastRequest(transport)).toMatchObject({
+      method: ProtocolMethod.ImageExportLayerWithSelectedPath,
+      params: { documentId: 1, layerSpec: 7, expand: 12 },
+    });
+    respond(transport, { data: "data:image/png;base64,path", bounds, width: 10, height: 10 });
+    await expect(exportedLayerWithPath).resolves.toMatchObject({
+      data: "data:image/png;base64,path",
+    });
+
     const preview = conn.modules.image.getPreview({ layerSpec: 7 });
     await flush();
     expect(lastRequest(transport)).toMatchObject({

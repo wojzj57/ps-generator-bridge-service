@@ -47,6 +47,9 @@ export class PublicModules {
   readonly image = {
     exportLayer: (params: ProtocolMethods[typeof ProtocolMethod.ImageExportLayer]["params"]) =>
       this.invoke(ProtocolMethod.ImageExportLayer, params),
+    exportLayerWithSelectedPath: (
+      params: ProtocolMethods[typeof ProtocolMethod.ImageExportLayerWithSelectedPath]["params"]
+    ) => this.invoke(ProtocolMethod.ImageExportLayerWithSelectedPath, params),
     getPreview: (params: ProtocolMethods[typeof ProtocolMethod.ImageGetPreview]["params"]) =>
       this.invoke(ProtocolMethod.ImageGetPreview, params),
     exportDocument: (

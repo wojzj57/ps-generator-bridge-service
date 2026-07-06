@@ -33,6 +33,7 @@ export const ProtocolMethod = {
   DocumentExport: "document:export",
   DocumentSave: "document:save",
   ImageExportLayer: "image:exportLayer",
+  ImageExportLayerWithSelectedPath: "image:exportLayerWithSelectedPath",
   ImageGetPreview: "image:getPreview",
   ImageExportDocument: "image:exportDocument",
   SelectionGetArea: "selection:getArea",
@@ -121,6 +122,10 @@ export interface ProtocolMethods {
   // across the boundary.
   [ProtocolMethod.ImageExportLayer]: {
     params: { documentId?: number; layerSpec: LayerSpec; settings?: Record<string, unknown> };
+    result: WsImageResult;
+  };
+  [ProtocolMethod.ImageExportLayerWithSelectedPath]: {
+    params: { documentId?: number; layerSpec: number; expand?: number };
     result: WsImageResult;
   };
   [ProtocolMethod.ImageGetPreview]: {
