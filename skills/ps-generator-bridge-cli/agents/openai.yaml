@@ -1,4 +1,4 @@
 interface:
   display_name: "PS Bridge CLI"
-  short_description: "Work on the PS Generator Bridge CLI and smoke harness."
-  default_prompt: "Use $ps-generator-bridge-cli to update the PS Generator Bridge CLI."
+  short_description: "Update the CLI package, binary, or Photoshop smoke harness."
+  default_prompt: "Use $ps-generator-bridge-cli to update the CLI package, ps-generator-bridge binary, or smoke harness."

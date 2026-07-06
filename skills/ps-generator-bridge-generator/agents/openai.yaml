@@ -1,4 +1,4 @@
 interface:
   display_name: "PS Bridge Generator"
-  short_description: "Work on the Photoshop Generator host package."
-  default_prompt: "Use $ps-generator-bridge-generator to update the Photoshop Generator host package."
+  short_description: "Update the Generator host, server, modules, or plugin loader."
+  default_prompt: "Use $ps-generator-bridge-generator to update the Generator host, server routes, modules, or plugin loader."
