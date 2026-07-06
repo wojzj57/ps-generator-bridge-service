@@ -59,9 +59,6 @@ export interface ImageModuleApi {
 export class ImageModule extends BaseModule implements ImageModuleApi {
   constructor(plugin: PsBridgeHost) {
     super("image", plugin);
-    this.plugin.events.on("imageChanged", (data) => {
-      log.debug("image changed", data);
-    });
   }
 
   /**
