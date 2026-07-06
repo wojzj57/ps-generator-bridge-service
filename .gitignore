@@ -10,3 +10,5 @@ generator-core/
 .scratch
 
 /notes/
+
+.env
