@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import sharp, { type Metadata } from "sharp";
 import {
   MainEvent,
   ProtocolMethod,
@@ -29,6 +29,26 @@ const DATA_URI_PATTERN = /^data:([^,]*),(.*)$/is;
 const HTTP_URI_PATTERN = /^https?:/i;
 const FILE_URI_PATTERN = /^file:/i;
 const BASE64_PATTERN = /^[A-Za-z0-9+/=\s]+$/;
+const DEFAULT_IMPORT_MAX_BYTES = 100 * 1024 * 1024;
+const DEFAULT_IMPORT_MAX_PIXELS = 100_000_000;
+const DEFAULT_IMPORT_FORMATS = ["png", "jpeg", "webp", "gif", "tiff"] as const;
+const OCTET_STREAM_TYPE = "application/octet-stream";
+const FORMAT_EXTENSIONS: Record<string, string[]> = {
+  png: [".png"],
+  jpeg: [".jpg", ".jpeg"],
+  webp: [".webp"],
+  gif: [".gif"],
+  tiff: [".tif", ".tiff"],
+};
+const CONTENT_TYPE_FORMATS: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpeg",
+  "image/jpg": "jpeg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/tiff": "tiff",
+  "image/tif": "tiff",
+};
 
 export type { LayerImportImageParams, LayerPreviewPayload };
 export type { LayerSelectionChangePayload };
@@ -231,30 +251,35 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
   }
 
   private async resolveImportImageSource(image: string): Promise<ImportImageSource> {
+    const config = this.importImageConfig();
     const value = image.trim();
     if (DATA_URI_PATTERN.test(value)) {
       const match = value.match(DATA_URI_PATTERN);
       const metadata = match?.[1] ?? "";
       const body = match?.[2] ?? "";
+      this.assertAllowedContentType(metadata);
       const buffer = metadata.toLowerCase().includes(";base64")
         ? Buffer.from(body.replace(/\s/g, ""), "base64")
         : Buffer.from(decodeURIComponent(body), "utf8");
-      return this.writeTempImportImage(buffer, extensionFromDataMetadata(metadata));
+      return this.writeTempImportImage(buffer, config);
     }
 
     if (HTTP_URI_PATTERN.test(value)) {
-      return this.downloadImportImage(value);
+      return this.downloadImportImage(value, config);
     }
 
     if (FILE_URI_PATTERN.test(value)) {
+      this.assertLocalImagePathsAllowed(config);
       const filePath = value.toLowerCase().startsWith("file://")
         ? fileURLToPath(value)
         : decodeURIComponent(value.slice("file:".length));
-      this.assertExistingImportFile(filePath);
+      await this.validateLocalImageFile(filePath, config);
       return { filePath };
     }
 
-    if (existsSync(value)) {
+    if (await pathExists(value)) {
+      this.assertLocalImagePathsAllowed(config);
+      await this.validateLocalImageFile(value, config);
       return { filePath: value };
     }
 
@@ -264,10 +289,13 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
         "image must be a data URI, URL, file URI, local path, or base64"
       );
     }
-    return this.writeTempImportImage(Buffer.from(compact, "base64"), ".png");
+    return this.writeTempImportImage(Buffer.from(compact, "base64"), config);
   }
 
-  private async downloadImportImage(url: string): Promise<ImportImageSource> {
+  private async downloadImportImage(
+    url: string,
+    config: ImportImageConfig
+  ): Promise<ImportImageSource> {
     let response: Response;
     try {
       response = await fetch(url);
@@ -281,22 +309,21 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
         status: response.status,
       });
     }
-    const contentType = response.headers.get("content-type") ?? undefined;
-    const buffer = Buffer.from(await response.arrayBuffer());
-    return this.writeTempImportImage(
-      buffer,
-      extensionFromUrl(url) ?? extensionFromMime(contentType)
-    );
+    this.assertAllowedContentType(response.headers.get("content-type"));
+    this.assertAllowedContentLength(response.headers.get("content-length"), config);
+    const buffer = await readResponseBuffer(response, config.maxBytes);
+    return this.writeTempImportImage(buffer, config);
   }
 
   private async writeTempImportImage(
     buffer: Buffer,
-    extension = ".png"
+    config: ImportImageConfig
   ): Promise<ImportImageSource> {
-    if (buffer.length === 0) throw bridgeError.badRequest("image data is empty");
+    this.assertBufferWithinLimit(buffer, config);
+    const format = await this.validateImageMetadata(buffer, config);
     const dir = await mkdtemp(join(tmpdir(), "ps-bridge-import-"));
     const hash = createHash("sha256").update(buffer).digest("hex").slice(0, 16);
-    const filePath = join(dir, `${hash}${normalizeExtension(extension)}`);
+    const filePath = join(dir, `${hash}${extensionForFormat(format)}`);
     await writeFile(filePath, buffer);
     return {
       filePath,
@@ -310,10 +337,92 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
     };
   }
 
-  private assertExistingImportFile(filePath: string): void {
-    if (!existsSync(filePath)) {
-      throw bridgeError.badRequest(`image file does not exist: ${filePath}`);
+  private async validateLocalImageFile(filePath: string, config: ImportImageConfig): Promise<void> {
+    let stats: Awaited<ReturnType<typeof stat>>;
+    try {
+      stats = await stat(filePath);
+    } catch {
+      throw bridgeError.badRequest("image file does not exist");
     }
+    if (!stats.isFile()) throw bridgeError.badRequest("image path must point to a file");
+    if (stats.size > config.maxBytes) throw imageTooLarge(config.maxBytes);
+
+    const extension = extname(filePath).toLowerCase();
+    if (!isAllowedExtension(extension, config)) {
+      throw bridgeError.badRequest("image file extension is not allowed");
+    }
+    await this.validateImageMetadata(filePath, config);
+  }
+
+  private assertBufferWithinLimit(buffer: Buffer, config: ImportImageConfig): void {
+    if (buffer.length === 0) throw bridgeError.badRequest("image data is empty");
+    if (buffer.length > config.maxBytes) throw imageTooLarge(config.maxBytes);
+  }
+
+  private async validateImageMetadata(
+    input: Buffer | string,
+    config: ImportImageConfig
+  ): Promise<string> {
+    let metadata: Metadata;
+    try {
+      metadata = await sharp(input, { limitInputPixels: config.maxPixels }).metadata();
+    } catch {
+      throw bridgeError.badRequest("image data is not a supported image format");
+    }
+    const format = normalizeFormat(metadata.format);
+    if (!format || !config.allowedFormats.has(format)) {
+      throw bridgeError.badRequest("image data is not a supported image format");
+    }
+    const width = metadata.width;
+    const height = metadata.height;
+    if (!isPositiveNumber(width) || !isPositiveNumber(height)) {
+      throw bridgeError.badRequest("image data is not a supported image format");
+    }
+    if (width * height > config.maxPixels) {
+      throw bridgeError.badRequest(`image exceeds max pixel count of ${config.maxPixels}`);
+    }
+    return format;
+  }
+
+  private assertAllowedContentType(contentType: string | null | undefined): void {
+    const format = formatFromContentType(contentType);
+    if (format === undefined) return;
+    if (!this.importImageConfig().allowedFormats.has(format)) {
+      throw bridgeError.badRequest("image content-type is not allowed");
+    }
+  }
+
+  private assertAllowedContentLength(
+    contentLength: string | null | undefined,
+    config: ImportImageConfig
+  ): void {
+    if (!contentLength) return;
+    const size = Number(contentLength);
+    if (Number.isFinite(size) && size > config.maxBytes) throw imageTooLarge(config.maxBytes);
+  }
+
+  private assertLocalImagePathsAllowed(config: ImportImageConfig): void {
+    if (!config.allowLocalPaths) throw bridgeError.badRequest("local image paths are disabled");
+  }
+
+  private importImageConfig(): ImportImageConfig {
+    const configuredFormats = this.plugin.config.allowedImportImageFormats;
+    const allowedFormats =
+      Array.isArray(configuredFormats) && configuredFormats.length > 0
+        ? new Set(configuredFormats.map(normalizeFormat).filter(isString))
+        : new Set<string>(DEFAULT_IMPORT_FORMATS);
+    return {
+      maxBytes: positiveConfigNumber(
+        this.plugin.config.maxImportImageBytes,
+        DEFAULT_IMPORT_MAX_BYTES
+      ),
+      maxPixels: positiveConfigNumber(
+        this.plugin.config.maxImportImagePixels,
+        DEFAULT_IMPORT_MAX_PIXELS
+      ),
+      allowedFormats,
+      allowLocalPaths: this.plugin.config.allowLocalImagePaths !== false,
+    };
   }
 
   private async resolveImportInsertIndex(
@@ -542,6 +651,13 @@ interface ImportImageSource {
   cleanup?: () => Promise<void>;
 }
 
+interface ImportImageConfig {
+  maxBytes: number;
+  maxPixels: number;
+  allowedFormats: Set<string>;
+  allowLocalPaths: boolean;
+}
+
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
@@ -550,31 +666,80 @@ function isPositiveNumber(value: unknown): value is number {
   return isFiniteNumber(value) && value > 0;
 }
 
-function extensionFromDataMetadata(metadata: string): string {
-  const mime = metadata.split(";")[0];
-  return extensionFromMime(mime);
+function positiveConfigNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
-function extensionFromUrl(url: string): string | undefined {
+function normalizeFormat(format: unknown): string | undefined {
+  if (typeof format !== "string") return undefined;
+  const normalized = format.trim().toLowerCase();
+  if (normalized === "jpg") return "jpeg";
+  if (normalized === "tif") return "tiff";
+  return normalized || undefined;
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
+
+async function pathExists(path: string): Promise<boolean> {
   try {
-    const extension = extname(new URL(url).pathname);
-    return extension || undefined;
+    await stat(path);
+    return true;
   } catch {
-    return undefined;
+    return false;
   }
 }
 
-function extensionFromMime(mime: string | undefined): string {
-  const normalized = mime?.split(";")[0]?.trim().toLowerCase();
-  if (normalized === "image/jpeg" || normalized === "image/jpg") return ".jpg";
-  if (normalized === "image/png") return ".png";
-  if (normalized === "image/webp") return ".webp";
-  if (normalized === "image/gif") return ".gif";
-  if (normalized === "image/tiff") return ".tif";
-  return ".png";
+function isAllowedExtension(extension: string, config: ImportImageConfig): boolean {
+  return [...config.allowedFormats].some((format) =>
+    (FORMAT_EXTENSIONS[format] ?? []).includes(extension)
+  );
 }
 
-function normalizeExtension(extension: string): string {
-  if (!extension) return ".png";
-  return extension.startsWith(".") ? extension : `.${extension}`;
+function extensionForFormat(format: string): string {
+  return FORMAT_EXTENSIONS[format]?.[0] ?? ".png";
+}
+
+function formatFromContentType(contentType: string | null | undefined): string | undefined {
+  const normalized = contentType?.split(";")[0]?.trim().toLowerCase();
+  if (!normalized || normalized === OCTET_STREAM_TYPE) return undefined;
+  return CONTENT_TYPE_FORMATS[normalized] ?? "__unsupported__";
+}
+
+function imageTooLarge(maxBytes: number): Error {
+  return bridgeError.badRequest(`image exceeds max size of ${formatBytes(maxBytes)}`);
+}
+
+function formatBytes(bytes: number): string {
+  const mb = bytes / (1024 * 1024);
+  return Number.isInteger(mb) ? `${mb}MB` : `${bytes} bytes`;
+}
+
+async function readResponseBuffer(response: Response, maxBytes: number): Promise<Buffer> {
+  if (!response.body) {
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length > maxBytes) throw imageTooLarge(maxBytes);
+    return buffer;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw imageTooLarge(maxBytes);
+      }
+      chunks.push(Buffer.from(value));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks, total);
 }

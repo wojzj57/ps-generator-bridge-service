@@ -22,8 +22,14 @@ import { fakeGenerator } from "./fakeGenerator";
 
 const silentLogger: Logger = { debug() {}, info() {}, warn() {}, error() {} };
 const BOUNDS = { left: 0, top: 0, right: 2, bottom: 2 };
+const PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
+const PNG_BYTES = Buffer.from(PNG_BASE64, "base64");
 
-function setup(generator: PsGenerator): {
+function setup(
+  generator: PsGenerator,
+  config: Record<string, unknown> = {}
+): {
   app: FastifyInstance;
   registry: Registry;
   module: LayerModule;
@@ -40,6 +46,7 @@ function setup(generator: PsGenerator): {
     height: 8,
   }));
   const plugin = {
+    config,
     generator,
     jsx: new JsxRunner(generator, silentLogger),
     events: runtimeEvents.createPluginFacade("host"),
@@ -275,7 +282,7 @@ describe("LayerModule image import", () => {
         id: "import",
         method: ProtocolMethod.LayerImportImage,
         params: {
-          image: "data:image/png;base64,cG5n",
+          image: `data:image/png;base64,${PNG_BASE64}`,
           name: "Imported",
           position: { x: 10, y: 20 },
           useWorkpath: true,
@@ -335,7 +342,7 @@ describe("LayerModule image import", () => {
         id: "import-b64",
         method: ProtocolMethod.LayerImportImage,
         params: {
-          image: Buffer.from("png").toString("base64"),
+          image: PNG_BASE64,
           size: { width: 12, height: 8 },
           layerIndex: 2,
         },
@@ -357,7 +364,7 @@ describe("LayerModule image import", () => {
   it("imports file URI images without deleting the source file", async () => {
     const dir = mkdtempSync(join(tmpdir(), "ps-bridge-layer-test-"));
     const filePath = join(dir, "source.png");
-    writeFileSync(filePath, Buffer.from("png"));
+    writeFileSync(filePath, PNG_BYTES);
     try {
       const generator = fakeGenerator();
       const addParams: Record<string, any>[] = [];
@@ -393,6 +400,186 @@ describe("LayerModule image import", () => {
       expect(existsSync(filePath)).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects local files that are not decodable images before calling Photoshop", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ps-bridge-layer-test-"));
+    const filePath = join(dir, "source.png");
+    writeFileSync(filePath, Buffer.from("not an image"));
+    try {
+      const generator = fakeGenerator();
+      const { app, registry, runtimeEvents } = setup(generator);
+
+      const res = await registry.dispatch(
+        {
+          id: "bad-local",
+          method: ProtocolMethod.LayerImportImage,
+          params: { image: filePath },
+        },
+        { generator }
+      );
+      runtimeEvents.dispose();
+      await app.close();
+
+      expect(res).toMatchObject({
+        id: "bad-local",
+        ok: false,
+        error: { code: "BAD_REQUEST", message: "image data is not a supported image format" },
+      });
+      expect(generator.jsxStringCalls).toHaveLength(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects local files with unsupported extensions before calling Photoshop", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ps-bridge-layer-test-"));
+    const filePath = join(dir, "source.txt");
+    writeFileSync(filePath, PNG_BYTES);
+    try {
+      const generator = fakeGenerator();
+      const { app, registry, runtimeEvents } = setup(generator);
+
+      const res = await registry.dispatch(
+        {
+          id: "bad-extension",
+          method: ProtocolMethod.LayerImportImage,
+          params: { image: filePath },
+        },
+        { generator }
+      );
+      runtimeEvents.dispose();
+      await app.close();
+
+      expect(res).toMatchObject({
+        id: "bad-extension",
+        ok: false,
+        error: { code: "BAD_REQUEST", message: "image file extension is not allowed" },
+      });
+      expect(generator.jsxStringCalls).toHaveLength(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("can disable local image paths through PluginConfig", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ps-bridge-layer-test-"));
+    const filePath = join(dir, "source.png");
+    writeFileSync(filePath, PNG_BYTES);
+    try {
+      const generator = fakeGenerator();
+      const { app, registry, runtimeEvents } = setup(generator, {
+        allowLocalImagePaths: false,
+      });
+
+      const res = await registry.dispatch(
+        {
+          id: "local-disabled",
+          method: ProtocolMethod.LayerImportImage,
+          params: { image: filePath },
+        },
+        { generator }
+      );
+      runtimeEvents.dispose();
+      await app.close();
+
+      expect(res).toMatchObject({
+        id: "local-disabled",
+        ok: false,
+        error: { code: "BAD_REQUEST", message: "local image paths are disabled" },
+      });
+      expect(generator.jsxStringCalls).toHaveLength(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects decoded base64 images over the configured byte limit", async () => {
+    const generator = fakeGenerator();
+    const { app, registry, runtimeEvents } = setup(generator, { maxImportImageBytes: 2 });
+
+    const res = await registry.dispatch(
+      {
+        id: "too-large-base64",
+        method: ProtocolMethod.LayerImportImage,
+        params: { image: PNG_BASE64 },
+      },
+      { generator }
+    );
+    runtimeEvents.dispose();
+    await app.close();
+
+    expect(res).toMatchObject({
+      id: "too-large-base64",
+      ok: false,
+      error: { code: "BAD_REQUEST", message: "image exceeds max size of 2 bytes" },
+    });
+    expect(generator.jsxStringCalls).toHaveLength(0);
+  });
+
+  it("rejects HTTP images with unsupported content types before reading the body", async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response(PNG_BYTES, { headers: { "content-type": "text/plain" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const generator = fakeGenerator();
+      const { app, registry, runtimeEvents } = setup(generator);
+
+      const res = await registry.dispatch(
+        {
+          id: "bad-content-type",
+          method: ProtocolMethod.LayerImportImage,
+          params: { image: "https://example.com/source.png" },
+        },
+        { generator }
+      );
+      runtimeEvents.dispose();
+      await app.close();
+
+      expect(res).toMatchObject({
+        id: "bad-content-type",
+        ok: false,
+        error: { code: "BAD_REQUEST", message: "image content-type is not allowed" },
+      });
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(generator.jsxStringCalls).toHaveLength(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("rejects HTTP images whose content length exceeds the configured byte limit", async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response(PNG_BYTES, {
+        headers: { "content-type": "image/png", "content-length": "3" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const generator = fakeGenerator();
+      const { app, registry, runtimeEvents } = setup(generator, { maxImportImageBytes: 2 });
+
+      const res = await registry.dispatch(
+        {
+          id: "too-large-http",
+          method: ProtocolMethod.LayerImportImage,
+          params: { image: "https://example.com/source.png" },
+        },
+        { generator }
+      );
+      runtimeEvents.dispose();
+      await app.close();
+
+      expect(res).toMatchObject({
+        id: "too-large-http",
+        ok: false,
+        error: { code: "BAD_REQUEST", message: "image exceeds max size of 2 bytes" },
+      });
+      expect(generator.jsxStringCalls).toHaveLength(0);
+    } finally {
+      vi.unstubAllGlobals();
     }
   });
 

@@ -50,6 +50,14 @@ export interface PluginConfig {
    * a symlink to the repo-root `/plugins` in development.
    */
   pluginsDir?: string;
+  /** Maximum decoded/imported image byte size accepted by layer import. */
+  maxImportImageBytes?: number;
+  /** Maximum image pixel count accepted by layer import. */
+  maxImportImagePixels?: number;
+  /** Image formats accepted by layer import validation. */
+  allowedImportImageFormats?: string[];
+  /** Whether public layer import accepts local file paths and file:// URLs. */
+  allowLocalImagePaths?: boolean;
   [key: string]: unknown;
 }
 
