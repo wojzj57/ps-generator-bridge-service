@@ -39,7 +39,7 @@ const imported = await connection.modules.layer.importImage({
 });
 ```
 
-`importImage()` 接收 data URI、原始 base64 图片数据、HTTP(S) URL、`file://` URI 或本地文件路径。可选放置字段可以设置图层名称、位置、尺寸、当前 work path mask，或相对目标图层插入。
+`importImage()` 接收 data URI、原始 base64 图片数据、HTTP(S) URL、`file://` URI 或本地文件路径。generator 会在导入 Photoshop 前把来源校验为图片。默认接受 `png`、`jpeg`、`webp`、`gif` 和 `tiff`，允许本地路径，解码后/导入字节数上限为 100 MB，尺寸上限为 100,000,000 总像素。可选放置字段可以设置图层名称、位置、尺寸、当前 work path mask，或相对目标图层插入。
 
 ## Action
 
@@ -86,6 +86,8 @@ Image 方法返回 `WsImageResult`：
 ```
 
 当 generator 配置了 COS 上传时，`data` 也可以是 HTTPS URL，而不是内联 data URL。
+
+`image.getPreview()` 和 `layer.getCurrentPreview()` 会按长边缩放，让预览长边接近 300 px；更小的图层保持原尺寸。
 
 `exportLayerWithSelectedPath()` 会把当前选择路径合成到导出的 layer 图片上。如果没有选择路径，它返回普通 layer 导出结果。
 

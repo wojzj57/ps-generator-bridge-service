@@ -61,7 +61,7 @@ Events have no `id` and no direct response.
 | `layer:getInfoById`       | Inspect layer by id.                                               |
 | `layer:getInfoByIndex`    | Inspect layer by index.                                            |
 | `layer:getCurrentPreview` | Get the current selected layer preview payload.                    |
-| `layer:importImage`       | Import an image source into Photoshop as a layer.                  |
+| `layer:importImage`       | Validate and import an image source into Photoshop as a layer.     |
 | `document:current`        | Get current document information.                                  |
 | `document:export`         | Export document.                                                   |
 | `document:save`           | Save document.                                                     |

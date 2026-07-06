@@ -2,6 +2,10 @@
 
 Environment variables are deployment-time overrides. Structured runtime parameters should usually be passed through `PluginConfig`.
 
+The generator entry `packages/generator/main.js` loads the package-local `.env`
+file before requiring the bundled host code. Use that file for local Photoshop
+Generator launches; existing process environment variables are not overwritten.
+
 | Variable                    | Required | Purpose                                              | Default                  |
 | --------------------------- | -------- | ---------------------------------------------------- | ------------------------ |
 | `PS_BRIDGE_PORT`            | No       | Overrides the generator service port when valid.     | `7700`                   |

@@ -8,11 +8,17 @@ generator 通过 `PluginConfig` 接收结构化运行选项，通过环境变量
 export interface PluginConfig {
   port?: number;
   pluginsDir?: string;
+  maxImportImageBytes?: number;
+  maxImportImagePixels?: number;
+  allowedImportImageFormats?: string[];
+  allowLocalImagePaths?: boolean;
   [key: string]: unknown;
 }
 ```
 
 `port` 控制 HTTP/WebSocket 服务端口。`pluginsDir` 指向一个目录，其直接子目录是插件包。
+
+layer 图片导入会在交给 Photoshop 前校验输入。`maxImportImageBytes` 限制解码后/导入的图片字节数，`maxImportImagePixels` 按总像素数限制图片尺寸，`allowedImportImageFormats` 限制可接受格式，`allowLocalImagePaths` 控制公开 `layer:importImage` 请求是否允许使用本地路径或 `file://` URI。
 
 ## 默认值
 
@@ -23,10 +29,16 @@ export interface PluginConfig {
 | Root WebSocket   | `/ws`                    |
 | Plugin WebSocket | `/ws/{pluginId}`         |
 | Plugin directory | package-local `plugins/` |
+| Import max bytes | `104857600`              |
+| Import max pixels | `100000000`             |
+| Import formats   | `png`, `jpeg`, `webp`, `gif`, `tiff` |
+| Local image paths | enabled                 |
 
 ## 环境变量覆盖
 
 环境变量是部署开关：
+
+generator-core 通过 `main.js` 加载包时，会先读取包内 `.env`，再启动打包后的 host 代码。进程中已经存在的环境变量优先，不会被 `.env` 覆盖。
 
 | 变量                        | 作用                                          |
 | --------------------------- | --------------------------------------------- |

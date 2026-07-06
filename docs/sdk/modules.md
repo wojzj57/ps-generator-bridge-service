@@ -39,7 +39,7 @@ const imported = await connection.modules.layer.importImage({
 });
 ```
 
-`importImage()` accepts a data URI, raw base64 image data, an HTTP(S) URL, a `file://` URI, or a local file path. Optional placement fields can name the layer, position it, resize it, apply the current work path as a mask, or insert relative to a target layer.
+`importImage()` accepts a data URI, raw base64 image data, an HTTP(S) URL, a `file://` URI, or a local file path. The generator validates the source as an image before importing it into Photoshop. By default it accepts `png`, `jpeg`, `webp`, `gif`, and `tiff`, allows local paths, limits decoded/imported bytes to 100 MB, and limits dimensions to 100,000,000 total pixels. Optional placement fields can name the layer, position it, resize it, apply the current work path as a mask, or insert relative to a target layer.
 
 ## Action
 
@@ -86,6 +86,8 @@ Image methods return `WsImageResult`:
 ```
 
 When COS upload is configured on the generator, `data` can be an HTTPS URL instead of an inline data URL.
+
+`image.getPreview()` and `layer.getCurrentPreview()` downscale by the longer edge so previews land near 300 px while smaller layers keep their original size.
 
 `exportLayerWithSelectedPath()` composites the current selection path over the exported layer image. If there is no selection path, it returns the plain layer export.
 

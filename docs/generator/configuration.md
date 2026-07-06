@@ -8,11 +8,17 @@ The generator accepts structured runtime options through `PluginConfig` and depl
 export interface PluginConfig {
   port?: number;
   pluginsDir?: string;
+  maxImportImageBytes?: number;
+  maxImportImagePixels?: number;
+  allowedImportImageFormats?: string[];
+  allowLocalImagePaths?: boolean;
   [key: string]: unknown;
 }
 ```
 
 `port` controls the HTTP/WebSocket service port. `pluginsDir` points to a directory whose direct child folders are plugin packages.
+
+Layer image import validates inputs before handing them to Photoshop. `maxImportImageBytes` caps decoded/imported image bytes, `maxImportImagePixels` caps image dimensions by total pixels, `allowedImportImageFormats` limits accepted formats, and `allowLocalImagePaths` controls whether public `layer:importImage` requests may use local paths or `file://` URIs.
 
 ## Defaults
 
@@ -23,10 +29,18 @@ export interface PluginConfig {
 | Root WebSocket   | `/ws`                    |
 | Plugin WebSocket | `/ws/{pluginId}`         |
 | Plugin directory | package-local `plugins/` |
+| Import max bytes | `104857600`              |
+| Import max pixels | `100000000`             |
+| Import formats   | `png`, `jpeg`, `webp`, `gif`, `tiff` |
+| Local image paths | enabled                 |
 
 ## Environment Overrides
 
 Environment variables are deployment knobs:
+
+When generator-core requires the package through `main.js`, the generator loads
+the package-local `.env` file before the bundled host code starts. Values already
+present in the process environment take precedence over `.env` values.
 
 | Variable                    | Purpose                                                                   |
 | --------------------------- | ------------------------------------------------------------------------- |
