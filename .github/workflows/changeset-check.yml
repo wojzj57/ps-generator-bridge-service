@@ -29,7 +29,7 @@ jobs:
         run: |
           changed_files=$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}")
 
-          publishable_changes=$(printf '%s\n' "$changed_files" | grep -E '^(packages/(sdk|generator|testkit)/src/|packages/generator/jsx/)' || true)
+          publishable_changes=$(printf '%s\n' "$changed_files" | grep -E '^(packages/(sdk|generator|cli)/src/|packages/generator/jsx/)' || true)
           changesets=$(printf '%s\n' "$changed_files" | grep -E '^\.changeset/.+\.md$' || true)
 
           if [[ -n "$publishable_changes" && -z "$changesets" ]]; then
