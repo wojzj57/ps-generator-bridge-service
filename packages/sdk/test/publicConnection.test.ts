@@ -523,6 +523,149 @@ describe("public Connection", () => {
     await expect(name).resolves.toBe("Design.psd");
   });
 
+  it("maps every built-in module wrapper to its protocol method", async () => {
+    const { conn, transports } = harness();
+    const transport = transports[0]!;
+    await connect(conn, transport);
+
+    const layerResult = { id: 7, index: 1, name: "Layer", type: 1, visible: true };
+    const documentResult = {
+      id: 1,
+      name: "Design.psd",
+      width: 100,
+      height: 100,
+      resolution: 72,
+      isDirty: false,
+    };
+    const imageResult = {
+      data: "data:image/png;base64,abc",
+      bounds: { left: 0, top: 0, right: 10, bottom: 10 },
+      width: 10,
+      height: 10,
+    };
+    const selectionPathResult = { svg: "<svg></svg>", x: 1, y: 2, width: 3, height: 4 };
+    const cases: Array<{
+      call: () => Promise<unknown>;
+      method: ProtocolMethod;
+      params: unknown;
+      result: unknown;
+    }> = [
+      {
+        call: () => conn.modules.action.autoCutout(),
+        method: ProtocolMethod.ActionAutoCutout,
+        params: {},
+        result: true,
+      },
+      {
+        call: () => conn.modules.action.removeBackground(),
+        method: ProtocolMethod.ActionRemoveBackground,
+        params: {},
+        result: { success: true },
+      },
+      {
+        call: () => conn.modules.document.getCurrentDocument(),
+        method: ProtocolMethod.DocumentCurrent,
+        params: {},
+        result: documentResult,
+      },
+      {
+        call: () => conn.modules.document.exportDocument({ filePath: "out.png", quality: 90 }),
+        method: ProtocolMethod.DocumentExport,
+        params: { filePath: "out.png", quality: 90 },
+        result: { ok: true },
+      },
+      {
+        call: () => conn.modules.document.saveDocument({ savePath: "out.psd" }),
+        method: ProtocolMethod.DocumentSave,
+        params: { savePath: "out.psd" },
+        result: { ok: true },
+      },
+      {
+        call: () => conn.modules.layer.getLayerInfo({ id: 7, getChildren: true }),
+        method: ProtocolMethod.LayerGetInfo,
+        params: { id: 7, getChildren: true },
+        result: layerResult,
+      },
+      {
+        call: () => conn.modules.layer.getLayerInfoByID(7, { getChildren: true }),
+        method: ProtocolMethod.LayerGetInfoById,
+        params: { layerID: 7, options: { getChildren: true } },
+        result: layerResult,
+      },
+      {
+        call: () => conn.modules.layer.getLayerInfoByIndex(2, { getChildren: false }),
+        method: ProtocolMethod.LayerGetInfoByIndex,
+        params: { layerIndex: 2, options: { getChildren: false } },
+        result: layerResult,
+      },
+      {
+        call: () => conn.modules.layer.getCurrentPreview(),
+        method: ProtocolMethod.LayerGetCurrentPreview,
+        params: {},
+        result: { id: 7, name: "Layer", index: 1, width: 12, height: 8, data: "preview" },
+      },
+      {
+        call: () => conn.modules.layer.importImage({ image: "data:image/png;base64,cG5n" }),
+        method: ProtocolMethod.LayerImportImage,
+        params: { image: "data:image/png;base64,cG5n" },
+        result: layerResult,
+      },
+      {
+        call: () => conn.modules.image.exportLayer({ layerSpec: 7, settings: { scaleX: 0.5 } }),
+        method: ProtocolMethod.ImageExportLayer,
+        params: { layerSpec: 7, settings: { scaleX: 0.5 } },
+        result: imageResult,
+      },
+      {
+        call: () => conn.modules.image.exportLayerWithSelectedPath({ layerSpec: 7, expand: 2 }),
+        method: ProtocolMethod.ImageExportLayerWithSelectedPath,
+        params: { layerSpec: 7, expand: 2 },
+        result: imageResult,
+      },
+      {
+        call: () => conn.modules.image.getPreview({ layerSpec: 7 }),
+        method: ProtocolMethod.ImageGetPreview,
+        params: { layerSpec: 7 },
+        result: imageResult,
+      },
+      {
+        call: () => conn.modules.image.exportDocument({ documentId: 1 }),
+        method: ProtocolMethod.ImageExportDocument,
+        params: { documentId: 1 },
+        result: imageResult,
+      },
+      {
+        call: () => conn.modules.selection.watch(),
+        method: ProtocolMethod.SelectionWatch,
+        params: {},
+        result: { ok: true },
+      },
+      {
+        call: () => conn.modules.selection.getArea(),
+        method: ProtocolMethod.SelectionGetArea,
+        params: {},
+        result: { x: 1, y: 2, width: 3, height: 4 },
+      },
+      {
+        call: () => conn.modules.selection.getPath({ expand: 2 }),
+        method: ProtocolMethod.SelectionGetPath,
+        params: { expand: 2 },
+        result: selectionPathResult,
+      },
+    ];
+
+    for (const item of cases) {
+      const promise = item.call();
+      await flush();
+      expect(lastRequest(transport)).toMatchObject({
+        method: item.method,
+        params: item.params,
+      });
+      respond(transport, item.result);
+      await expect(promise).resolves.toEqual(item.result);
+    }
+  });
+
   it("exposes typed module wrappers", async () => {
     const { conn, transports } = harness();
     const transport = transports[0]!;
