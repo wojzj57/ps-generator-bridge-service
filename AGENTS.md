@@ -11,15 +11,15 @@ PS Generator Bridge Service 是一个 Photoshop Generator monorepo：`generator`
 
 ## 按任务快速导航
 
-| 你的任务 | 先去这里 | 说明 |
-|---|---|---|
-| **了解整体术语与边界** | `CONTEXT.md` | Ubiquitous language，先统一 server / plugin / module / protocol 等词 |
-| **改协议或新增能力** | `packages/sdk/src/protocol/` | `ProtocolMethods` 是服务能力的 source of truth |
-| **改 Photoshop Generator host** | `packages/generator/` + `packages/generator/TESTING.md` | Generator 插件、Fastify/WebSocket server、模块、插件加载与测试边界 |
-| **改 SDK client** | `packages/sdk/` | 保持 browser-safe / Node-free；不要把 server 类型泄漏进 SDK root |
-| **改 CLI / smoke harness** | `packages/cli/` | Windows Photoshop + `generator-core` smoke 工具 |
-| **写公开文档** | `docs/` + package README | GitHub 与 GitHub Pages 的公共文档来源 |
-| **查包导出边界** | `docs/reference/package-exports.md` | SDK root、SDK plugin subpath、generator CJS 入口的公开面 |
+| 你的任务                        | 先去这里                                                | 说明                                                                 |
+| ------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------- |
+| **了解整体术语与边界**          | `CONTEXT.md`                                            | Ubiquitous language，先统一 server / plugin / module / protocol 等词 |
+| **改协议或新增能力**            | `packages/sdk/src/protocol/`                            | `ProtocolMethods` 是服务能力的 source of truth                       |
+| **改 Photoshop Generator host** | `packages/generator/` + `packages/generator/TESTING.md` | Generator 插件、Fastify/WebSocket server、模块、插件加载与测试边界   |
+| **改 SDK client**               | `packages/sdk/`                                         | 保持 browser-safe / Node-free；不要把 server 类型泄漏进 SDK root     |
+| **改 CLI / smoke harness**      | `packages/cli/`                                         | Windows Photoshop + `generator-core` smoke 工具                      |
+| **写公开文档**                  | `docs/` + package README                                | GitHub 与 GitHub Pages 的公共文档来源                                |
+| **查包导出边界**                | `docs/reference/package-exports.md`                     | SDK root、SDK plugin subpath、generator CJS 入口的公开面             |
 
 ---
 
@@ -89,11 +89,11 @@ log.warn("selection event registration failed", error);
 
 ## 包速查
 
-| Package | npm | Role |
-|---|---|---|
-| `packages/sdk` | `@ps-generator-bridge/sdk` | Isomorphic client + protocol contract。零 PS/Node coupling，browser-safe。 |
-| `packages/generator` | `@ps-generator-bridge/generator` | In-PS Generator plugin + WebSocket service，由 `generator-core` 加载。 |
-| `packages/cli` | `@ps-generator-bridge/cli` | 命令行工具，包括 Windows PS + `generator-core` smoke harness。 |
+| Package              | npm                              | Role                                                                       |
+| -------------------- | -------------------------------- | -------------------------------------------------------------------------- |
+| `packages/sdk`       | `@ps-generator-bridge/sdk`       | Isomorphic client + protocol contract。零 PS/Node coupling，browser-safe。 |
+| `packages/generator` | `@ps-generator-bridge/generator` | In-PS Generator plugin + WebSocket service，由 `generator-core` 加载。     |
+| `packages/cli`       | `@ps-generator-bridge/cli`       | 命令行工具，包括 Windows PS + `generator-core` smoke harness。             |
 
 ---
 

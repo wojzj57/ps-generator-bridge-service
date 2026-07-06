@@ -22,17 +22,17 @@ Layer image import validates inputs before handing them to Photoshop. `maxImport
 
 ## Defaults
 
-| Setting          | Default                  |
-| ---------------- | ------------------------ |
-| Host             | `127.0.0.1`              |
-| Port             | `7700`                   |
-| Root WebSocket   | `/ws`                    |
-| Plugin WebSocket | `/ws/{pluginId}`         |
-| Plugin directory | package-local `plugins/` |
-| Import max bytes | `104857600`              |
-| Import max pixels | `100000000`             |
-| Import formats   | `png`, `jpeg`, `webp`, `gif`, `tiff` |
-| Local image paths | enabled                 |
+| Setting           | Default                              |
+| ----------------- | ------------------------------------ |
+| Host              | `127.0.0.1`                          |
+| Port              | `7700`                               |
+| Root WebSocket    | `/ws`                                |
+| Plugin WebSocket  | `/ws/{pluginId}`                     |
+| Plugin directory  | package-local `plugins/`             |
+| Import max bytes  | `104857600`                          |
+| Import max pixels | `100000000`                          |
+| Import formats    | `png`, `jpeg`, `webp`, `gif`, `tiff` |
+| Local image paths | enabled                              |
 
 ## Environment Overrides
 

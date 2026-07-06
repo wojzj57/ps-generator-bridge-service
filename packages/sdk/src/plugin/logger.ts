@@ -23,8 +23,8 @@ function currentGeneratorLogger(): Logger | undefined {
 function isBridgeLogger(logger: Logger | undefined): logger is BridgeLogger {
   return Boolean(
     logger &&
-      typeof logger === "object" &&
-      (logger as Partial<BridgeLogger>)[BRIDGE_LOGGER_KEY] === true
+    typeof logger === "object" &&
+    (logger as Partial<BridgeLogger>)[BRIDGE_LOGGER_KEY] === true
   );
 }
 

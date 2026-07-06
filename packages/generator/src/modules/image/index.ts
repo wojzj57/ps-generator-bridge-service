@@ -408,8 +408,8 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
     }
     throw bridgeError.jsxFailed(
       `Unexpected response from PS in getLayerPixmap: js=${JSON.stringify(js)}, ` +
-      `pixmap=${pixmapBuffer ? "truthy" : "falsy"}, ` +
-      `iccExpected=${params.getICCProfileData}`
+        `pixmap=${pixmapBuffer ? "truthy" : "falsy"}, ` +
+        `iccExpected=${params.getICCProfileData}`
     );
   }
 

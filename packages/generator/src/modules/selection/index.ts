@@ -12,17 +12,17 @@ type SelectionActionEvent = (typeof SELECTION_ACTION_EVENTS)[number];
 
 type SubPathItem =
   | {
-    kind: "C";
-    in?: { x: number; y: number };
-    out?: { x: number; y: number };
-    x: number;
-    y: number;
-  }
+      kind: "C";
+      in?: { x: number; y: number };
+      out?: { x: number; y: number };
+      x: number;
+      y: number;
+    }
   | {
-    kind: "P";
-    x: number;
-    y: number;
-  };
+      kind: "P";
+      x: number;
+      y: number;
+    };
 
 type PathItem = SubPathItem[][];
 

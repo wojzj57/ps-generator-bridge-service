@@ -22,17 +22,17 @@ layer 图片导入会在交给 Photoshop 前校验输入。`maxImportImageBytes`
 
 ## 默认值
 
-| 设置             | 默认值                   |
-| ---------------- | ------------------------ |
-| Host             | `127.0.0.1`              |
-| Port             | `7700`                   |
-| Root WebSocket   | `/ws`                    |
-| Plugin WebSocket | `/ws/{pluginId}`         |
-| Plugin directory | package-local `plugins/` |
-| Import max bytes | `104857600`              |
-| Import max pixels | `100000000`             |
-| Import formats   | `png`, `jpeg`, `webp`, `gif`, `tiff` |
-| Local image paths | enabled                 |
+| 设置              | 默认值                               |
+| ----------------- | ------------------------------------ |
+| Host              | `127.0.0.1`                          |
+| Port              | `7700`                               |
+| Root WebSocket    | `/ws`                                |
+| Plugin WebSocket  | `/ws/{pluginId}`                     |
+| Plugin directory  | package-local `plugins/`             |
+| Import max bytes  | `104857600`                          |
+| Import max pixels | `100000000`                          |
+| Import formats    | `png`, `jpeg`, `webp`, `gif`, `tiff` |
+| Local image paths | enabled                              |
 
 ## 环境变量覆盖
 
