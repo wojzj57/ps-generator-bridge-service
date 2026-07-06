@@ -38,6 +38,22 @@ export type LayerPreviewPayload = {
 
 export type LayerSelectionChangePayload = PsLayer[] | null;
 
+export interface LayerImportImageParams {
+  image: string;
+  name?: string;
+  position?: {
+    x: number;
+    y: number;
+  };
+  size?: {
+    width: number;
+    height: number;
+  };
+  useWorkpath?: boolean;
+  layerIndex?: number;
+  layerId?: number;
+}
+
 export interface PsDocument {
   id: number;
   name: string;

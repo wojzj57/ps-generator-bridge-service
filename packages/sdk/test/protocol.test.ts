@@ -36,6 +36,7 @@ describe("protocol", () => {
     expect(ProtocolMethod.ActionRemoveBackground).toBe("action:removeBackground");
     expect(ProtocolMethod.LayerGetInfo).toBe("layer:getInfo");
     expect(ProtocolMethod.LayerGetCurrentPreview).toBe("layer:getCurrentPreview");
+    expect(ProtocolMethod.LayerImportImage).toBe("layer:importImage");
     expect(ProtocolMethod.DocumentCurrent).toBe("document:current");
     expect(ProtocolMethod.DocumentExport).toBe("document:export");
     expect(ProtocolMethod.DocumentSave).toBe("document:save");

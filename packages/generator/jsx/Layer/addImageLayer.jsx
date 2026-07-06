@@ -1,5 +1,7 @@
 var filePath = params.filePath;
 var targetLayerId = params.id != undefined && params.id !== "" ? Number(params.id) : null;
+var targetInsertIndex =
+  params.insertIndex != undefined && params.insertIndex !== "" ? Number(params.insertIndex) : null;
 var layerName = params.name;
 var replace = false;
 
@@ -152,7 +154,9 @@ try {
   function toTransform() {
     var insertIndex;
 
-    if (targetLayerId != null && !isNaN(targetLayerId)) {
+    if (targetInsertIndex != null && !isNaN(targetInsertIndex)) {
+      insertIndex = targetInsertIndex;
+    } else if (targetLayerId != null && !isNaN(targetLayerId)) {
       var data = getInsertInfo(targetLayerId);
       insertIndex = data.insertIndex;
     }

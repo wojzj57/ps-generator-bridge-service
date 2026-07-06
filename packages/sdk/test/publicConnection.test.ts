@@ -552,6 +552,18 @@ describe("public Connection", () => {
       data: "data:image/png;base64,abc",
     });
     await expect(preview).resolves.toMatchObject({ width: 12, height: 8 });
+
+    const imported = conn.modules.layer.importImage({
+      image: "data:image/png;base64,cG5n",
+      name: "Imported",
+    });
+    await flush();
+    expect(lastRequest(transport)).toMatchObject({
+      method: ProtocolMethod.LayerImportImage,
+      params: { image: "data:image/png;base64,cG5n", name: "Imported" },
+    });
+    respond(transport, { id: 8, index: 2, name: "Imported", type: 1, visible: true });
+    await expect(imported).resolves.toMatchObject({ id: 8, name: "Imported" });
   });
 
   it("exposes image module wrappers", async () => {

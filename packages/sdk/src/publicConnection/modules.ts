@@ -27,6 +27,8 @@ export class PublicModules {
     getLayerInfoByIndex: (layerIndex: number, options?: { getChildren: boolean }) =>
       this.invoke(ProtocolMethod.LayerGetInfoByIndex, { layerIndex, options }),
     getCurrentPreview: () => this.invoke(ProtocolMethod.LayerGetCurrentPreview, {}),
+    importImage: (params: ProtocolMethods[typeof ProtocolMethod.LayerImportImage]["params"]) =>
+      this.invoke(ProtocolMethod.LayerImportImage, params),
   };
 
   readonly document = {

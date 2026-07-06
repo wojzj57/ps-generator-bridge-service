@@ -19,6 +19,7 @@ describe("Registry.dispatch", () => {
       ProtocolMethod.ActionRemoveBackground,
       ProtocolMethod.LayerGetInfo,
       ProtocolMethod.LayerGetCurrentPreview,
+      ProtocolMethod.LayerImportImage,
       ProtocolMethod.DocumentCurrent,
       ProtocolMethod.DocumentExport,
       ProtocolMethod.DocumentSave,

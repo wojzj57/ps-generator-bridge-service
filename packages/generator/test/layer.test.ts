@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import Fastify, { type FastifyInstance } from "fastify";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   MainEvent,
   ProtocolMethod,
@@ -70,6 +74,31 @@ function layer(
     rect: { x: 0, y: 0, width, height },
     bounds: { left: 0, top: 0, right: width, bottom: height },
   };
+}
+
+function jsxParams(script: string): Record<string, any> {
+  const marker = "var params = ";
+  const start = script.indexOf(marker);
+  if (start === -1) return {};
+  const valueStart = start + marker.length;
+  const valueEnd = script.indexOf(";", valueStart);
+  return JSON.parse(script.slice(valueStart, valueEnd));
+}
+
+function isAddImageScript(script: string): boolean {
+  return script.includes("function addImageLayer");
+}
+
+function isTransformScript(script: string): boolean {
+  return script.includes("function transformLayer");
+}
+
+function isWorkpathMaskScript(script: string): boolean {
+  return script.includes("function workpathToSelection");
+}
+
+function isGetLayerInfoScript(script: string): boolean {
+  return script.includes("function getLayerInfoByID");
 }
 
 describe("LayerModule current preview", () => {
@@ -201,6 +230,192 @@ describe("LayerModule current preview", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("LayerModule image import", () => {
+  it("imports data URI images above a layer id, transforms with completed rect, masks, and returns layer info", async () => {
+    const generator = fakeGenerator();
+    const addParams: Record<string, any>[] = [];
+    const transformParams: Record<string, any>[] = [];
+    const workpathParams: Record<string, any>[] = [];
+
+    generator.onEvaluateJSXString = (script) => {
+      const params = jsxParams(script);
+      if (isGetLayerInfoScript(script)) {
+        if (params.layerID === 11) return layer({ id: 11, index: 4, name: "Anchor" });
+        if (params.layerID === 33) {
+          return layer({ id: 33, index: 5, name: "Imported", width: 40, height: 30 });
+        }
+      }
+      if (isAddImageScript(script)) {
+        addParams.push(params);
+        expect(existsSync(params.filePath)).toBe(true);
+        return 33;
+      }
+      if (isTransformScript(script)) {
+        transformParams.push(params);
+        return undefined;
+      }
+      if (isWorkpathMaskScript(script)) {
+        workpathParams.push(params);
+        return undefined;
+      }
+      return undefined;
+    };
+
+    const { app, registry, runtimeEvents } = setup(generator);
+    const res = await registry.dispatch(
+      {
+        id: "import",
+        method: ProtocolMethod.LayerImportImage,
+        params: {
+          image: "data:image/png;base64,cG5n",
+          name: "Imported",
+          position: { x: 10, y: 20 },
+          useWorkpath: true,
+          layerId: 11,
+        },
+      },
+      { generator }
+    );
+    runtimeEvents.dispose();
+    await app.close();
+
+    expect(res).toMatchObject({
+      id: "import",
+      ok: true,
+      result: { id: 33, index: 5, name: "Imported" },
+    });
+    expect(addParams[0]).toMatchObject({
+      name: "Imported",
+      insertIndex: 5,
+    });
+    expect(existsSync(addParams[0]!.filePath)).toBe(false);
+    expect(transformParams[0]).toMatchObject({
+      id: 33,
+      rect: { x: 10, y: 20, width: 40, height: 30 },
+    });
+    expect(workpathParams[0]).toMatchObject({ id: 33, blur: 10 });
+  });
+
+  it("imports raw base64 images above a layer index and completes size-only transforms", async () => {
+    const generator = fakeGenerator();
+    const addParams: Record<string, any>[] = [];
+    const transformParams: Record<string, any>[] = [];
+
+    generator.onEvaluateJSXString = (script) => {
+      const params = jsxParams(script);
+      if (isAddImageScript(script)) {
+        addParams.push(params);
+        expect(existsSync(params.filePath)).toBe(true);
+        return 44;
+      }
+      if (isGetLayerInfoScript(script) && params.layerID === 44) {
+        return {
+          ...layer({ id: 44, index: 3, name: "Sized", width: 40, height: 30 }),
+          rect: { x: 3, y: 4, width: 40, height: 30 },
+        };
+      }
+      if (isTransformScript(script)) {
+        transformParams.push(params);
+        return undefined;
+      }
+      return undefined;
+    };
+
+    const { app, registry, runtimeEvents } = setup(generator);
+    const res = await registry.dispatch(
+      {
+        id: "import-b64",
+        method: ProtocolMethod.LayerImportImage,
+        params: {
+          image: Buffer.from("png").toString("base64"),
+          size: { width: 12, height: 8 },
+          layerIndex: 2,
+        },
+      },
+      { generator }
+    );
+    runtimeEvents.dispose();
+    await app.close();
+
+    expect(res).toMatchObject({ id: "import-b64", ok: true, result: { id: 44 } });
+    expect(addParams[0]).toMatchObject({ insertIndex: 3 });
+    expect(existsSync(addParams[0]!.filePath)).toBe(false);
+    expect(transformParams[0]).toMatchObject({
+      id: 44,
+      rect: { x: 3, y: 4, width: 12, height: 8 },
+    });
+  });
+
+  it("imports file URI images without deleting the source file", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ps-bridge-layer-test-"));
+    const filePath = join(dir, "source.png");
+    writeFileSync(filePath, Buffer.from("png"));
+    try {
+      const generator = fakeGenerator();
+      const addParams: Record<string, any>[] = [];
+      generator.onEvaluateJSXString = (script) => {
+        const params = jsxParams(script);
+        if (isAddImageScript(script)) {
+          addParams.push(params);
+          return 55;
+        }
+        if (isGetLayerInfoScript(script) && params.layerID === 55) {
+          return layer({ id: 55, index: 1, name: "Local" });
+        }
+        return undefined;
+      };
+
+      const { app, registry, runtimeEvents } = setup(generator);
+      const res = await registry.dispatch(
+        {
+          id: "import-file",
+          method: ProtocolMethod.LayerImportImage,
+          params: {
+            image: pathToFileURL(filePath).toString(),
+            name: "Local",
+          },
+        },
+        { generator }
+      );
+      runtimeEvents.dispose();
+      await app.close();
+
+      expect(res).toMatchObject({ id: "import-file", ok: true, result: { id: 55 } });
+      expect(addParams[0]).toMatchObject({ filePath, name: "Local" });
+      expect(existsSync(filePath)).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects imports with both layerId and layerIndex", async () => {
+    const generator = fakeGenerator();
+    const { app, registry, runtimeEvents } = setup(generator);
+
+    const res = await registry.dispatch(
+      {
+        id: "conflict",
+        method: ProtocolMethod.LayerImportImage,
+        params: {
+          image: "data:image/png;base64,cG5n",
+          layerId: 1,
+          layerIndex: 2,
+        },
+      },
+      { generator }
+    );
+    runtimeEvents.dispose();
+    await app.close();
+
+    expect(res).toMatchObject({
+      id: "conflict",
+      ok: false,
+      error: { code: "BAD_REQUEST" },
+    });
+    expect(generator.jsxStringCalls).toHaveLength(0);
   });
 });
 

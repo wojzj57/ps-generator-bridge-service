@@ -1,5 +1,6 @@
 import type { SubscribableEventName } from "./events";
 import type {
+  LayerImportImageParams,
   LayerPreviewPayload,
   LayerSpec,
   PsDocument,
@@ -27,6 +28,7 @@ export const ProtocolMethod = {
   LayerGetInfoById: "layer:getInfoById",
   LayerGetInfoByIndex: "layer:getInfoByIndex",
   LayerGetCurrentPreview: "layer:getCurrentPreview",
+  LayerImportImage: "layer:importImage",
   DocumentCurrent: "document:current",
   DocumentExport: "document:export",
   DocumentSave: "document:save",
@@ -95,6 +97,10 @@ export interface ProtocolMethods {
   [ProtocolMethod.LayerGetCurrentPreview]: {
     params: Record<string, never>;
     result: LayerPreviewPayload;
+  };
+  [ProtocolMethod.LayerImportImage]: {
+    params: LayerImportImageParams;
+    result: PsLayer;
   };
   [ProtocolMethod.DocumentCurrent]: {
     params: Record<string, never>;
