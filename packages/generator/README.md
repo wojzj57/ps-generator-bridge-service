@@ -61,6 +61,9 @@ Environment overrides:
 | `PS_BRIDGE_PLUGINS_DIR` | Overrides the default plugin directory when `pluginsDir` is not provided.              |
 | `PS_BRIDGE_COS_*`       | Enables optional COS-backed image upload when all required credentials are configured. |
 
+`main.js` loads the package-local `.env` file before requiring the bundled
+plugin entry, so these overrides are available during host construction.
+
 Prefer `PluginConfig` for structured run parameters. Use environment variables for deployment-time overrides and secrets.
 
 ## Server Endpoints
