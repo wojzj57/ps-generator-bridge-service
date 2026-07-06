@@ -1,5 +1,13 @@
 # @ps-generator-bridge/cli
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies
+  - @ps-generator-bridge/generator@0.3.0
+  - @ps-generator-bridge/sdk@0.3.0
+
 ## 0.1.3
 
 ### Patch Changes

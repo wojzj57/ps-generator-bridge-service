@@ -1,6 +1,6 @@
 {
   "name": "@ps-generator-bridge/generator",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "PS Generator Bridge - Photoshop Generator plugin + WebSocket service (runs in PS's bundled Node)",
   "license": "MIT",
   "author": "wojzj57",
