@@ -40,11 +40,12 @@ pnpm --filter @ps-generator-bridge/cli typecheck
 ps-generator-bridge setup-core [--update]
 ps-generator-bridge run (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core]
 ps-generator-bridge dev (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core]
+ps-generator-bridge clean
 ```
 
 ### `setup-core`
 
-Clones or updates Adobe `generator-core` and runs `npm install`.
+Clones or updates Adobe `generator-core`, then runs `npm install`. The install is skipped when `node_modules` already exists; pass `--update` to pull the latest `generator-core` and force a fresh install.
 
 When run inside a pnpm workspace, `generator-core` is stored at:
 
@@ -52,11 +53,11 @@ When run inside a pnpm workspace, `generator-core` is stored at:
 <workspace-root>/generator-core
 ```
 
-Outside a pnpm workspace, it falls back to:
+Outside a pnpm workspace, it falls back to a stable per-user cache directory under `ps-generator-bridge/generator-core`:
 
-```text
-<system-temp>/ps-generator-bridge/generator-core
-```
+- Windows: `%LOCALAPPDATA%\ps-generator-bridge\generator-core`
+- macOS: `~/Library/Caches/ps-generator-bridge/generator-core`
+- Linux: `$XDG_CACHE_HOME/ps-generator-bridge/generator-core` (falling back to `~/.cache`)
 
 ### `run`
 
@@ -72,6 +73,14 @@ Starts the same harness and keeps `generator-core` running until interrupted.
 
 ```bash
 ps-generator-bridge dev --plugins-dir ./plugins --port 7700
+```
+
+### `clean`
+
+Removes the cached `generator-core` clone from the per-user cache directory. When run inside a pnpm workspace it does nothing, because the workspace copy is managed by `pnpm setup`.
+
+```bash
+ps-generator-bridge clean
 ```
 
 ## Plugin Inputs
