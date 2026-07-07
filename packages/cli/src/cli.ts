@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { runDev, runHarness, setupGeneratorCore, type HarnessOptions } from "./core";
+import { runClean, runDev, runHarness, setupGeneratorCore, type HarnessOptions } from "./core";
 
-type Command = "setup-core" | "run" | "dev";
+type Command = "setup-core" | "run" | "dev" | "clean";
 
 interface Parsed {
   command: Command;
@@ -11,10 +11,15 @@ interface Parsed {
 const USAGE = `Usage:
   ps-generator-bridge setup-core [--update]
   ps-generator-bridge run (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core]
-  ps-generator-bridge dev (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core]`;
+  ps-generator-bridge dev (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core]
+  ps-generator-bridge clean`;
 
 async function main(): Promise<void> {
   const parsed = parseArgs(process.argv.slice(2));
+  if (parsed.command === "clean") {
+    await runClean();
+    return;
+  }
   if (parsed.command === "setup-core") {
     await setupGeneratorCore({ update: parsed.options.updateCore ?? parsed.options.update });
     return;
@@ -33,13 +38,23 @@ function parseArgs(args: string[]): Parsed {
   }
 
   const command = args.shift();
-  if (command !== "setup-core" && command !== "run" && command !== "dev") {
+  if (
+    command !== "setup-core" &&
+    command !== "run" &&
+    command !== "dev" &&
+    command !== "clean"
+  ) {
     throw usage(`Unknown command: ${command ?? "(missing)"}`);
   }
 
   const options: Parsed["options"] = {
     expectPlugins: [],
   };
+
+  if (command === "clean") {
+    if (args.length > 0) throw usage(`clean does not accept any options: ${args[0]}`);
+    return { command, options };
+  }
 
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];

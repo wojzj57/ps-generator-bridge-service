@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { Connection, type PluginInfo } from "@ps-generator-bridge/sdk";
 import WebSocketImpl from "ws";
-import { ensureGeneratorCore, generatorCoreDir } from "./generatorCore";
+import { cleanGeneratorCore, ensureGeneratorCore, generatorCoreDir } from "./generatorCore";
 import { ensurePhotoshopRunning } from "./photoshop";
 import { cleanupPluginSource, preparePluginSource, scanPluginCandidates } from "./pluginDirs";
 
@@ -22,6 +22,10 @@ export interface HarnessOptions {
 
 export async function setupGeneratorCore(options: { update?: boolean } = {}): Promise<void> {
   await ensureGeneratorCore({ update: options.update ?? false });
+}
+
+export async function runClean(): Promise<void> {
+  cleanGeneratorCore();
 }
 
 export async function runHarness(options: HarnessOptions): Promise<void> {
