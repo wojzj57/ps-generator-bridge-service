@@ -1,4 +1,0 @@
-interface:
-  display_name: "PS Bridge Release"
-  short_description: "Manage Changesets, release workflows, and npm publishing."
-  default_prompt: "Use $ps-generator-bridge-release to update Changesets, release workflows, or npm publishing."
