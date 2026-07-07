@@ -136,7 +136,7 @@ async function readPlugins(port: number): Promise<PluginInfo[]> {
 
 async function smokeServerInfo(port: number, timeoutMs: number) {
   const connection = new Connection({
-    url: `ws://127.0.0.1:${port}/ws`,
+    url: `ws://127.0.0.1:${port}`,
     WebSocket: WebSocketImpl as unknown as typeof WebSocket,
     timeoutMs,
     maxRetries: 0,
