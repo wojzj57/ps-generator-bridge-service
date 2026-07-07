@@ -21,7 +21,11 @@ export async function ensureGeneratorCore(options: { update: boolean }): Promise
     run("git", ["pull", "--ff-only"], dir);
   }
 
-  run("npm", ["install"], dir);
+  if (options.update || !existsSync(join(dir, "node_modules"))) {
+    run("npm", ["install"], dir);
+  } else {
+    console.log("[generator-core] node_modules present; skipping npm install (use --update to refresh)");
+  }
 }
 
 export function cleanGeneratorCore(): void {
