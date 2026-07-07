@@ -38,12 +38,7 @@ function parseArgs(args: string[]): Parsed {
   }
 
   const command = args.shift();
-  if (
-    command !== "setup-core" &&
-    command !== "run" &&
-    command !== "dev" &&
-    command !== "clean"
-  ) {
+  if (command !== "setup-core" && command !== "run" && command !== "dev" && command !== "clean") {
     throw usage(`Unknown command: ${command ?? "(missing)"}`);
   }
 
