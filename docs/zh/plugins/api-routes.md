@@ -43,3 +43,12 @@ create(params: unknown) {
 ```
 
 并防止全局模块路由抢占插件命名空间。
+
+## 内置模块路由
+
+generator 也会在 `/action`、`/document`、`/layer`、`/image`、`/selection`
+这些保留模块路径段下暴露内置模块 HTTP 路由。这些路由是现有 Protocol
+方法的第二入口，返回形状复用对应 WebSocket request 方法。
+
+持续事件能力（例如 `selection:change`）仍然通过 WebSocket 事件订阅使用，
+不会暴露为 HTTP 路由。

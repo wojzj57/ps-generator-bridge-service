@@ -3,7 +3,7 @@ import websocket from "@fastify/websocket";
 import cors from "@fastify/cors";
 import { randomUUID } from "node:crypto";
 import type { WebSocket } from "ws";
-import { parseFrame, serializeFrame } from "@ps-generator-bridge/sdk";
+import { ErrorCode, parseFrame, serializeFrame } from "@ps-generator-bridge/sdk";
 import { Registry } from "./registry";
 import { registerBuiltins } from "./builtins";
 import { PluginManager, type PluginEntry, type PluginInfo } from "../plugins";
@@ -13,7 +13,7 @@ import { setGeneratorLogger, useLogger, type Logger } from "@ps-generator-bridge
 import type { PsGenerator } from "../types/generator";
 import type { JsxRunnerApi } from "../utils/jsxRunner";
 import { EventManager, RuntimeEventManager, type EventEndpointScope } from "../utils/eventManager";
-import { bridgeError } from "../errors";
+import { bridgeError, toProtocolError } from "../errors";
 
 const log = useLogger("server");
 
@@ -63,6 +63,10 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
   // logger, keeping one log format (ADR 0003).
   const app = Fastify({ logger: false });
   app.register(cors, { origin: true });
+  app.setErrorHandler((error, _request, reply) => {
+    const protocolError = toProtocolError(error);
+    reply.code(statusForProtocolError(protocolError.code)).send(protocolError);
+  });
   let boundPort = 0;
 
   const runtimeEvents =
@@ -257,4 +261,22 @@ function createEventSession(options: {
       });
     },
   };
+}
+
+function statusForProtocolError(code: string): number {
+  switch (code) {
+    case ErrorCode.BadRequest:
+      return 400;
+    case ErrorCode.PluginNotFound:
+    case ErrorCode.DocumentNotFound:
+    case ErrorCode.LayerNotFound:
+      return 404;
+    case ErrorCode.NoDocument:
+    case ErrorCode.PhotoshopBusy:
+      return 409;
+    case ErrorCode.PhotoshopUnavailable:
+      return 503;
+    default:
+      return 500;
+  }
 }

@@ -1,5 +1,5 @@
 import { ProtocolMethod } from "@ps-generator-bridge/sdk";
-import { ws } from "@ps-generator-bridge/sdk/plugin";
+import { api, ws } from "@ps-generator-bridge/sdk/plugin";
 import { BaseModule } from "../base";
 import type { PsBridgeHost } from "../../plugin";
 
@@ -41,6 +41,11 @@ export class ActionModule extends BaseModule implements ActionModuleApi {
     return true;
   }
 
+  @api({ method: "POST", url: "/action/auto-cutout" })
+  async autoCutoutApi(): Promise<boolean> {
+    return this.autoCutout();
+  }
+
   /**
    * Remove the background of the current layer. Runs `jsx/Action/removeBackground.jsx`
    * and wraps the jsx's boolean result as `{ success }`.
@@ -49,5 +54,10 @@ export class ActionModule extends BaseModule implements ActionModuleApi {
   async removeBackground(): Promise<{ success: boolean }> {
     const result = await this.jsx.executeSafe<boolean>("Action/removeBackground");
     return { success: result };
+  }
+
+  @api({ method: "POST", url: "/action/remove-background" })
+  async removeBackgroundApi(): Promise<{ success: boolean }> {
+    return this.removeBackground();
   }
 }

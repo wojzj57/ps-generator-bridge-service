@@ -1,8 +1,9 @@
 import { ProtocolMethod } from "@ps-generator-bridge/sdk";
-import { ws } from "@ps-generator-bridge/sdk/plugin";
+import { api, ws } from "@ps-generator-bridge/sdk/plugin";
 import { BaseModule } from "../base";
 import type { PsBridgeHost } from "../../plugin";
 import { bridgeError } from "../../errors";
+import { bodyRecord, type ApiRequestLike } from "../apiParams";
 
 export type PsDocument = {
   id: number;
@@ -43,14 +44,29 @@ export class DocumentModule extends BaseModule implements DocumentModuleApi {
     return data as PsDocument;
   }
 
+  @api("/document/current")
+  async getCurrentDocumentApi(): Promise<PsDocument> {
+    return this.getCurrentDocument();
+  }
+
   @ws(ProtocolMethod.DocumentExport)
   async exportDocument(params: Record<string, any>) {
     if (!params.filePath) throw bridgeError.badRequest("filePath is required");
     return await this.jsx.executeSafe("Document/exportDocument", params);
   }
 
+  @api({ method: "POST", url: "/document/export" })
+  async exportDocumentApi(request: ApiRequestLike): Promise<unknown> {
+    return this.exportDocument(bodyRecord(request));
+  }
+
   @ws(ProtocolMethod.DocumentSave)
   async saveDocument(params: { savePath?: string }) {
     return await this.jsx.executeSafe("Document/saveDocument", params);
+  }
+
+  @api({ method: "POST", url: "/document/save" })
+  async saveDocumentApi(request: ApiRequestLike): Promise<unknown> {
+    return this.saveDocument(bodyRecord(request));
   }
 }
