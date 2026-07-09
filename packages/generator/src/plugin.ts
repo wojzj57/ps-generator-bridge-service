@@ -21,7 +21,7 @@ import {
   ImageModule,
   SelectionModule,
 } from "./modules";
-import { CosService } from "./services/cos";
+import { CosService, parseCosEnv } from "./services/cos";
 import { PLUGIN_NAME, PLUGIN_VERSION } from "./meta";
 import { bridgeError } from "./errors";
 
@@ -118,7 +118,11 @@ export class PsBridgeHost implements PluginHost {
       image: new MODULES.image(this),
       selection: new MODULES.selection(this),
     };
-    this.cos = CosService.fromEnv(log);
+    // Read the COS secret layer from env once, then construct the service from
+    // structured config — keeping env-reading out of CosService (AGENTS.md
+    // config-vs-env split). Absent config means image exports fall back to base64.
+    const cosConfig = parseCosEnv();
+    this.cos = cosConfig ? new CosService(cosConfig, log) : undefined;
     log.info(this.cos ? "CosService enabled" : "CosService disabled (env incomplete)");
   }
 

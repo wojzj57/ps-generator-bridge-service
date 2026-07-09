@@ -18,9 +18,18 @@ vi.mock("cos-nodejs-sdk-v5", () => ({
   },
 }));
 
-import { CosService } from "../src/services/cos";
+import { CosService, parseCosEnv, type CosConfig } from "../src/services/cos";
 
 const silentLogger: Logger = { debug() {}, info() {}, warn() {}, error() {} };
+
+const CONFIG: CosConfig = {
+  secretId: "id",
+  secretKey: "key",
+  bucket: "bucket-1300000000",
+  region: "ap-guangzhou",
+  keyPrefix: "ps-bridge/exports",
+  urlExpires: 315360000,
+};
 
 const ENV_KEYS = [
   "PS_BRIDGE_COS_SECRET_ID",
@@ -54,20 +63,38 @@ function setAllEnv() {
   process.env.PS_BRIDGE_COS_REGION = "ap-guangzhou";
 }
 
-describe("CosService.fromEnv", () => {
+describe("parseCosEnv", () => {
   it("returns undefined when no PS_BRIDGE_COS_* env is set", () => {
-    expect(CosService.fromEnv(silentLogger)).toBeUndefined();
+    expect(parseCosEnv()).toBeUndefined();
   });
 
   it("returns undefined when only some fields are set", () => {
     process.env.PS_BRIDGE_COS_SECRET_ID = "id";
     process.env.PS_BRIDGE_COS_SECRET_KEY = "key";
-    expect(CosService.fromEnv(silentLogger)).toBeUndefined();
+    expect(parseCosEnv()).toBeUndefined();
   });
 
   it("treats whitespace-only fields as missing", () => {
     setAllEnv();
     process.env.PS_BRIDGE_COS_SECRET_ID = "   ";
+    expect(parseCosEnv()).toBeUndefined();
+  });
+
+  it("parses a full config with trimmed values and defaults", () => {
+    setAllEnv();
+    expect(parseCosEnv()).toEqual(CONFIG);
+  });
+
+  it("applies KEY_PREFIX / URL_EXPIRES overrides", () => {
+    setAllEnv();
+    process.env.PS_BRIDGE_COS_KEY_PREFIX = "custom/prefix";
+    process.env.PS_BRIDGE_COS_URL_EXPIRES = "3600";
+    expect(parseCosEnv()).toMatchObject({ keyPrefix: "custom/prefix", urlExpires: 3600 });
+  });
+});
+
+describe("CosService.fromEnv", () => {
+  it("returns undefined when no PS_BRIDGE_COS_* env is set", () => {
     expect(CosService.fromEnv(silentLogger)).toBeUndefined();
   });
 
@@ -78,11 +105,9 @@ describe("CosService.fromEnv", () => {
 });
 
 describe("CosService.uploadObject", () => {
+  // Construct directly from injected config — no process.env mocking needed.
   function make(): CosService {
-    setAllEnv();
-    const svc = CosService.fromEnv(silentLogger);
-    if (!svc) throw new Error("expected a CosService");
-    return svc;
+    return new CosService(CONFIG, silentLogger);
   }
 
   it("uploads bytes and returns the signed URL; key carries prefix/name/.png", async () => {
@@ -150,8 +175,7 @@ describe("CosService.uploadObject", () => {
 
 describe("CosService.uploadFile", () => {
   function make(): CosService {
-    setAllEnv();
-    return CosService.fromEnv(silentLogger)!;
+    return new CosService(CONFIG, silentLogger);
   }
 
   it("uploads a local file and keeps its extension in the key", async () => {

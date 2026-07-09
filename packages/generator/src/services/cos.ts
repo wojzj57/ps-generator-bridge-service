@@ -19,8 +19,8 @@ export interface CosServiceApi {
   uploadFile(dir: string, name?: string): Promise<string>;
 }
 
-/** Permanent-key COS config, read from the environment by {@link CosService.fromEnv}. */
-interface CosConfig {
+/** Permanent-key COS config. Built from the environment by {@link parseCosEnv}. */
+export interface CosConfig {
   secretId: string;
   secretKey: string;
   bucket: string;
@@ -57,21 +57,15 @@ export class CosService implements CosServiceApi {
 
   /**
    * Build a CosService from the environment, or return undefined when COS is not
-   * configured. All four `PS_BRIDGE_COS_SECRET_ID/SECRET_KEY/BUCKET/REGION` must be
-   * present and non-empty — a missing field means "not enabled", decided once at
-   * startup rather than failing loudly on the first upload.
+   * configured (see {@link parseCosEnv}). Kept as a convenience for callers and
+   * tests that want the env-driven path in one call; production wiring
+   * (`plugin.ts`) reads env once via {@link parseCosEnv} and constructs directly,
+   * keeping the config layer (structured params) separate from the secret layer
+   * (env), per the config-vs-env split in AGENTS.md.
    */
   static fromEnv(logger: Logger): CosService | undefined {
-    const secretId = process.env.PS_BRIDGE_COS_SECRET_ID?.trim();
-    const secretKey = process.env.PS_BRIDGE_COS_SECRET_KEY?.trim();
-    const bucket = process.env.PS_BRIDGE_COS_BUCKET?.trim();
-    const region = process.env.PS_BRIDGE_COS_REGION?.trim();
-    if (!secretId || !secretKey || !bucket || !region) return undefined;
-    const keyPrefix = process.env.PS_BRIDGE_COS_KEY_PREFIX?.trim() || DEFAULT_KEY_PREFIX;
-    const expiresRaw = Number(process.env.PS_BRIDGE_COS_URL_EXPIRES);
-    const urlExpires =
-      Number.isFinite(expiresRaw) && expiresRaw > 0 ? expiresRaw : DEFAULT_URL_EXPIRES_SECONDS;
-    return new CosService({ secretId, secretKey, bucket, region, keyPrefix, urlExpires }, logger);
+    const config = parseCosEnv();
+    return config ? new CosService(config, logger) : undefined;
   }
 
   async uploadObject(data: Uint8Array, name?: string): Promise<string> {
@@ -166,4 +160,28 @@ export class CosService implements CosServiceApi {
       );
     });
   }
+}
+
+/**
+ * Read the COS config from the environment, or return undefined when COS is not
+ * configured. All four `PS_BRIDGE_COS_SECRET_ID/SECRET_KEY/BUCKET/REGION` must be
+ * present and non-empty — a missing field means "not enabled", decided once at
+ * startup rather than failing loudly on the first upload. The two tuning knobs
+ * (`KEY_PREFIX`, `URL_EXPIRES`) fall back to their defaults.
+ *
+ * This is the sole env-reading seam: it turns the `PS_BRIDGE_COS_*` secret layer
+ * into a structured {@link CosConfig}, so {@link CosService} only ever depends on
+ * config (injectable in tests) and never touches `process.env` itself.
+ */
+export function parseCosEnv(): CosConfig | undefined {
+  const secretId = process.env.PS_BRIDGE_COS_SECRET_ID?.trim();
+  const secretKey = process.env.PS_BRIDGE_COS_SECRET_KEY?.trim();
+  const bucket = process.env.PS_BRIDGE_COS_BUCKET?.trim();
+  const region = process.env.PS_BRIDGE_COS_REGION?.trim();
+  if (!secretId || !secretKey || !bucket || !region) return undefined;
+  const keyPrefix = process.env.PS_BRIDGE_COS_KEY_PREFIX?.trim() || DEFAULT_KEY_PREFIX;
+  const expiresRaw = Number(process.env.PS_BRIDGE_COS_URL_EXPIRES);
+  const urlExpires =
+    Number.isFinite(expiresRaw) && expiresRaw > 0 ? expiresRaw : DEFAULT_URL_EXPIRES_SECONDS;
+  return { secretId, secretKey, bucket, region, keyPrefix, urlExpires };
 }
