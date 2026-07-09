@@ -55,11 +55,11 @@ export interface PsDocumentInfo {
   selection: number[];
   resolution: number;
   globalLight: { angle: number; altitude: number };
-  generatorSettings?: any;
+  generatorSettings?: Record<string, unknown>;
   profile: string;
   mode: string;
   depth: number;
-  layers: any[];
+  layers: unknown[];
 }
 
 export interface PsHSBCColor {

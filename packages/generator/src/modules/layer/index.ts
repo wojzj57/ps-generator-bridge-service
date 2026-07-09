@@ -63,7 +63,7 @@ export class PsLayer {
   declare public rect: PsRect;
   declare public clip: boolean;
   declare public children?: PsLayer[];
-  declare public generatorSettings?: { [key: string]: any };
+  declare public generatorSettings?: Record<string, unknown>;
 
   constructor(init: Partial<PsLayer>) {
     Object.assign(this, init);
