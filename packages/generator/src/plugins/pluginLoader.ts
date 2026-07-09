@@ -71,7 +71,11 @@ export async function loadPlugins(options: LoadOptions): Promise<LoadResult> {
   const { pluginsDir, hostFor, knownIds, logger: log } = options;
   const loaded: LoadedPlugin[] = [];
   const skipped: SkippedPlugin[] = [];
-  const taken = new Set(knownIds);
+  // id -> the folder that already claimed it, so a later duplicate can name the
+  // winner in its skip reason. Ids passed in via `knownIds` predate this scan
+  // (e.g. reserved built-ins), so their owner is labelled generically.
+  const taken = new Map<string, string>();
+  for (const id of knownIds) taken.set(id, "<reserved>");
 
   let dirs: string[];
   try {
@@ -86,7 +90,7 @@ export async function loadPlugins(options: LoadOptions): Promise<LoadResult> {
     const outcome = await loadOne(dir, hostFor, taken);
     if (outcome.kind === "loaded") {
       loaded.push({ id: outcome.id, plugin: outcome.plugin, path: outcome.path });
-      taken.add(outcome.id);
+      taken.set(outcome.id, name);
       log.info(`plugin loaded: ${name} (${outcome.id})`);
     } else {
       skipped.push({
@@ -108,7 +112,7 @@ type Outcome =
 async function loadOne(
   dir: string,
   hostFor: (pluginDir: string, pluginId: string) => PluginHost,
-  taken: Set<string>
+  taken: Map<string, string>
 ): Promise<Outcome> {
   // Read + parse package.json.
   let pkg: { main?: unknown };
@@ -164,8 +168,13 @@ async function loadOne(
   if (!isValidPluginId(id)) {
     return { kind: "skipped", reason: `illegal id '${id}' (must match [A-Za-z0-9_-]+)` };
   }
-  if (taken.has(id)) {
-    return { kind: "skipped", id, reason: `duplicate id '${id}'` };
+  const owner = taken.get(id);
+  if (owner !== undefined) {
+    return {
+      kind: "skipped",
+      id,
+      reason: `duplicate id '${id}' (already claimed by '${owner}')`,
+    };
   }
   try {
     const host = hostFor(dir, id);

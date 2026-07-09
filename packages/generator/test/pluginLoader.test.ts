@@ -291,7 +291,24 @@ module.exports = NoId;
       logger: recordingLogger(),
     });
     expect(res.loaded).toEqual([]);
-    expect(res.skipped[0]?.reason).toMatch(/duplicate id 'taken'/);
+    expect(res.skipped[0]?.reason).toMatch(/duplicate id 'taken' \(already claimed by '<reserved>'\)/);
+  });
+
+  it("skips a later plugin whose id collides with an earlier folder, naming the winner", async () => {
+    const d = await newDir();
+    // Folders load in sorted order: "a-first" wins the id, "z-second" is skipped.
+    await writePlugin("a-first", { "index.js": klass("shared") });
+    await writePlugin("z-second", { "index.js": klass("shared") });
+    const res = await loadPlugins({
+      pluginsDir: d,
+      hostFor: () => fakeHost,
+      knownIds: new Set(),
+      logger: recordingLogger(),
+    });
+    expect(res.loaded.map((l) => l.id)).toEqual(["shared"]);
+    expect(res.skipped).toHaveLength(1);
+    expect(res.skipped[0]?.path).toBe("z-second");
+    expect(res.skipped[0]?.reason).toMatch(/duplicate id 'shared' \(already claimed by 'a-first'\)/);
   });
 
   it("skips a package that throws on load, isolating the failure", async () => {
