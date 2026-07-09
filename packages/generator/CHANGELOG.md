@@ -1,5 +1,22 @@
 # @ps-generator-bridge/generator
 
+## 0.4.0
+
+### Minor Changes
+
+- Features
+
+  1. Add `layer:getInfoBySelectionIndex` and `getLayerInfoBySelectionIndex()` so clients can resolve Photoshop selection indices directly while the generator handles background-layer index offsets.
+
+  Fixes
+
+  1. Pass explicit transform geometry into the Photoshop JSX layer transform path so requested bounds are applied consistently.
+  2. Report the first plugin folder or reserved id owner when later plugin folders are skipped for duplicate ids.
+
+  Documentation
+
+  1. Document selection-index layer lookup and duplicate plugin id diagnostics in the English and Chinese public docs.
+
 ## 0.3.0
 
 ### Minor Changes
