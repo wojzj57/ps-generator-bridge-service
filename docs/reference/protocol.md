@@ -60,6 +60,7 @@ Events have no `id` and no direct response.
 | `layer:getInfo`                     | Inspect layer information.                                         |
 | `layer:getInfoById`                 | Inspect layer by id.                                               |
 | `layer:getInfoByIndex`              | Inspect layer by index.                                            |
+| `layer:getInfoBySelectionIndex`     | Inspect layer by Photoshop selection index.                        |
 | `layer:getCurrentPreview`           | Get the current selected layer preview payload.                    |
 | `layer:importImage`                 | Validate and import an image source into Photoshop as a layer.     |
 | `document:current`                  | Get current document information.                                  |

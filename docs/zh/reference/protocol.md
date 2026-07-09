@@ -60,6 +60,7 @@ Event 没有 `id`，也没有直接响应。
 | `layer:getInfo`                     | 检查 layer 信息。                               |
 | `layer:getInfoById`                 | 按 id 检查 layer。                              |
 | `layer:getInfoByIndex`              | 按 index 检查 layer。                           |
+| `layer:getInfoBySelectionIndex`     | 按 Photoshop selection index 检查 layer。       |
 | `layer:getCurrentPreview`           | 获取当前选中 layer 的预览 payload。             |
 | `layer:importImage`                 | 校验图片源并导入 Photoshop 为 layer。           |
 | `document:current`                  | 获取当前文档信息。                              |

@@ -29,6 +29,10 @@ const byIndex = await connection.modules.layer.getLayerInfoByIndex(1, {
   getChildren: false,
 });
 
+const bySelection = await connection.modules.layer.getLayerInfoBySelectionIndex(1, {
+  getChildren: false,
+});
+
 const preview = await connection.modules.layer.getCurrentPreview();
 
 const imported = await connection.modules.layer.importImage({
@@ -38,6 +42,11 @@ const imported = await connection.modules.layer.importImage({
   size: { width: 512, height: 512 },
 });
 ```
+
+`getLayerInfo()` can also accept `{ selection }` when you already have a Photoshop
+selection index from an `imageChanged` event. `getLayerInfoBySelectionIndex()`
+uses the same selection-index path and lets the generator resolve Photoshop's
+background-layer offset before reading the layer.
 
 `importImage()` accepts a data URI, raw base64 image data, an HTTP(S) URL, a `file://` URI, or a local file path. The generator validates the source as an image before importing it into Photoshop. By default it accepts `png`, `jpeg`, `webp`, `gif`, and `tiff`, allows local paths, limits decoded/imported bytes to 100 MB, and limits dimensions to 100,000,000 total pixels. Optional placement fields can name the layer, position it, resize it, apply the current work path as a mask, or insert relative to a target layer.
 

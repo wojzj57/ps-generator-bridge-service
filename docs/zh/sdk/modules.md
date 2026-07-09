@@ -29,6 +29,10 @@ const byIndex = await connection.modules.layer.getLayerInfoByIndex(1, {
   getChildren: false,
 });
 
+const bySelection = await connection.modules.layer.getLayerInfoBySelectionIndex(1, {
+  getChildren: false,
+});
+
 const preview = await connection.modules.layer.getCurrentPreview();
 
 const imported = await connection.modules.layer.importImage({
@@ -38,6 +42,11 @@ const imported = await connection.modules.layer.importImage({
   size: { width: 512, height: 512 },
 });
 ```
+
+当你已经从 `imageChanged` 事件拿到 Photoshop selection index 时，
+`getLayerInfo()` 也可以接收 `{ selection }`。`getLayerInfoBySelectionIndex()`
+使用同一条 selection-index 路径，并由 generator 在读取图层前处理 Photoshop
+背景图层带来的 index 偏移。
 
 `importImage()` 接收 data URI、原始 base64 图片数据、HTTP(S) URL、`file://` URI 或本地文件路径。generator 会在导入 Photoshop 前把来源校验为图片。默认接受 `png`、`jpeg`、`webp`、`gif` 和 `tiff`，允许本地路径，解码后/导入字节数上限为 100 MB，尺寸上限为 100,000,000 总像素。可选放置字段可以设置图层名称、位置、尺寸、当前 work path mask，或相对目标图层插入。
 
