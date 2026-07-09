@@ -11,4 +11,8 @@ export abstract class BaseModule {
     public readonly name: string,
     public readonly plugin: PsBridgeHost
   ) {}
+
+  protected get jsx() {
+    return this.plugin.jsx;
+  }
 }

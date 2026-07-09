@@ -37,7 +37,7 @@ export class ActionModule extends BaseModule implements ActionModuleApi {
    */
   @ws(ProtocolMethod.ActionAutoCutout)
   async autoCutout(): Promise<boolean> {
-    await this.plugin.jsx.executeSafe("Action/autoCutout");
+    await this.jsx.executeSafe("Action/autoCutout");
     return true;
   }
 
@@ -47,7 +47,7 @@ export class ActionModule extends BaseModule implements ActionModuleApi {
    */
   @ws(ProtocolMethod.ActionRemoveBackground)
   async removeBackground(): Promise<{ success: boolean }> {
-    const result = await this.plugin.jsx.executeSafe<boolean>("Action/removeBackground");
+    const result = await this.jsx.executeSafe<boolean>("Action/removeBackground");
     return { success: result };
   }
 }

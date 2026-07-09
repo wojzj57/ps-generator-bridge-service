@@ -80,7 +80,7 @@ export class SelectionModule extends BaseModule implements SelectionModuleApi {
   @ws(ProtocolMethod.SelectionGetArea)
   async getArea(): Promise<PsRect | null> {
     try {
-      const selection = await this.plugin.jsx.execute<string | unknown[] | null>(
+      const selection = await this.jsx.execute<string | unknown[] | null>(
         "Layer/getSelection"
       );
       return parseSelectionBounds(selection);
@@ -95,7 +95,7 @@ export class SelectionModule extends BaseModule implements SelectionModuleApi {
     if (!selectionArea) return null;
 
     const expand = Math.max(0, params?.expand ?? 0);
-    const raw = await this.plugin.jsx.execute<string | SelectionPathResult>(
+    const raw = await this.jsx.execute<string | SelectionPathResult>(
       "Selection/getSelectionPath",
       {
         expand,
@@ -110,7 +110,7 @@ export class SelectionModule extends BaseModule implements SelectionModuleApi {
   private async selectionChangedProducer(
     context: SubscribableContext<PsRect | null>
   ): Promise<() => void> {
-    await this.plugin.jsx.execute("Selection/registerEvent", {
+    await this.jsx.execute("Selection/registerEvent", {
       events: [...SELECTION_ACTION_EVENTS],
     });
     const messageBus = getPhotoshopMessageBus(this.plugin.generator);

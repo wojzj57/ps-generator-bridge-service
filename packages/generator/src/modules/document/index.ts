@@ -34,7 +34,7 @@ export class DocumentModule extends BaseModule implements DocumentModuleApi {
 
   @ws(ProtocolMethod.DocumentCurrent)
   async getCurrentDocument() {
-    const data = await this.plugin.jsx.executeSafe("Document/getDocumentInfo");
+    const data = await this.jsx.executeSafe("Document/getDocumentInfo");
     if (!data) {
       this.currentDocument = null;
       throw bridgeError.noDocument();
@@ -46,11 +46,11 @@ export class DocumentModule extends BaseModule implements DocumentModuleApi {
   @ws(ProtocolMethod.DocumentExport)
   async exportDocument(params: Record<string, any>) {
     if (!params.filePath) throw bridgeError.badRequest("filePath is required");
-    return await this.plugin.jsx.executeSafe("Document/exportDocument", params);
+    return await this.jsx.executeSafe("Document/exportDocument", params);
   }
 
   @ws(ProtocolMethod.DocumentSave)
   async saveDocument(params: { savePath?: string }) {
-    return await this.plugin.jsx.executeSafe("Document/saveDocument", params);
+    return await this.jsx.executeSafe("Document/saveDocument", params);
   }
 }

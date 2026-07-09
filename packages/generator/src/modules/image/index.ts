@@ -330,7 +330,7 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
       includeClipped: settings.includeClipped !== undefined ? settings.includeClipped : true,
     };
 
-    const channel = this.plugin.jsx.openJSXFile("Layer/getLayerPixmap", params, true);
+    const channel = this.jsx.openJSXFile("Layer/getLayerPixmap", params, true);
 
     let jsResolve!: (v: { bounds: PsBounds } | undefined) => void;
     let jsReject!: (e: unknown) => void;
