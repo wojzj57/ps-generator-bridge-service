@@ -26,6 +26,8 @@ export class PublicModules {
       this.invoke(ProtocolMethod.LayerGetInfoById, { layerID, options }),
     getLayerInfoByIndex: (layerIndex: number, options?: { getChildren: boolean }) =>
       this.invoke(ProtocolMethod.LayerGetInfoByIndex, { layerIndex, options }),
+    getLayerInfoBySelectionIndex: (selection: number, options?: { getChildren: boolean }) =>
+      this.invoke(ProtocolMethod.LayerGetInfoBySelectionIndex, { selection, options }),
     getCurrentPreview: () => this.invoke(ProtocolMethod.LayerGetCurrentPreview, {}),
     importImage: (params: ProtocolMethods[typeof ProtocolMethod.LayerImportImage]["params"]) =>
       this.invoke(ProtocolMethod.LayerImportImage, params),

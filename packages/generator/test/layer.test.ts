@@ -108,6 +108,42 @@ function isGetLayerInfoScript(script: string): boolean {
   return script.includes("function getLayerInfoByID");
 }
 
+describe("LayerModule get info", () => {
+  it("layer:getInfoBySelectionIndex delegates to getLayerInfo with selection", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = (script) => {
+      const params = jsxParams(script);
+      if (params.selection === 2 && params.getChildren === true) {
+        return layer({ id: 20, index: 3, name: "Selected" });
+      }
+      return layer({ id: 7, index: 1, name: "Layer" });
+    };
+    const { app, registry, runtimeEvents } = setup(generator);
+
+    const res = await registry.dispatch(
+      {
+        id: "selected",
+        method: ProtocolMethod.LayerGetInfoBySelectionIndex,
+        params: { selection: 2, options: { getChildren: true } },
+      },
+      { generator }
+    );
+    runtimeEvents.dispose();
+    await app.close();
+
+    expect(res).toMatchObject({
+      id: "selected",
+      ok: true,
+      result: { id: 20, index: 3, name: "Selected" },
+    });
+    expect(generator.jsxStringCalls).toHaveLength(1);
+    expect(jsxParams(generator.jsxStringCalls[0]!.script)).toMatchObject({
+      selection: 2,
+      getChildren: true,
+    });
+  });
+});
+
 describe("LayerModule current preview", () => {
   it("layer:getCurrentPreview generates and returns the current layer preview", async () => {
     const generator = fakeGenerator();
@@ -152,12 +188,13 @@ describe("LayerModule current preview", () => {
     expect(imageGetPreview).not.toHaveBeenCalled();
   });
 
-  it("publishes layer:previewChange from the first selected layer after mapping index to layerIndex", async () => {
+  it("publishes layer:previewChange from the first selected layer selection", async () => {
     vi.useFakeTimers();
     try {
       const generator = fakeGenerator();
       generator.onEvaluateJSXString = (script) => {
-        if (script.includes('"layerIndex":2')) {
+        const params = jsxParams(script);
+        if (params.selection === 1) {
           return layer({ id: 9, index: 2, name: "Selected" });
         }
         return layer({ id: 7, index: 1, name: "Layer" });
@@ -195,7 +232,9 @@ describe("LayerModule current preview", () => {
         height: 8,
         data: "data:image/png;base64,cG5n",
       });
-      expect(generator.jsxStringCalls[0]?.script).toContain('"layerIndex":2');
+      expect(generator.jsxStringCalls.some((call) => call.script.includes('"selection":1'))).toBe(
+        true
+      );
       expect(imageGetPreview).toHaveBeenCalledWith({ layerSpec: 9 });
     } finally {
       vi.useRealTimers();
@@ -616,11 +655,12 @@ describe("LayerModule image import", () => {
 });
 
 describe("LayerModule selection change", () => {
-  it("publishes layer:selectionChange with layer info after mapping indices to layerIndex", async () => {
+  it("publishes layer:selectionChange with layer info from selected layer indices", async () => {
     const generator = fakeGenerator();
     generator.onEvaluateJSXString = (script) => {
-      if (script.includes('"layerIndex":3')) return layer({ id: 20, index: 3, name: "Second" });
-      if (script.includes('"layerIndex":6')) return layer({ id: 50, index: 6, name: "Fifth" });
+      const params = jsxParams(script);
+      if (params.selection === 2) return layer({ id: 20, index: 3, name: "Second" });
+      if (params.selection === 5) return layer({ id: 50, index: 6, name: "Fifth" });
       return layer({ id: 7, index: 1, name: "Layer" });
     };
     const { app, runtimeEvents } = setup(generator);
@@ -648,9 +688,47 @@ describe("LayerModule selection change", () => {
       { id: 20, index: 3, name: "Second" },
       { id: 50, index: 6, name: "Fifth" },
     ]);
-    expect(generator.jsxStringCalls).toHaveLength(2);
-    expect(generator.jsxStringCalls[0]?.script).toContain('"layerIndex":3');
-    expect(generator.jsxStringCalls[1]?.script).toContain('"layerIndex":6');
+    expect(generator.jsxStringCalls.map((call) => jsxParams(call.script).selection)).toEqual(
+      expect.arrayContaining([2, 5])
+    );
+  });
+
+  it("passes selected layer indices to Layer/getLayerInfo without pre-offsetting", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = (script) => {
+      const params = jsxParams(script);
+      if (params.selection === 2) return layer({ id: 20, index: 2, name: "Second" });
+      if (params.selection === 5) return layer({ id: 50, index: 5, name: "Fifth" });
+      return layer({ id: 7, index: 1, name: "Layer" });
+    };
+    const { app, runtimeEvents } = setup(generator);
+    const seen: LayerSelectionChangePayload[] = [];
+    runtimeEvents.mainScope.on(MainEvent.LayerSelectionChange, (payload) =>
+      seen.push(payload as LayerSelectionChangePayload)
+    );
+
+    await runtimeEvents.ensureSubscribable(MainEvent.LayerSelectionChange);
+    generator.emit("imageChanged", {
+      version: "1.6.1",
+      timeStamp: 1,
+      count: 1,
+      id: 59,
+      selection: [2, 5],
+      metaDataOnly: true,
+    });
+    await vi.waitFor(() => {
+      expect(seen).toHaveLength(1);
+    });
+    runtimeEvents.dispose();
+    await app.close();
+
+    expect(seen[0]).toMatchObject([
+      { id: 20, index: 2, name: "Second" },
+      { id: 50, index: 5, name: "Fifth" },
+    ]);
+    expect(generator.jsxStringCalls.map((call) => jsxParams(call.script).selection)).toEqual(
+      expect.arrayContaining([2, 5])
+    );
   });
 
   it("publishes null for empty layer selection changes", async () => {

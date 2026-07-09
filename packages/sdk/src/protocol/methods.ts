@@ -27,6 +27,7 @@ export const ProtocolMethod = {
   LayerGetInfo: "layer:getInfo",
   LayerGetInfoById: "layer:getInfoById",
   LayerGetInfoByIndex: "layer:getInfoByIndex",
+  LayerGetInfoBySelectionIndex: "layer:getInfoBySelectionIndex",
   LayerGetCurrentPreview: "layer:getCurrentPreview",
   LayerImportImage: "layer:importImage",
   DocumentCurrent: "document:current",
@@ -82,6 +83,7 @@ export interface ProtocolMethods {
     params?: {
       id?: number;
       index?: number;
+      selection?: number;
       getChildren?: boolean;
       getGeneratorSettings?: boolean;
     };
@@ -93,6 +95,10 @@ export interface ProtocolMethods {
   };
   [ProtocolMethod.LayerGetInfoByIndex]: {
     params: { layerIndex: number; options?: { getChildren: boolean } };
+    result: PsLayer;
+  };
+  [ProtocolMethod.LayerGetInfoBySelectionIndex]: {
+    params: { selection: number; options?: { getChildren: boolean } };
     result: PsLayer;
   };
   [ProtocolMethod.LayerGetCurrentPreview]: {

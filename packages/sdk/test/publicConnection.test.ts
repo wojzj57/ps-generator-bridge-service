@@ -633,6 +633,12 @@ describe("public Connection", () => {
         result: layerResult,
       },
       {
+        call: () => conn.modules.layer.getLayerInfo({ selection: 1 }),
+        method: ProtocolMethod.LayerGetInfo,
+        params: { selection: 1 },
+        result: layerResult,
+      },
+      {
         call: () => conn.modules.layer.getLayerInfoByID(7, { getChildren: true }),
         method: ProtocolMethod.LayerGetInfoById,
         params: { layerID: 7, options: { getChildren: true } },
@@ -642,6 +648,12 @@ describe("public Connection", () => {
         call: () => conn.modules.layer.getLayerInfoByIndex(2, { getChildren: false }),
         method: ProtocolMethod.LayerGetInfoByIndex,
         params: { layerIndex: 2, options: { getChildren: false } },
+        result: layerResult,
+      },
+      {
+        call: () => conn.modules.layer.getLayerInfoBySelectionIndex(1, { getChildren: false }),
+        method: ProtocolMethod.LayerGetInfoBySelectionIndex,
+        params: { selection: 1, options: { getChildren: false } },
         result: layerResult,
       },
       {

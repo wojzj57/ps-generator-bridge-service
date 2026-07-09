@@ -63,7 +63,7 @@ export class PsLayer {
   declare public rect: PsRect;
   declare public clip: boolean;
   declare public children?: PsLayer[];
-  // public declare generatorSettings?: { [key: string]: any };
+  declare public generatorSettings?: { [key: string]: any };
 
   constructor(init: Partial<PsLayer>) {
     Object.assign(this, init);
@@ -98,11 +98,19 @@ export interface LayerModuleApi {
   getLayerInfo(options?: {
     id?: number;
     index?: number;
+    selection?: number;
     getChildren?: boolean;
     getGeneratorSettings?: boolean;
   }): Promise<PsLayer>;
-  getLayerInfoByID(layerID: number, options?: { getChildren: boolean }): Promise<PsLayer>;
-  getLayerInfoByIndex(layerIndex: number, options?: { getChildren: boolean }): Promise<PsLayer>;
+  getLayerInfoByID(
+    layerIDOrParams: number | { layerID: number; options?: { getChildren: boolean } }
+  ): Promise<PsLayer>;
+  getLayerInfoByIndex(
+    layerIndexOrParams: number | { layerIndex: number; options?: { getChildren: boolean } }
+  ): Promise<PsLayer>;
+  getLayerInfoBySelectionIndex(
+    selectionOrParams: number | { selection: number; options?: { getChildren: boolean } }
+  ): Promise<PsLayer>;
   getCurrentPreview(): Promise<LayerPreviewPayload>;
   importImage(params: LayerImportImageParams): Promise<PsLayer>;
 }
@@ -122,12 +130,14 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
   public async getLayerInfo(options?: {
     id?: number;
     index?: number;
+    selection?: number;
     getChildren?: boolean;
     getGeneratorSettings?: boolean;
   }): Promise<PsLayer> {
-    return await this.plugin.jsx.executeSafe("Layer/getLayerInfo", {
+    return await this.jsx.executeSafe("Layer/getLayerInfo", {
       layerID: options?.id,
       layerIndex: options?.index,
+      selection: options?.selection,
       getChildren: options?.getChildren,
       getGeneratorSettings: options?.getGeneratorSettings,
     });
@@ -135,39 +145,46 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
 
   @ws(ProtocolMethod.LayerGetInfoById)
   public getLayerInfoByID(
-    layerIDOrParams: number | { layerID: number; options?: { getChildren: boolean } },
-    options?: {
-      getChildren: boolean;
-    }
+    layerIDOrParams: number | { layerID: number; options?: { getChildren: boolean } }
   ): Promise<PsLayer> {
     const layerID = typeof layerIDOrParams === "number" ? layerIDOrParams : layerIDOrParams.layerID;
-    const resolvedOptions = typeof layerIDOrParams === "number" ? options : layerIDOrParams.options;
+    const resolvedOptions =
+      typeof layerIDOrParams === "number" ? undefined : layerIDOrParams.options;
     if (layerID == null) throw bridgeError.badRequest("Invalid layerID");
-    const params = {
-      layerID: layerID,
+    return this.getLayerInfo({
+      id: layerID,
       getChildren: resolvedOptions?.getChildren,
-    };
-    return this.plugin.jsx.executeSafe("Layer/getLayerInfo", params);
+    });
   }
 
   @ws(ProtocolMethod.LayerGetInfoByIndex)
   public getLayerInfoByIndex(
-    layerIndexOrParams: number | { layerIndex: number; options?: { getChildren: boolean } },
-    options?: {
-      getChildren: boolean;
-    }
+    layerIndexOrParams: number | { layerIndex: number; options?: { getChildren: boolean } }
   ): Promise<PsLayer> {
     const layerIndex =
       typeof layerIndexOrParams === "number" ? layerIndexOrParams : layerIndexOrParams.layerIndex;
     const resolvedOptions =
-      typeof layerIndexOrParams === "number" ? options : layerIndexOrParams.options;
+      typeof layerIndexOrParams === "number" ? undefined : layerIndexOrParams.options;
     if (layerIndex == null) throw bridgeError.badRequest("Invalid layerIndex");
-    // 明确定义参数类型
-    const params = {
-      layerIndex,
+    return this.getLayerInfo({
+      index: layerIndex,
       getChildren: resolvedOptions?.getChildren,
-    };
-    return this.plugin.jsx.executeSafe("Layer/getLayerInfo", params);
+    });
+  }
+
+  @ws(ProtocolMethod.LayerGetInfoBySelectionIndex)
+  public getLayerInfoBySelectionIndex(
+    selectionOrParams: number | { selection: number; options?: { getChildren: boolean } }
+  ): Promise<PsLayer> {
+    const selection =
+      typeof selectionOrParams === "number" ? selectionOrParams : selectionOrParams.selection;
+    const resolvedOptions =
+      typeof selectionOrParams === "number" ? undefined : selectionOrParams.options;
+    if (selection == null) throw bridgeError.badRequest("Invalid selection");
+    return this.getLayerInfo({
+      selection,
+      getChildren: resolvedOptions?.getChildren,
+    });
   }
 
   @ws(ProtocolMethod.LayerGetCurrentPreview)
@@ -517,8 +534,7 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
     }
 
     try {
-      const layerIndex = this.toPhotoshopLayerIndex(index);
-      this.currentLayer = await this.getLayerInfoByIndex(layerIndex);
+      this.currentLayer = await this.getLayerInfoBySelectionIndex(index);
     } catch (error) {
       log.warn("selected layer lookup failed", error);
       this.currentLayer = undefined;
@@ -537,22 +553,14 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
     }
 
     const layers: PsLayer[] = [];
-    for (const index of selection) {
+    for (const selectedIndex of selection) {
       try {
-        layers.push(
-          await this.plugin.jsx.executeSafe<PsLayer>("Layer/getLayerInfo", {
-            layerIndex: this.toPhotoshopLayerIndex(index),
-          })
-        );
+        layers.push(await this.getLayerInfoBySelectionIndex(selectedIndex));
       } catch (error) {
         log.warn("selected layer lookup failed", error);
       }
     }
     emit(layers);
-  }
-
-  private toPhotoshopLayerIndex(index: number): number {
-    return index + 1;
   }
 
   private async handlePixelChange(

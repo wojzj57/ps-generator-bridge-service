@@ -35,6 +35,9 @@ describe("protocol", () => {
     expect(ProtocolMethod.ActionAutoCutout).toBe("action:autoCutout");
     expect(ProtocolMethod.ActionRemoveBackground).toBe("action:removeBackground");
     expect(ProtocolMethod.LayerGetInfo).toBe("layer:getInfo");
+    expect(ProtocolMethod.LayerGetInfoById).toBe("layer:getInfoById");
+    expect(ProtocolMethod.LayerGetInfoByIndex).toBe("layer:getInfoByIndex");
+    expect(ProtocolMethod.LayerGetInfoBySelectionIndex).toBe("layer:getInfoBySelectionIndex");
     expect(ProtocolMethod.LayerGetCurrentPreview).toBe("layer:getCurrentPreview");
     expect(ProtocolMethod.LayerImportImage).toBe("layer:importImage");
     expect(ProtocolMethod.DocumentCurrent).toBe("document:current");

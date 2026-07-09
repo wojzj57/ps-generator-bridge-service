@@ -150,6 +150,20 @@ describe("JsxRunner.executeBuiltin (root)", () => {
     expect(generator.jsxStringCalls[0]?.script).toContain('var params = {"id":3};');
     expect(generator.jsxStringCalls[0]?.script).toContain("getLayerInfoByID");
   });
+
+  it("includes native selection handling in Layer/getLayerInfo", async () => {
+    const generator = fakeGenerator();
+    generator.onEvaluateJSXString = () => undefined;
+    const runner = new JsxRunner(generator, silentLogger);
+
+    await runner.executeBuiltin("Layer/getLayerInfo", { selection: 1 }, true);
+
+    expect(generator.jsxStringCalls[0]?.script).toContain('var params = {"selection":1};');
+    expect(generator.jsxStringCalls[0]?.script).toContain("function hasBackgroundLayer");
+    expect(generator.jsxStringCalls[0]?.script).toContain(
+      "layerIndex = hasBackgroundLayer() ? selection + 1 : selection;"
+    );
+  });
 });
 
 describe("JsxRunner.execute", () => {

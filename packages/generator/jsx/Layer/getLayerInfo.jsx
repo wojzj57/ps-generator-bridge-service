@@ -30,17 +30,17 @@ if (typeof JSON !== "object") {
     Date.prototype.toJSON = function () {
       return isFinite(this.valueOf())
         ? this.getUTCFullYear() +
-            "-" +
-            f(this.getUTCMonth() + 1) +
-            "-" +
-            f(this.getUTCDate()) +
-            "T" +
-            f(this.getUTCHours()) +
-            ":" +
-            f(this.getUTCMinutes()) +
-            ":" +
-            f(this.getUTCSeconds()) +
-            "Z"
+        "-" +
+        f(this.getUTCMonth() + 1) +
+        "-" +
+        f(this.getUTCDate()) +
+        "T" +
+        f(this.getUTCHours()) +
+        ":" +
+        f(this.getUTCMinutes()) +
+        ":" +
+        f(this.getUTCSeconds()) +
+        "Z"
         : null;
     };
 
@@ -58,13 +58,13 @@ if (typeof JSON !== "object") {
     rx_escapable.lastIndex = 0;
     return rx_escapable.test(string)
       ? '"' +
-          string.replace(rx_escapable, function (a) {
-            var c = meta[a];
-            return typeof c === "string"
-              ? c
-              : "\\u" + ("0000" + a.charCodeAt(0).toString(16)).slice(-4);
-          }) +
-          '"'
+      string.replace(rx_escapable, function (a) {
+        var c = meta[a];
+        return typeof c === "string"
+          ? c
+          : "\\u" + ("0000" + a.charCodeAt(0).toString(16)).slice(-4);
+      }) +
+      '"'
       : '"' + string + '"';
   }
 
@@ -179,15 +179,28 @@ if (typeof JSON !== "object") {
   }
 })();
 
+function hasBackgroundLayer() {
+  var ref = new ActionReference();
+  ref.putProperty(charIDToTypeID("Prpr"), stringIDToTypeID("hasBackgroundLayer"));
+  ref.putEnumerated(charIDToTypeID("Dcmn"), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
+  return executeActionGet(ref).getBoolean(stringIDToTypeID("hasBackgroundLayer"));
+}
 //#endregion
 
 var layerID = params.layerID;
 var layerIndex = params.layerIndex;
-if (layerIndex != undefined) {
-  var idRef = new ActionReference();
-  idRef.putProperty(charIDToTypeID("Prpr"), stringIDToTypeID("layerID"));
-  idRef.putIndex(stringIDToTypeID("layer"), layerIndex);
-  layerID = executeActionGet(idRef).getInteger(stringIDToTypeID("layerID"));
+var selection = params.selection;
+
+if (layerID == undefined) {
+  if (layerIndex == undefined && selection != undefined) {
+    layerIndex = hasBackgroundLayer() ? selection + 1 : selection;
+  }
+  if (layerIndex != undefined) {
+    var idRef = new ActionReference();
+    idRef.putProperty(charIDToTypeID("Prpr"), stringIDToTypeID("layerID"));
+    idRef.putIndex(stringIDToTypeID("layer"), layerIndex);
+    layerID = executeActionGet(idRef).getInteger(stringIDToTypeID("layerID"));
+  }
 }
 
 var _getChildren = params.getChildren != undefined ? params.getChildren : false;
@@ -195,21 +208,6 @@ var _getChildren = params.getChildren != undefined ? params.getChildren : false;
 function getLayerInfoByID(layerID) {
   var result = {};
   result.id = layerID;
-  // index
-  // var ref = new ActionReference();
-  // ref.putProperty(
-  //   charIDToTypeID("Prpr"),
-  //   stringIDToTypeID("hasBackgroundLayer")
-  // );
-  // ref.putEnumerated(
-  //   charIDToTypeID("Dcmn"),
-  //   charIDToTypeID("Ordn"),
-  //   charIDToTypeID("Trgt")
-  // );
-
-  // var hasBackgroundLayer = executeActionGet(ref).getBoolean(
-  //   stringIDToTypeID("hasBackgroundLayer")
-  // );
 
   var ref = new ActionReference();
   ref.putProperty(charIDToTypeID("Prpr"), stringIDToTypeID("itemIndex"));
@@ -316,7 +314,8 @@ try {
     );
     layerID = executeActionGet(ref1).getInteger(stringIDToTypeID("layerID"));
   }
-  result = JSON.stringify(getLayerInfoByID(layerID));
+  var data = getLayerInfoByID(layerID);
+  result = JSON.stringify(data);
 } catch (error) {
   result = "Error:获取的图层信息错误";
 }
