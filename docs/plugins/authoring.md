@@ -29,7 +29,9 @@ The generator loads plugin packages from direct children of the plugin directory
 - a default export class derived from `BasePlugin`
 - a static `id`
 
-Plugin ids are route and endpoint identities. They must be unique among loaded plugins.
+Plugin ids are route and endpoint identities. They must be unique among loaded
+plugins. When two plugin folders claim the same id, the later folder is skipped
+and the load diagnostic names the folder or reserved id that already claimed it.
 
 ## Decorators
 
