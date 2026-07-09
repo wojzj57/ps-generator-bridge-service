@@ -1,5 +1,6 @@
 var targetLayerId = params.id;
-var rect = params.rect;
+var pos = params.position;
+var size = params.size;
 
 function getLayerBoundsById(id) {
   var lr = new ActionReference();
@@ -109,11 +110,7 @@ function transformLayer(id, pos, size) {
 
 try {
   function toTransform() {
-    transformLayer(
-      targetLayerId,
-      { x: rect.x, y: rect.y },
-      { width: rect.width, height: rect.height }
-    );
+    transformLayer(targetLayerId, pos, size);
   }
   app.activeDocument.suspendHistory("图片变化", "toTransform()");
 } catch (error) {

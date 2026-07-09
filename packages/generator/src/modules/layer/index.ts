@@ -189,13 +189,13 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
     const source = await this.resolveImportImageSource(params.image);
     try {
       const insertIndex = await this.resolveImportInsertIndex(params);
-      let layerID = await this.plugin.jsx.executeSafe<number>("Layer/addImageLayer", {
+      let layerID = await this.jsx.executeSafe<number>("Layer/addImageLayer", {
         filePath: source.filePath,
         name: params.name,
         insertIndex,
       });
       if (!isPositiveNumber(layerID)) {
-        layerID = await this.plugin.jsx.executeSafe<number>("Layer/getActiveLayerID");
+        layerID = await this.jsx.executeSafe<number>("Layer/getActiveLayerID");
       }
       if (!isPositiveNumber(layerID)) {
         throw bridgeError.jsxFailed("Image import did not return a layer id");
@@ -204,15 +204,22 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
       let layer = await this.getLayerInfoByID(layerID);
       const transformRect = this.resolveTransformRect(layer, params);
       if (transformRect) {
-        await this.plugin.jsx.executeSafe("Layer/transformLayer", {
+        await this.jsx.executeSafe("Layer/transformLayer", {
           id: layerID,
-          rect: transformRect,
+          position: {
+            x: transformRect.x,
+            y: transformRect.y,
+          },
+          size: {
+            width: transformRect.width,
+            height: transformRect.height,
+          },
         });
         layer = await this.getLayerInfoByID(layerID);
       }
 
       if (params.useWorkpath) {
-        await this.plugin.jsx.executeSafe("Layer/setLayerWorkpathMask", {
+        await this.jsx.executeSafe("Layer/setLayerWorkpathMask", {
           id: layerID,
           blur: 10,
         });

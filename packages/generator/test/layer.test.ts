@@ -306,8 +306,10 @@ describe("LayerModule image import", () => {
     expect(existsSync(addParams[0]!.filePath)).toBe(false);
     expect(transformParams[0]).toMatchObject({
       id: 33,
-      rect: { x: 10, y: 20, width: 40, height: 30 },
+      position: { x: 10, y: 20 },
+      size: { width: 40, height: 30 },
     });
+    expect(transformParams[0]).not.toHaveProperty("rect");
     expect(workpathParams[0]).toMatchObject({ id: 33, blur: 10 });
   });
 
@@ -357,8 +359,10 @@ describe("LayerModule image import", () => {
     expect(existsSync(addParams[0]!.filePath)).toBe(false);
     expect(transformParams[0]).toMatchObject({
       id: 44,
-      rect: { x: 3, y: 4, width: 12, height: 8 },
+      position: { x: 3, y: 4 },
+      size: { width: 12, height: 8 },
     });
+    expect(transformParams[0]).not.toHaveProperty("rect");
   });
 
   it("imports file URI images without deleting the source file", async () => {
