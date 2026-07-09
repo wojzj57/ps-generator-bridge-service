@@ -291,7 +291,9 @@ module.exports = NoId;
       logger: recordingLogger(),
     });
     expect(res.loaded).toEqual([]);
-    expect(res.skipped[0]?.reason).toMatch(/duplicate id 'taken' \(already claimed by '<reserved>'\)/);
+    expect(res.skipped[0]?.reason).toMatch(
+      /duplicate id 'taken' \(already claimed by '<reserved>'\)/
+    );
   });
 
   it("skips a later plugin whose id collides with an earlier folder, naming the winner", async () => {
@@ -308,7 +310,9 @@ module.exports = NoId;
     expect(res.loaded.map((l) => l.id)).toEqual(["shared"]);
     expect(res.skipped).toHaveLength(1);
     expect(res.skipped[0]?.path).toBe("z-second");
-    expect(res.skipped[0]?.reason).toMatch(/duplicate id 'shared' \(already claimed by 'a-first'\)/);
+    expect(res.skipped[0]?.reason).toMatch(
+      /duplicate id 'shared' \(already claimed by 'a-first'\)/
+    );
   });
 
   it("skips a package that throws on load, isolating the failure", async () => {

@@ -80,9 +80,7 @@ export class SelectionModule extends BaseModule implements SelectionModuleApi {
   @ws(ProtocolMethod.SelectionGetArea)
   async getArea(): Promise<PsRect | null> {
     try {
-      const selection = await this.jsx.execute<string | unknown[] | null>(
-        "Layer/getSelection"
-      );
+      const selection = await this.jsx.execute<string | unknown[] | null>("Layer/getSelection");
       return parseSelectionBounds(selection);
     } catch {
       return null;
@@ -95,12 +93,9 @@ export class SelectionModule extends BaseModule implements SelectionModuleApi {
     if (!selectionArea) return null;
 
     const expand = Math.max(0, params?.expand ?? 0);
-    const raw = await this.jsx.execute<string | SelectionPathResult>(
-      "Selection/getSelectionPath",
-      {
-        expand,
-      }
-    );
+    const raw = await this.jsx.execute<string | SelectionPathResult>("Selection/getSelectionPath", {
+      expand,
+    });
     const result = parseSelectionPathResult(raw);
     if (!result?.path) return null;
     return this.pathToSvg(result.path);
