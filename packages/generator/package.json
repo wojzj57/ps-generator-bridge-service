@@ -41,14 +41,15 @@
     "main.js",
     "dist",
     "jsx",
-    "plugins",
+    ".env.example",
+    "CHANGELOG.md",
     "README.md",
     "README_zh.md"
   ],
   "generator-core-version": ">=1.0.0",
   "scripts": {
-    "prepare": "tsup",
-    "build": "tsup",
+    "prepare": "rimraf dist && tsup",
+    "build": "rimraf dist && tsup",
     "build:watch": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",

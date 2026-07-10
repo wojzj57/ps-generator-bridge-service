@@ -35,9 +35,7 @@ export default defineConfig({
       "@ps-generator-bridge/sdk": sdkSource,
     };
   },
-  // jsx ships as plain-text resources (ADR 0008) and is NOT copied into the
-  // build: `JsxRunner` resolves them from the package's `jsx/` tree directly
-  // (`__dirname/../jsx`, where __dirname is `dist`), so the source files are the
-  // single runtime location. Same for plugins, which the loader reads from
-  // `<package>/plugins` at runtime.
+  // jsx ships as plain-text resources (ADR 0008) at the package root.
+  // `JsxRunner` resolves them from `../jsx` when the bundled code runs from
+  // `dist`, so installers must keep the top-level `jsx/` directory.
 });

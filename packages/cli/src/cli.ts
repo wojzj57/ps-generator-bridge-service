@@ -1,23 +1,40 @@
 #!/usr/bin/env node
-import { runClean, runDev, runHarness, setupGeneratorCore, type HarnessOptions } from "./core";
-
-type Command = "setup-core" | "run" | "dev" | "clean";
-
-interface Parsed {
-  command: Command;
-  options: HarnessOptions & { update?: boolean };
-}
-
-const USAGE = `Usage:
-  ps-generator-bridge setup-core [--update]
-  ps-generator-bridge run (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core]
-  ps-generator-bridge dev (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core]
-  ps-generator-bridge clean`;
+import { parseArgs, USAGE } from "./cliArgs";
+import { runClean, runDev, runHarness, setupGeneratorCore } from "./core";
+import { setupGeneratorRuntime } from "./setup";
+import { setupGeneratorSettings } from "./setupGeneratorSettings";
+import { setupPhotoshop } from "./setupPhotoshop";
 
 async function main(): Promise<void> {
   const parsed = parseArgs(process.argv.slice(2));
+  if (parsed.command === "help") {
+    console.log(USAGE);
+    return;
+  }
   if (parsed.command === "clean") {
     await runClean();
+    return;
+  }
+  if (parsed.command === "setup") {
+    const result = setupGeneratorRuntime(parsed.options);
+    console.log(`Installed generator runtime ${result.version}: ${result.targetDir}`);
+    return;
+  }
+  if (parsed.command === "setup-photoshop") {
+    await setupPhotoshop(parsed.options);
+    return;
+  }
+  if (parsed.command === "setup-generator-settings") {
+    const result = setupGeneratorSettings({
+      pref: parsed.options.pref as string,
+      password: parsed.options.password,
+    });
+    if (result.changedKeys.length === 0) {
+      console.log(`Photoshop Generator settings already configured: ${result.path}`);
+    } else {
+      console.log(`Configured Photoshop Generator settings: ${result.path}`);
+      console.log(`Updated preference keys: ${result.changedKeys.join(", ")}`);
+    }
     return;
   }
   if (parsed.command === "setup-core") {
@@ -29,85 +46,6 @@ async function main(): Promise<void> {
     return;
   }
   await runDev(parsed.options);
-}
-
-function parseArgs(args: string[]): Parsed {
-  if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
-    console.log(USAGE);
-    process.exit(0);
-  }
-
-  const command = args.shift();
-  if (command !== "setup-core" && command !== "run" && command !== "dev" && command !== "clean") {
-    throw usage(`Unknown command: ${command ?? "(missing)"}`);
-  }
-
-  const options: Parsed["options"] = {
-    expectPlugins: [],
-  };
-
-  if (command === "clean") {
-    if (args.length > 0) throw usage(`clean does not accept any options: ${args[0]}`);
-    return { command, options };
-  }
-
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    switch (arg) {
-      case "--update":
-        options.update = true;
-        break;
-      case "--update-core":
-        options.updateCore = true;
-        break;
-      case "--plugin":
-        options.plugin = readValue(args, ++i, arg);
-        break;
-      case "--plugins-dir":
-        options.pluginsDir = readValue(args, ++i, arg);
-        break;
-      case "--expect-plugin":
-        options.expectPlugins.push(readValue(args, ++i, arg));
-        break;
-      case "--port":
-        options.port = readNumber(readValue(args, ++i, arg), arg);
-        break;
-      case "--timeout":
-        options.timeoutMs = readNumber(readValue(args, ++i, arg), arg);
-        break;
-      case "--help":
-      case "-h":
-        console.log(USAGE);
-        process.exit(0);
-      default:
-        throw usage(`Unknown option: ${arg}`);
-    }
-  }
-
-  if (command === "setup-core") return { command, options };
-  if (options.plugin && options.pluginsDir) {
-    throw usage("--plugin and --plugins-dir are mutually exclusive");
-  }
-  if (!options.plugin && !options.pluginsDir) {
-    throw usage("Either --plugin or --plugins-dir is required");
-  }
-  return { command, options };
-}
-
-function readValue(args: string[], index: number, name: string): string {
-  const value = args[index];
-  if (!value || value.startsWith("--")) throw usage(`${name} requires a value`);
-  return value;
-}
-
-function readNumber(value: string, name: string): number {
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) throw usage(`${name} must be a positive integer`);
-  return parsed;
-}
-
-function usage(message: string): Error {
-  return new Error(`${message}\n\n${USAGE}`);
 }
 
 main().catch((error) => {

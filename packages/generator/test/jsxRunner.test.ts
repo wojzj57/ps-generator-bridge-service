@@ -8,9 +8,9 @@ import { fakeGenerator } from "./fakeGenerator";
 
 const silentLogger: Logger = { debug() {}, info() {}, warn() {}, error() {} };
 
-// Real source polyfills tree (packages/generator/jsx/polyfills). The bundled
-// dist copy lives under dist/jsx/polyfills, but vitest runs the source file
-// directly, so __dirname-based resolution can't reach it — point at source.
+// Real source polyfills tree (packages/generator/jsx/polyfills). Vitest runs
+// the source file directly, so __dirname-based resolution can't reach the
+// package-root runtime tree — point at source.
 const SOURCE_POLYFILLS = join(__dirname, "..", "jsx", "polyfills");
 
 // Per-test scratch dir for init() edge-case tests (missing/empty/corrupt).
