@@ -6,6 +6,7 @@ import WebSocketImpl from "ws";
 import { cleanGeneratorCore, ensureGeneratorCore, generatorCoreDir } from "./generatorCore";
 import { ensurePhotoshopRunning } from "./photoshop";
 import { cleanupPluginSource, preparePluginSource, scanPluginCandidates } from "./pluginDirs";
+import { resolveRemotePassword } from "./remotePassword";
 
 const DEFAULT_PORT = 7700;
 const DEFAULT_TIMEOUT_MS = 60_000;
@@ -18,6 +19,7 @@ export interface HarnessOptions {
   port?: number;
   timeoutMs?: number;
   updateCore?: boolean;
+  password?: string;
 }
 
 export async function setupGeneratorCore(options: { update?: boolean } = {}): Promise<void> {
@@ -51,6 +53,7 @@ async function withHarness(
 ): Promise<void> {
   ensureWindows();
   ensurePhotoshopRunning();
+  const password = resolveRemotePassword(options.password);
   await ensureGeneratorCore({ update: options.updateCore ?? false });
 
   const port = options.port ?? DEFAULT_PORT;
@@ -64,6 +67,7 @@ async function withHarness(
       port,
       pluginsDir: pluginSource.pluginsDir,
       hostPluginDir: resolveHostGeneratorDir(),
+      password,
     });
     await waitForHealth(port, timeoutMs);
     const plugins = await readPlugins(port);
@@ -89,18 +93,23 @@ function startGeneratorCore(options: {
   port: number;
   pluginsDir: string;
   hostPluginDir: string;
+  password: string;
 }): ChildProcess {
   const app = join(generatorCoreDir(), "app.js");
   console.log(`Starting generator-core: ${app}`);
-  const child = spawn(process.execPath, [app, "-f", options.hostPluginDir], {
-    cwd: generatorCoreDir(),
-    env: {
-      ...process.env,
-      PS_BRIDGE_PLUGINS_DIR: options.pluginsDir,
-      PS_BRIDGE_PORT: String(options.port),
-    },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  const child = spawn(
+    process.execPath,
+    generatorCoreArguments(app, options.hostPluginDir, options.password),
+    {
+      cwd: generatorCoreDir(),
+      env: {
+        ...process.env,
+        PS_BRIDGE_PLUGINS_DIR: options.pluginsDir,
+        PS_BRIDGE_PORT: String(options.port),
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    }
+  );
   child.stdout?.on("data", (chunk) => process.stdout.write(chunk));
   child.stderr?.on("data", (chunk) => process.stderr.write(chunk));
   child.on("exit", (code, signal) => {
@@ -108,6 +117,14 @@ function startGeneratorCore(options: {
     if (signal) console.error(`generator-core exited with signal ${signal}`);
   });
   return child;
+}
+
+export function generatorCoreArguments(
+  app: string,
+  hostPluginDir: string,
+  password: string
+): string[] {
+  return [app, "-f", hostPluginDir, "-P", password];
 }
 
 async function waitForHealth(port: number, timeoutMs: number): Promise<void> {

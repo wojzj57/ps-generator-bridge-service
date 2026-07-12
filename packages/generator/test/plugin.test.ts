@@ -16,7 +16,7 @@ const silentLogger: Logger = { debug() {}, info() {}, warn() {}, error() {} };
 const SDK_PLUGIN = resolve(__dirname, "../../sdk/dist/plugin.cjs");
 
 // vitest runs source directly, so JsxRunner's __dirname-based default
-// (dist/jsx/polyfills) doesn't exist — point init() at the source tree so
+// (package-root jsx/polyfills from the bundled dist) doesn't exist — point init() at the source tree so
 // polyfill priming works in the integration test.
 const SOURCE_POLYFILLS = join(__dirname, "..", "jsx", "polyfills");
 

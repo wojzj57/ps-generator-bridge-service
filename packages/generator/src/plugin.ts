@@ -65,7 +65,7 @@ export interface PluginConfig {
 /**
  * Test-only overrides for `JsxRunner` construction. Production callers pass
  * nothing; tests point `polyfillsDir` at the source `jsx/polyfills` tree so
- * `init()` reads real files instead of the bundler's `dist/jsx/polyfills`
+ * `init()` reads real files instead of the package-root `jsx/polyfills`
  * (which `__dirname`-based resolution can't reach under vitest's source
  * runtime).
  */

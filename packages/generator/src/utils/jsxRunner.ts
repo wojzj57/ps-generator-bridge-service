@@ -91,8 +91,8 @@ type SafeJsxResult<T> =
  * starting with `"Error:"` becomes a thrown `Error` carrying the remainder.
  *
  * jsx text caching is handled by generator-core's `_sendJSXCache`, so this seam
- * adds none of its own. `__dirname` is `dist` for all bundled code, so
- * `polyfillsDir` defaults to `dist/jsx/polyfills`.
+ * adds none of its own. `__dirname` is `dist` for all bundled code, so the
+ * packaged runtime reads from the package-root `jsx/` tree.
  *
  * ExtendScript's default engine persists globals across evaluations, so the
  * polyfills injected once in `init()` remain available to every later

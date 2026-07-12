@@ -11,4 +11,6 @@ generator-core/
 
 /notes/
 
+/packages/cli/assets/MachinePrefs.psp
+
 .env
