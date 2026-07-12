@@ -1,11 +1,25 @@
 name: Release
 
 on:
-  pull_request_target:
+  # npm trusted publishing requires a branch or manual-dispatch OIDC context.
+  # Do not move package publishing back to pull_request_target.
+  push:
     branches:
       - master
-    types:
-      - closed
+    paths:
+      - "packages/*/package.json"
+      - "packages/*/CHANGELOG.md"
+      - "pnpm-lock.yaml"
+  workflow_dispatch:
+    inputs:
+      base_sha:
+        description: Base commit of the merged release PR
+        required: true
+        type: string
+      release_sha:
+        description: Merge commit of the release PR to publish
+        required: true
+        type: string
 
 concurrency:
   group: release
@@ -19,21 +33,25 @@ permissions:
 jobs:
   release:
     name: Build and publish packages
-    if: >-
-      github.event.pull_request.merged == true &&
-      contains(github.event.pull_request.labels.*.name, 'release')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout merged commit
+      - name: Checkout release commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_sha || github.sha }}
           fetch-depth: 0
 
-      - name: Validate release PR
+      - name: Validate manual recovery target
+        if: github.event_name == 'workflow_dispatch'
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          MASTER_SHA: ${{ github.sha }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: git merge-base --is-ancestor "$RELEASE_SHA" "$MASTER_SHA"
+
+      - name: Validate release commit
+        env:
+          BASE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.base_sha || github.event.before }}
+          HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.release_sha || github.sha }}
           IS_RELEASE: "true"
         run: node scripts/check-release-intent.mjs
 
