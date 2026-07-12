@@ -1,5 +1,25 @@
 # @ps-generator-bridge/cli
 
+## 0.2.0
+
+### Minor Changes
+
+- Features
+
+  1. Add `setup` to install a self-contained Generator runtime while preserving user-owned configuration, logs, and plugins during managed updates.
+  2. Add `setup-photoshop` to discover Windows Photoshop installations, install the runtime safely, and atomically enable Generator and Remote Connections in existing preferences.
+  3. Add `setup-generator-settings` and shared `--password` or `PS_GENERATOR_REMOTE_PASSWORD` handling for setup, run, and development workflows.
+
+  Documentation
+
+  1. Document the new installation, Photoshop configuration, password, overwrite-safety, and recovery workflows in English and Chinese.
+
+### Patch Changes
+
+- Updated dependencies
+  - @ps-generator-bridge/generator@0.5.0
+  - @ps-generator-bridge/sdk@0.5.0
+
 ## 0.1.6
 
 ### Patch Changes
