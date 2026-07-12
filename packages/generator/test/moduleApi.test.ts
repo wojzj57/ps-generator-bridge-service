@@ -129,6 +129,22 @@ describe("built-in module HTTP APIs", () => {
     await expectError(port, "/selection/path?expand=nope", undefined, 400, ErrorCode.BadRequest);
   });
 
+  it("preserves Fastify client errors as bad requests", async () => {
+    const { port } = await startModuleServer();
+
+    await expectError(
+      port,
+      "/document/export",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{broken",
+      },
+      400,
+      ErrorCode.BadRequest
+    );
+  });
+
   it("normalizes JSX failures for HTTP routes", async () => {
     const { port, generator } = await startModuleServer();
     generator.onEvaluateJSXString = () => "Error:cutout failed";

@@ -64,6 +64,11 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
   const app = Fastify({ logger: false });
   app.register(cors, { origin: true });
   app.setErrorHandler((error, _request, reply) => {
+    const clientErrorStatus = getClientErrorStatus(error);
+    if (clientErrorStatus !== undefined) {
+      reply.code(clientErrorStatus).send(bridgeError.badRequest(error.message).toProtocolError());
+      return;
+    }
     const protocolError = toProtocolError(error);
     reply.code(statusForProtocolError(protocolError.code)).send(protocolError);
   });
@@ -279,4 +284,15 @@ function statusForProtocolError(code: string): number {
     default:
       return 500;
   }
+}
+
+function getClientErrorStatus(error: unknown): number | undefined {
+  if (typeof error !== "object" || error === null || !("statusCode" in error)) return undefined;
+  const statusCode = error.statusCode;
+  return typeof statusCode === "number" &&
+    Number.isInteger(statusCode) &&
+    statusCode >= 400 &&
+    statusCode < 500
+    ? statusCode
+    : undefined;
 }
