@@ -86,6 +86,19 @@ pnpm --filter @ps-generator-bridge/cli typecheck
 
 SDK 默认使用 `ws://127.0.0.1:7700` 作为服务 base URL，并连接到 `/ws`。
 
+## 内置能力
+
+| 模块        | 能力摘要                                       |
+| ----------- | ---------------------------------------------- |
+| `action`    | 主体选择和背景移除。                           |
+| `document`  | 当前文档元数据、导出和保存操作。               |
+| `layer`     | 图层查询、预览、图片导入和图层变更事件。       |
+| `image`     | 图层、选中路径、预览和文档图片导出。           |
+| `selection` | 选择监听、区域、路径和 selection change 事件。 |
+
+每项能力的 SDK、Plugin Host、WebSocket、HTTP API 和 MCP 可用性见
+[内置能力矩阵](./docs/zh/reference/built-in-capabilities.md)。当前版本尚未实现 MCP。
+
 ## 环境变量
 
 | 变量                    | 作用                                    |
@@ -107,6 +120,7 @@ SDK 默认使用 `ws://127.0.0.1:7700` 作为服务 base URL，并连接到 `/ws
 - [docs/zh/generator/troubleshooting.md](./docs/zh/generator/troubleshooting.md) 说明排障方式。
 - [docs/zh/plugins/authoring.md](./docs/zh/plugins/authoring.md) 说明外部插件开发。
 - [docs/zh/reference/protocol.md](./docs/zh/reference/protocol.md) 说明公开协议契约。
+- [docs/zh/reference/built-in-capabilities.md](./docs/zh/reference/built-in-capabilities.md) 对比内置能力的访问面。
 - [docs/zh/reference/environment.md](./docs/zh/reference/environment.md) 说明环境变量。
 - [docs/zh/reference/package-exports.md](./docs/zh/reference/package-exports.md) 说明包导出边界。
 - [CONTEXT.md](./CONTEXT.md) 定义项目术语。

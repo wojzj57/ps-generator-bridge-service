@@ -34,5 +34,6 @@ Chinese documentation: [简体中文](./zh/README.md)
 ## Reference
 
 - [Protocol](./reference/protocol.md)
+- [Built-In Capabilities](./reference/built-in-capabilities.md)
 - [Environment](./reference/environment.md)
 - [Package Exports](./reference/package-exports.md)

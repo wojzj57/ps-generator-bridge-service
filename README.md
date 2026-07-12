@@ -85,6 +85,20 @@ The generator package is loaded by `generator-core` through its CommonJS `main.j
 
 The SDK uses `ws://127.0.0.1:7700` as the default service base URL and connects to `/ws`.
 
+## Built-In Capabilities
+
+| Module      | Capability summary                                              |
+| ----------- | --------------------------------------------------------------- |
+| `action`    | Main-subject selection and background removal.                  |
+| `document`  | Active-document metadata, export, and save operations.          |
+| `layer`     | Layer lookup, previews, image import, and layer change events.  |
+| `image`     | Layer, selected-path, preview, and document image export.       |
+| `selection` | Selection watching, bounds, paths, and selection change events. |
+
+See the [built-in capability matrix](./docs/reference/built-in-capabilities.md)
+for per-capability SDK, Plugin Host, WebSocket, HTTP API, and MCP availability.
+MCP is not implemented in the current version.
+
 ## Environment Variables
 
 | Variable                | Purpose                                                                                 |
@@ -108,6 +122,7 @@ Structured runtime options such as `port` and `pluginsDir` should flow through `
 - [docs/generator/troubleshooting.md](./docs/generator/troubleshooting.md) covers troubleshooting.
 - [docs/plugins/authoring.md](./docs/plugins/authoring.md) documents external plugin authoring.
 - [docs/reference/protocol.md](./docs/reference/protocol.md) documents the public protocol contract.
+- [docs/reference/built-in-capabilities.md](./docs/reference/built-in-capabilities.md) compares built-in capability access surfaces.
 - [docs/reference/environment.md](./docs/reference/environment.md) documents environment variables.
 - [docs/reference/package-exports.md](./docs/reference/package-exports.md) documents package export boundaries.
 - [CONTEXT.md](./CONTEXT.md) defines the project vocabulary.

@@ -53,6 +53,7 @@ export const enSidebar: DefaultTheme.Sidebar = [
     text: "Reference",
     items: [
       { text: "Protocol", link: "/reference/protocol" },
+      { text: "Built-In Capabilities", link: "/reference/built-in-capabilities" },
       { text: "Environment", link: "/reference/environment" },
       { text: "Package Exports", link: "/reference/package-exports" },
     ],
@@ -98,6 +99,7 @@ export const zhSidebar: DefaultTheme.Sidebar = [
     text: "参考",
     items: [
       { text: "协议", link: "/zh/reference/protocol" },
+      { text: "内置能力", link: "/zh/reference/built-in-capabilities" },
       { text: "环境变量", link: "/zh/reference/environment" },
       { text: "包导出", link: "/zh/reference/package-exports" },
     ],
