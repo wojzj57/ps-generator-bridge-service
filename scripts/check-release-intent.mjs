@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 const packages = [
   {
@@ -34,6 +35,25 @@ const versionChanges = packages.map((entry) => {
 });
 
 const errors = [];
+const releaseWorkflow = readFileSync(".github/workflows/release.yml", "utf8");
+
+if (/^\s*pull_request_target:/mu.test(releaseWorkflow)) {
+  errors.push(
+    "The release workflow must not publish from pull_request_target because npm trusted publishing rejects that OIDC context."
+  );
+}
+if (!/^\s*push:/mu.test(releaseWorkflow)) {
+  errors.push("The release workflow must publish from a master push OIDC context.");
+}
+if (!/^\s*workflow_dispatch:/mu.test(releaseWorkflow)) {
+  errors.push("The release workflow must provide a manual recovery trigger.");
+}
+if (!/^\s*base_sha:/mu.test(releaseWorkflow) || !/^\s*release_sha:/mu.test(releaseWorkflow)) {
+  errors.push("The release workflow recovery trigger must require base_sha and release_sha.");
+}
+if (!/^\s*id-token:\s*write\s*$/mu.test(releaseWorkflow)) {
+  errors.push("The release workflow must grant id-token: write for npm trusted publishing.");
+}
 
 if (pendingChangesets.length > 0) {
   errors.push(

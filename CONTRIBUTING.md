@@ -161,9 +161,15 @@ feature pull request.
     Merge only after the generated versions and changelogs have been reviewed.
 
 11. Do not run `pnpm release` locally. Merging the labeled version pull request
-    triggers the trusted release workflow, which checks out the merged commit,
-    installs dependencies, rebuilds packages, checks package contents, and
-    publishes through Changesets.
+    triggers the trusted release workflow from the resulting `master` push. The
+    workflow checks out the merged commit, installs dependencies, rebuilds
+    packages, checks package contents, and publishes through Changesets.
+
+Each npm package's Trusted Publisher must point to the GitHub repository
+`wojzj57/ps-generator-bridge-service` and workflow filename `release.yml`.
+Package publishing must stay on the workflow's `push` or `workflow_dispatch`
+contexts; `pull_request_target` does not provide an npm-compatible trusted
+publishing identity.
 
 ### Release validation and recovery
 
@@ -178,7 +184,19 @@ The `Release intent` check enforces these rules:
 - a release pull request cannot contain source, test, or documentation edits.
 
 If publishing fails after merge, inspect the npm registry before taking action.
-If no package was published, rerun the failed GitHub Actions release job. If
-only some packages were published, do not reuse versions that already exist on
-npm and do not rerun blindly; prepare a corrective version pull request for the
-remaining packages.
+If no package was published, rerun the failed GitHub Actions release job. When
+the workflow definition or its OIDC trigger caused the failure, merge the
+workflow fix first and manually dispatch the corrected workflow with the
+original release PR commit pair:
+
+```bash
+gh workflow run release.yml --ref master \
+  -f base_sha=<release-pr-base-sha> \
+  -f release_sha=<release-pr-merge-sha>
+```
+
+The manual run requires `release_sha` to be part of the current `master`,
+validates `base_sha..release_sha`, and checks out that exact release commit
+before publishing. If only some packages were published, do not reuse versions
+that already exist on npm and do not rerun blindly; prepare a corrective version
+pull request for the remaining packages.
