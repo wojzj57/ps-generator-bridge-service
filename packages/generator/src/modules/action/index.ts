@@ -35,29 +35,21 @@ export class ActionModule extends BaseModule implements ActionModuleApi {
    * success is implicit, and a failure surfaces as a thrown error (hence an
    * INTERNAL response), so this always resolves to `true` on the happy path.
    */
+  @api({ method: "POST", url: "/action/auto-cutout" })
   @ws(ProtocolMethod.ActionAutoCutout)
   async autoCutout(): Promise<boolean> {
     await this.jsx.executeSafe("Action/autoCutout");
     return true;
   }
 
-  @api({ method: "POST", url: "/action/auto-cutout" })
-  async autoCutoutApi(): Promise<boolean> {
-    return this.autoCutout();
-  }
-
   /**
    * Remove the background of the current layer. Runs `jsx/Action/removeBackground.jsx`
    * and wraps the jsx's boolean result as `{ success }`.
    */
+  @api({ method: "POST", url: "/action/remove-background" })
   @ws(ProtocolMethod.ActionRemoveBackground)
   async removeBackground(): Promise<{ success: boolean }> {
     const result = await this.jsx.executeSafe<boolean>("Action/removeBackground");
     return { success: result };
-  }
-
-  @api({ method: "POST", url: "/action/remove-background" })
-  async removeBackgroundApi(): Promise<{ success: boolean }> {
-    return this.removeBackground();
   }
 }

@@ -232,6 +232,7 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
     });
   }
 
+  @api("/layer/current-preview")
   @ws(ProtocolMethod.LayerGetCurrentPreview)
   public async getCurrentPreview(): Promise<LayerPreviewPayload> {
     try {
@@ -243,11 +244,6 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
       this.previewCache = null;
       return null;
     }
-  }
-
-  @api("/layer/current-preview")
-  public getCurrentPreviewApi(): Promise<LayerPreviewPayload> {
-    return this.getCurrentPreview();
   }
 
   @ws(ProtocolMethod.LayerImportImage)

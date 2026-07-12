@@ -33,6 +33,7 @@ export class DocumentModule extends BaseModule implements DocumentModuleApi {
 
   public currentDocument: PsDocument | null = null;
 
+  @api("/document/current")
   @ws(ProtocolMethod.DocumentCurrent)
   async getCurrentDocument() {
     const data = await this.jsx.executeSafe("Document/getDocumentInfo");
@@ -42,11 +43,6 @@ export class DocumentModule extends BaseModule implements DocumentModuleApi {
     }
     this.currentDocument = data as PsDocument;
     return data as PsDocument;
-  }
-
-  @api("/document/current")
-  async getCurrentDocumentApi(): Promise<PsDocument> {
-    return this.getCurrentDocument();
   }
 
   @ws(ProtocolMethod.DocumentExport)

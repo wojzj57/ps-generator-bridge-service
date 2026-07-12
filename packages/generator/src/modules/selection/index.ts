@@ -78,6 +78,7 @@ export class SelectionModule extends BaseModule implements SelectionModuleApi {
     return { ok: true };
   }
 
+  @api("/selection/area")
   @ws(ProtocolMethod.SelectionGetArea)
   async getArea(): Promise<PsRect | null> {
     try {
@@ -86,11 +87,6 @@ export class SelectionModule extends BaseModule implements SelectionModuleApi {
     } catch {
       return null;
     }
-  }
-
-  @api("/selection/area")
-  async getAreaApi(): Promise<PsRect | null> {
-    return this.getArea();
   }
 
   @ws(ProtocolMethod.SelectionGetPath)
