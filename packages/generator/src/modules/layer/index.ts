@@ -13,6 +13,7 @@ import {
   type LayerSelectionChangePayload,
 } from "@ps-generator-bridge/sdk";
 import {
+  api,
   subscribable,
   useLogger,
   ws,
@@ -22,6 +23,15 @@ import { BaseModule } from "../base";
 import type { PsBridgeHost } from "../../plugin";
 import type { PsBounds, PsRect } from "../../types/ps";
 import { bridgeError } from "../../errors";
+import {
+  bodyRecord,
+  optionalBoolean,
+  optionalNumber,
+  queryParams,
+  requiredNumber,
+  routeParams,
+  type ApiRequestLike,
+} from "../apiParams";
 
 const log = useLogger("layer");
 const PREVIEW_CHANGE_DEBOUNCE_MS = 300;
@@ -143,6 +153,17 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
     });
   }
 
+  @api("/layer/info")
+  public async getLayerInfoApi(request: ApiRequestLike): Promise<PsLayer> {
+    const query = queryParams(request);
+    return this.getLayerInfo({
+      id: optionalNumber(query.id, "id", { integer: true }),
+      index: optionalNumber(query.index, "index", { integer: true }),
+      getChildren: optionalBoolean(query.getChildren, "getChildren"),
+      getGeneratorSettings: optionalBoolean(query.getGeneratorSettings, "getGeneratorSettings"),
+    });
+  }
+
   @ws(ProtocolMethod.LayerGetInfoById)
   public getLayerInfoByID(
     layerIDOrParams: number | { layerID: number; options?: { getChildren: boolean } }
@@ -154,6 +175,18 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
     return this.getLayerInfo({
       id: layerID,
       getChildren: resolvedOptions?.getChildren,
+    });
+  }
+
+  @api("/layer/by-id/:layerID")
+  public getLayerInfoByIdApi(request: ApiRequestLike): Promise<PsLayer> {
+    const params = routeParams(request);
+    const query = queryParams(request);
+    return this.getLayerInfoByID({
+      layerID: requiredNumber(params.layerID, "layerID", { integer: true }),
+      options: {
+        getChildren: optionalBoolean(query.getChildren, "getChildren") ?? false,
+      },
     });
   }
 
@@ -187,6 +220,19 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
     });
   }
 
+  @api("/layer/by-index/:layerIndex")
+  public getLayerInfoByIndexApi(request: ApiRequestLike): Promise<PsLayer> {
+    const params = routeParams(request);
+    const query = queryParams(request);
+    return this.getLayerInfoByIndex({
+      layerIndex: requiredNumber(params.layerIndex, "layerIndex", { integer: true }),
+      options: {
+        getChildren: optionalBoolean(query.getChildren, "getChildren") ?? false,
+      },
+    });
+  }
+
+  @api("/layer/current-preview")
   @ws(ProtocolMethod.LayerGetCurrentPreview)
   public async getCurrentPreview(): Promise<LayerPreviewPayload> {
     try {
@@ -247,6 +293,11 @@ export class LayerModule extends BaseModule implements LayerModuleApi {
     } finally {
       await source.cleanup?.();
     }
+  }
+
+  @api({ method: "POST", url: "/layer/import-image" })
+  public importImageApi(request: ApiRequestLike): Promise<PsLayer> {
+    return this.importImage(bodyRecord(request) as unknown as LayerImportImageParams);
   }
 
   private validateImportImageParams(params: LayerImportImageParams): void {

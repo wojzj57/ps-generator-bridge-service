@@ -78,11 +78,31 @@ Plugin-specific methods are open string names and are invoked through `connectio
 
 ## HTTP APIs
 
-| Endpoint                   | Purpose                                                |
-| -------------------------- | ------------------------------------------------------ |
-| `GET /health`              | Service liveness probe.                                |
-| `GET /plugins`             | Loaded plugin discovery.                               |
-| `GET /plugins/{id}/health` | Loaded plugin runtime status or failed load diagnosis. |
+| Endpoint                                      | Purpose                                                         |
+| --------------------------------------------- | --------------------------------------------------------------- |
+| `GET /health`                                 | Service liveness probe.                                         |
+| `GET /plugins`                                | Loaded plugin discovery.                                        |
+| `GET /plugins/{id}/health`                    | Loaded plugin runtime status or failed load diagnosis.          |
+| `POST /action/auto-cutout`                    | Run `action:autoCutout`; returns `boolean`.                     |
+| `POST /action/remove-background`              | Run `action:removeBackground`; returns `{ success }`.           |
+| `GET /document/current`                       | Run `document:current`; returns `PsDocument`.                   |
+| `POST /document/export`                       | Run `document:export`; body is the WS params.                   |
+| `POST /document/save`                         | Run `document:save`; body is `{ savePath? }`.                   |
+| `GET /layer/info`                             | Run `layer:getInfo`; params come from query string.             |
+| `GET /layer/by-id/{layerID}`                  | Run `layer:getInfoById`; `getChildren` is a query arg.          |
+| `GET /layer/by-index/{layerIndex}`            | Run `layer:getInfoByIndex`; `getChildren` is a query arg.       |
+| `GET /layer/current-preview`                  | Run `layer:getCurrentPreview`.                                  |
+| `POST /layer/import-image`                    | Run `layer:importImage`; body is `LayerImportImageParams`.      |
+| `POST /image/export-layer`                    | Run `image:exportLayer`; body is the WS params.                 |
+| `POST /image/export-layer-with-selected-path` | Run `image:exportLayerWithSelectedPath`; body is the WS params. |
+| `GET /image/preview/{layerSpec}`              | Run `image:getPreview`; `documentId` is a query arg.            |
+| `POST /image/export-document`                 | Run `image:exportDocument`; body is the WS params.              |
+| `GET /selection/area`                         | Run `selection:getArea`; returns `PsRect \| null`.              |
+| `GET /selection/path`                         | Run `selection:getPath`; `expand` is a query arg.               |
+
+Module HTTP APIs reuse the corresponding WS result shape. `selection:change`
+remains a WS/event capability because HTTP cannot carry the ongoing selection
+change stream.
 
 ## Server Info
 

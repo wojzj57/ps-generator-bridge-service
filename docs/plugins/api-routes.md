@@ -43,3 +43,13 @@ This keeps plugin HTTP routes under:
 ```
 
 and prevents global module routes from stealing plugin namespaces.
+
+## Built-In Module Routes
+
+The generator also exposes built-in module HTTP routes under reserved module
+segments such as `/action`, `/document`, `/layer`, `/image`, and `/selection`.
+These routes are second entry points for existing Protocol methods; they reuse
+the same result shapes as the corresponding WebSocket request methods.
+
+Long-lived event capabilities, such as `selection:change`, stay on WebSocket
+event subscription instead of HTTP.

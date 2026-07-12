@@ -1,9 +1,10 @@
 import { MainEvent, ProtocolMethod } from "@ps-generator-bridge/sdk";
-import { subscribable, ws } from "@ps-generator-bridge/sdk/plugin";
+import { api, subscribable, ws } from "@ps-generator-bridge/sdk/plugin";
 import { BaseModule } from "../base";
 import type { PsBridgeHost } from "../../plugin";
 import type { PsRect } from "../../types/ps";
 import type { SubscribableContext } from "@ps-generator-bridge/sdk/plugin";
+import { optionalNumber, queryParams, type ApiRequestLike } from "../apiParams";
 
 const SELECTION_ACTION_EVENTS = ["setd", "SbtF", "AddT", "move"] as const;
 const CHANGE_COOLDOWN_MS = 500;
@@ -77,6 +78,7 @@ export class SelectionModule extends BaseModule implements SelectionModuleApi {
     return { ok: true };
   }
 
+  @api("/selection/area")
   @ws(ProtocolMethod.SelectionGetArea)
   async getArea(): Promise<PsRect | null> {
     try {
@@ -99,6 +101,12 @@ export class SelectionModule extends BaseModule implements SelectionModuleApi {
     const result = parseSelectionPathResult(raw);
     if (!result?.path) return null;
     return this.pathToSvg(result.path);
+  }
+
+  @api("/selection/path")
+  async getPathApi(request: ApiRequestLike): Promise<SelectionPathData | null> {
+    const query = queryParams(request);
+    return this.getPath({ expand: optionalNumber(query.expand, "expand") });
   }
 
   @subscribable(MainEvent.SelectionChanged)

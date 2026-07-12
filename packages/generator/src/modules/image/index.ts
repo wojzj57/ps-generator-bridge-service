@@ -4,9 +4,17 @@ import type { PsBridgeHost } from "../../plugin";
 import type { PsGenerator } from "../../types/generator";
 import type { PsBounds, PsPixmap } from "../../types/ps";
 import { Pixmap } from "../../utils/pixmap";
-import { useLogger, ws } from "@ps-generator-bridge/sdk/plugin";
+import { api, useLogger, ws } from "@ps-generator-bridge/sdk/plugin";
 import { ProtocolMethod, type LayerSpec, type WsImageResult } from "@ps-generator-bridge/sdk";
 import { bridgeError } from "../../errors";
+import {
+  bodyRecord,
+  optionalNumber,
+  queryParams,
+  requiredNumber,
+  routeParams,
+  type ApiRequestLike,
+} from "../apiParams";
 
 const log = useLogger("image");
 
@@ -197,6 +205,16 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
     return this.toWsResult(result, { upload: true }, name);
   }
 
+  @api({ method: "POST", url: "/image/export-layer" })
+  async exportLayerApi(request: ApiRequestLike): Promise<WsImageResult> {
+    const body = bodyRecord(request);
+    return this.exportLayerWs({
+      documentId: optionalNumber(body.documentId, "documentId", { integer: true }),
+      layerSpec: requiredLayerSpec(body.layerSpec),
+      settings: body.settings as PsGenerator.GetPixmapSettings | undefined,
+    });
+  }
+
   @ws(ProtocolMethod.ImageExportLayerWithSelectedPath)
   async exportLayerWithSelectedPathWs(options: {
     documentId?: number;
@@ -208,6 +226,16 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
     return this.toWsResult(result, { upload: true }, name);
   }
 
+  @api({ method: "POST", url: "/image/export-layer-with-selected-path" })
+  async exportLayerWithSelectedPathApi(request: ApiRequestLike): Promise<WsImageResult> {
+    const body = bodyRecord(request);
+    return this.exportLayerWithSelectedPathWs({
+      documentId: optionalNumber(body.documentId, "documentId", { integer: true }),
+      layerSpec: requiredNumber(body.layerSpec, "layerSpec", { integer: true }),
+      expand: optionalNumber(body.expand, "expand"),
+    });
+  }
+
   /**
    * `@ws` wrapper over {@link getPreview} (RFC 0008). Always returns base64 —
    * previews are high-frequency, downscaled thumbnails not worth a COS round-trip,
@@ -217,6 +245,16 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
   async getPreviewWs(options: { documentId?: number; layerSpec: number }): Promise<WsImageResult> {
     const result = await this.getPreview(options);
     return this.toWsResult(result, { upload: false });
+  }
+
+  @api("/image/preview/:layerSpec")
+  async getPreviewApi(request: ApiRequestLike): Promise<WsImageResult> {
+    const params = routeParams(request);
+    const query = queryParams(request);
+    return this.getPreviewWs({
+      documentId: optionalNumber(query.documentId, "documentId", { integer: true }),
+      layerSpec: requiredNumber(params.layerSpec, "layerSpec", { integer: true }),
+    });
   }
 
   /**
@@ -231,6 +269,13 @@ export class ImageModule extends BaseModule implements ImageModuleApi {
     const result = await this.exportDocument(options);
     const name = this.plugin.cos ? this.resolveDocumentName(options.documentId) : undefined;
     return this.toWsResult(result, { upload: true }, name);
+  }
+
+  @api({ method: "POST", url: "/image/export-document" })
+  async exportDocumentApi(request: ApiRequestLike): Promise<WsImageResult> {
+    return this.exportDocumentWs(
+      bodyRecord(request) as { documentId?: number; settings?: PsGenerator.GetPixmapSettings }
+    );
   }
 
   /**
@@ -521,4 +566,22 @@ function withChannelTimeout<T>(
   return Promise.race([promise, timeout]).finally(() => {
     if (timer) clearTimeout(timer);
   });
+}
+
+function requiredLayerSpec(value: unknown): LayerSpec {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (isLayerRange(value)) return value;
+  if (value === undefined || value === null) throw bridgeError.badRequest("layerSpec is required");
+  throw bridgeError.badRequest("layerSpec must be a number or layer range object");
+}
+
+function isLayerRange(value: unknown): value is Exclude<LayerSpec, number> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const range = value as Record<string, unknown>;
+  return (
+    Number.isFinite(range.firstLayerIndex) &&
+    Number.isFinite(range.lastLayerIndex) &&
+    Array.isArray(range.hidden) &&
+    range.hidden.every((item) => typeof item === "number" && Number.isFinite(item))
+  );
 }

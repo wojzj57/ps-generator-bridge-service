@@ -78,11 +78,30 @@ Event 没有 `id`，也没有直接响应。
 
 ## HTTP API
 
-| Endpoint                   | 作用                               |
-| -------------------------- | ---------------------------------- |
-| `GET /health`              | 服务存活检查。                     |
-| `GET /plugins`             | 已加载插件发现。                   |
-| `GET /plugins/{id}/health` | 已加载插件运行状态或加载失败诊断。 |
+| Endpoint                                      | 作用                                                          |
+| --------------------------------------------- | ------------------------------------------------------------- |
+| `GET /health`                                 | 服务存活检查。                                                |
+| `GET /plugins`                                | 已加载插件发现。                                              |
+| `GET /plugins/{id}/health`                    | 已加载插件运行状态或加载失败诊断。                            |
+| `POST /action/auto-cutout`                    | 执行 `action:autoCutout`，返回 `boolean`。                    |
+| `POST /action/remove-background`              | 执行 `action:removeBackground`，返回 `{ success }`。          |
+| `GET /document/current`                       | 执行 `document:current`，返回 `PsDocument`。                  |
+| `POST /document/export`                       | 执行 `document:export`，body 使用 WS 参数。                   |
+| `POST /document/save`                         | 执行 `document:save`，body 为 `{ savePath? }`。               |
+| `GET /layer/info`                             | 执行 `layer:getInfo`，参数来自 query string。                 |
+| `GET /layer/by-id/{layerID}`                  | 执行 `layer:getInfoById`，`getChildren` 来自 query。          |
+| `GET /layer/by-index/{layerIndex}`            | 执行 `layer:getInfoByIndex`，`getChildren` 来自 query。       |
+| `GET /layer/current-preview`                  | 执行 `layer:getCurrentPreview`。                              |
+| `POST /layer/import-image`                    | 执行 `layer:importImage`，body 为 `LayerImportImageParams`。  |
+| `POST /image/export-layer`                    | 执行 `image:exportLayer`，body 使用 WS 参数。                 |
+| `POST /image/export-layer-with-selected-path` | 执行 `image:exportLayerWithSelectedPath`，body 使用 WS 参数。 |
+| `GET /image/preview/{layerSpec}`              | 执行 `image:getPreview`，`documentId` 来自 query。            |
+| `POST /image/export-document`                 | 执行 `image:exportDocument`，body 使用 WS 参数。              |
+| `GET /selection/area`                         | 执行 `selection:getArea`，返回 `PsRect \| null`。             |
+| `GET /selection/path`                         | 执行 `selection:getPath`，`expand` 来自 query。               |
+
+模块 HTTP API 复用对应 WS 方法的结果形状。`selection:change` 仍然是
+WS/event 能力，因为 HTTP 不能承载持续的选区变化事件流。
 
 ## Server Info
 
