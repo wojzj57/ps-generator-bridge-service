@@ -1,35 +1,41 @@
 name: Release
 
 on:
-  push:
+  pull_request_target:
     branches:
       - master
-    paths:
-      - ".github/workflows/release.yml"
-      - ".changeset/**"
-      - "package.json"
-      - "packages/*/package.json"
-      - "packages/*/CHANGELOG.md"
-      - "CHANGELOG.md"
+    types:
+      - closed
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 permissions:
   contents: write
-  pull-requests: write
+  pull-requests: read
   id-token: write
 
 jobs:
   release:
-    name: Version and publish packages
+    name: Build and publish packages
+    if: >-
+      github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'release')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout merged commit
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: 0
+
+      - name: Validate release PR
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          IS_RELEASE: "true"
+        run: node scripts/check-release-intent.mjs
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -46,27 +52,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check formatting
-        run: pnpm format:check
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Test
-        run: pnpm test
-
-      - name: Build
+      - name: Build publishable packages
         run: pnpm build
 
       - name: Check package contents
         run: pnpm pack:check
 
-      - name: Create version PR or publish
+      - name: Publish packages
         uses: changesets/action@v1
         with:
-          version: pnpm version-packages
           publish: pnpm release
-          title: "chore: version packages"
-          commit: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
