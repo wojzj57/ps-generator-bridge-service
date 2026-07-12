@@ -46,10 +46,53 @@ and prevents global module routes from stealing plugin namespaces.
 
 ## Built-In Module Routes
 
-The generator also exposes built-in module HTTP routes under reserved module
-segments such as `/action`, `/document`, `/layer`, `/image`, and `/selection`.
-These routes are second entry points for existing Protocol methods; they reuse
-the same result shapes as the corresponding WebSocket request methods.
+The generator also exposes built-in module HTTP routes under the reserved
+`/action`, `/document`, `/layer`, `/image`, and `/selection` segments. These
+routes are second entry points for existing Protocol methods and reuse the same
+result shapes as the corresponding WebSocket request methods.
+
+| Method | Route                                    | Input                                                                              |
+| ------ | ---------------------------------------- | ---------------------------------------------------------------------------------- |
+| `POST` | `/action/auto-cutout`                    | No body required                                                                   |
+| `POST` | `/action/remove-background`              | No body required                                                                   |
+| `GET`  | `/document/current`                      | None                                                                               |
+| `POST` | `/document/export`                       | JSON body with required `filePath` and optional export fields                      |
+| `POST` | `/document/save`                         | JSON body with optional `savePath`                                                 |
+| `GET`  | `/layer/info`                            | Optional `id`, `index`, `getChildren`, and `getGeneratorSettings` query parameters |
+| `GET`  | `/layer/by-id/:layerID`                  | Optional `getChildren` query parameter                                             |
+| `GET`  | `/layer/by-index/:layerIndex`            | Optional `getChildren` query parameter                                             |
+| `GET`  | `/layer/current-preview`                 | None                                                                               |
+| `POST` | `/layer/import-image`                    | `LayerImportImageParams` JSON body; `image` is required                            |
+| `POST` | `/image/export-layer`                    | JSON body with required `layerSpec`; optional `documentId` and `settings`          |
+| `POST` | `/image/export-layer-with-selected-path` | JSON body with required numeric `layerSpec`; optional `documentId` and `expand`    |
+| `GET`  | `/image/preview/:layerSpec`              | Optional `documentId` query parameter                                              |
+| `POST` | `/image/export-document`                 | JSON body with optional `documentId` and `settings`                                |
+| `GET`  | `/selection/area`                        | None                                                                               |
+| `GET`  | `/selection/path`                        | Optional `expand` query parameter                                                  |
+
+POST bodies must be JSON objects. Numeric path and query parameters accept
+numeric strings; parameters documented as integers reject fractional values.
+Boolean query parameters accept `true`, `false`, `1`, or `0`. Invalid JSON,
+missing required fields, and invalid parameter values return `400` with a
+Protocol error body.
+
+Image export routes return `WsImageResult`. Its `data` field is either a
+`data:image/png;base64,...` URI or, when COS upload is enabled, an HTTPS URL.
+The preview route always returns a data URI. The remaining fields contain the
+image `bounds`, `width`, and `height`.
+
+## Error Responses
+
+Module routes serialize errors with the same `ProtocolError` shape used by
+WebSocket responses. The HTTP status is selected from the Protocol error code:
+
+| HTTP status | Protocol errors                                               |
+| ----------- | ------------------------------------------------------------- |
+| `400`       | `BadRequest`, including malformed JSON and invalid parameters |
+| `404`       | `PluginNotFound`, `DocumentNotFound`, `LayerNotFound`         |
+| `409`       | `NoDocument`, `PhotoshopBusy`                                 |
+| `503`       | `PhotoshopUnavailable`                                        |
+| `500`       | Other server and JSX failures                                 |
 
 Long-lived event capabilities, such as `selection:change`, stay on WebSocket
 event subscription instead of HTTP.

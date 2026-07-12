@@ -33,5 +33,6 @@ English documentation: [English](../README.md)
 ## 参考
 
 - [协议](./reference/protocol.md)
+- [内置能力](./reference/built-in-capabilities.md)
 - [环境变量](./reference/environment.md)
 - [包导出](./reference/package-exports.md)
