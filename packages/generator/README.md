@@ -1,6 +1,6 @@
 # `@ps-generator-bridge/generator`
 
-Photoshop Generator plugin and WebSocket service for PS Generator Bridge. This package is loaded by Adobe `generator-core` inside Photoshop's bundled Node runtime and exposes Photoshop operations to SDK clients.
+Photoshop Generator plugin and HTTP/WebSocket service for PS Generator Bridge. This package is loaded by Adobe `generator-core` inside Photoshop's bundled Node runtime and exposes Photoshop operations to SDK clients.
 
 Online documentation:
 
@@ -13,6 +13,7 @@ Full public documentation lives in the repository docs:
 - [Configuration](../../docs/generator/configuration.md)
 - [Photoshop Setup](../../docs/generator/photoshop-setup.md)
 - [Troubleshooting](../../docs/generator/troubleshooting.md)
+- [API Routes](../../docs/plugins/api-routes.md)
 
 ## Install
 
@@ -68,12 +69,14 @@ Prefer `PluginConfig` for structured run parameters. Use environment variables f
 
 ## Server Endpoints
 
-| Endpoint           | Purpose                                                                         |
-| ------------------ | ------------------------------------------------------------------------------- |
-| `GET /health`      | Liveness probe.                                                                 |
-| `GET /plugins`     | Lists loaded external plugin ids.                                               |
-| `WS /ws`           | Root SDK protocol endpoint.                                                     |
-| `WS /ws/:pluginId` | Plugin-scoped protocol endpoint with scoped-first dispatch and global fallback. |
+| Endpoint                   | Purpose                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------- |
+| `GET /health`              | Liveness probe.                                                                 |
+| `GET /plugins`             | Lists loaded external plugin ids.                                               |
+| `GET/POST /{module}/...`   | Built-in action, document, layer, image, and selection HTTP APIs.               |
+| `GET/POST /{pluginId}/...` | HTTP APIs registered by an external plugin with `@api`.                         |
+| `WS /ws`                   | Root SDK protocol endpoint.                                                     |
+| `WS /ws/:pluginId`         | Plugin-scoped protocol endpoint with scoped-first dispatch and global fallback. |
 
 The first WebSocket frame sent by the server is a `connected` event containing `clientId`. Clients reuse that id through `?id=` on reconnect.
 
@@ -88,8 +91,9 @@ The generator registers built-in protocol methods for:
 - layer inspection
 - document operations
 - image export results as JSON-safe `WsImageResult`
+- selection area, path, and change events
 
-Protocol method names and payload types live in `@ps-generator-bridge/sdk`; keep the generator implementation aligned with `packages/sdk/src/protocol.ts`.
+Protocol method names and payload types live in `@ps-generator-bridge/sdk`; keep the generator implementation aligned with `packages/sdk/src/protocol/`.
 
 ## Plugin Host
 
@@ -97,7 +101,7 @@ External plugins are loaded from direct child folders of the plugin directory. E
 
 The host passed to each plugin exposes narrow capabilities:
 
-- `modules` for built-in layer, document, action, and image APIs
+- `modules` for built-in layer, document, action, image, and selection APIs
 - `events` for Photoshop, main, and plugin-local event subscriptions; plugin
   authors publish plugin-local events with `events.emit(...)`
 - `jsx` scoped to the plugin's own `jsx` directory, with access to built-in JSX

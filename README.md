@@ -79,9 +79,9 @@ pnpm --filter @ps-generator-bridge/cli typecheck
 The generator package is loaded by `generator-core` through its CommonJS `main.js` entry. During initialization it:
 
 1. Registers a Photoshop Generator menu item.
-2. Starts a Fastify WebSocket service on `127.0.0.1` (default port `7700`).
+2. Starts a Fastify HTTP/WebSocket service on `127.0.0.1` (default port `7700`).
 3. Loads optional external plugins from `pluginsDir` or `PS_BRIDGE_PLUGINS_DIR`.
-4. Registers built-in modules for document, layer, action, image, JSX, and event methods.
+4. Registers built-in modules for document, layer, action, image, selection, JSX, and event methods.
 
 The SDK uses `ws://127.0.0.1:7700` as the default service base URL and connects to `/ws`.
 

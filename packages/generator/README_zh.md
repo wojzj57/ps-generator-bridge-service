@@ -5,7 +5,15 @@ Online documentation:
 - English: https://wojzj57.github.io/ps-generator-bridge-service/getting-started/run-generator
 - Chinese: https://wojzj57.github.io/ps-generator-bridge-service/zh/getting-started/run-generator
 
-PS Generator Bridge 的 Photoshop Generator 插件和 WebSocket 服务。该包由 Adobe `generator-core` 在 Photoshop 内置 Node 运行时中加载，并把 Photoshop 操作暴露给 SDK 客户端。
+PS Generator Bridge 的 Photoshop Generator 插件和 HTTP/WebSocket 服务。该包由 Adobe `generator-core` 在 Photoshop 内置 Node 运行时中加载，并把 Photoshop 操作暴露给 SDK 客户端。
+
+完整公开文档位于仓库 docs：
+
+- [运行 Generator](../../docs/zh/getting-started/run-generator.md)
+- [配置](../../docs/zh/generator/configuration.md)
+- [Photoshop 设置](../../docs/zh/generator/photoshop-setup.md)
+- [故障排除](../../docs/zh/generator/troubleshooting.md)
+- [API 路由](../../docs/zh/plugins/api-routes.md)
 
 ## 安装
 
@@ -58,12 +66,14 @@ export interface PluginConfig {
 
 ## 服务端端点
 
-| Endpoint           | 作用                                                              |
-| ------------------ | ----------------------------------------------------------------- |
-| `GET /health`      | 存活探针。                                                        |
-| `GET /plugins`     | 列出已加载的外部插件 id。                                         |
-| `WS /ws`           | 根 SDK 协议端点。                                                 |
-| `WS /ws/:pluginId` | 插件作用域协议端点，先查 scoped handler，再 fallback 到全局能力。 |
+| Endpoint                   | 作用                                                              |
+| -------------------------- | ----------------------------------------------------------------- |
+| `GET /health`              | 存活探针。                                                        |
+| `GET /plugins`             | 列出已加载的外部插件 id。                                         |
+| `GET/POST /{module}/...`   | 内置 action、document、layer、image、selection HTTP API。         |
+| `GET/POST /{pluginId}/...` | 外部插件通过 `@api` 注册的 HTTP API。                             |
+| `WS /ws`                   | 根 SDK 协议端点。                                                 |
+| `WS /ws/:pluginId`         | 插件作用域协议端点，先查 scoped handler，再 fallback 到全局能力。 |
 
 WebSocket 连接建立后，服务端发送的第一帧是包含 `clientId` 的 `connected` 事件。客户端重连时通过 `?id=` 回传该 id。
 
@@ -78,8 +88,9 @@ generator 注册的内置协议方法包括：
 - layer 信息读取
 - document 操作
 - 以 JSON-safe `WsImageResult` 返回的 image export
+- selection 区域、路径和变更事件
 
-协议方法名和 payload 类型定义在 `@ps-generator-bridge/sdk` 中；generator 实现必须与 `packages/sdk/src/protocol.ts` 保持一致。
+协议方法名和 payload 类型定义在 `@ps-generator-bridge/sdk` 中；generator 实现必须与 `packages/sdk/src/protocol/` 保持一致。
 
 ## 插件宿主
 
@@ -87,7 +98,7 @@ generator 注册的内置协议方法包括：
 
 传给每个插件的 host 只暴露窄接口：
 
-- `modules`：内置 layer、document、action、image API
+- `modules`：内置 layer、document、action、image、selection API
 - `events`：Photoshop 事件订阅
 - `jsx`：作用域限定到插件自己的 `jsx` 目录，同时可访问内置 JSX
 - `cos`：配置完整时提供的可选上传能力
