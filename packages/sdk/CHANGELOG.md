@@ -1,5 +1,22 @@
 # @ps-generator-bridge/sdk
 
+## 0.5.0
+
+### Minor Changes
+
+- Features
+
+  1. Expose the built-in action, document, layer, image, and selection capabilities through HTTP routes that reuse the existing module implementations and Protocol result shapes.
+  2. Include `.env.example` and `CHANGELOG.md` in the Generator package so the CLI can install a complete standalone runtime.
+
+  Fixes
+
+  1. Preserve Fastify client-error status codes and return Protocol `BadRequest` responses for malformed JSON and invalid HTTP parameters.
+
+  Documentation
+
+  1. Add bilingual HTTP route references and a capability matrix comparing SDK, Plugin Host, WebSocket, HTTP API, and MCP availability.
+
 ## 0.4.0
 
 ### Minor Changes
