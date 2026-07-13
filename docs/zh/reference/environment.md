@@ -32,3 +32,10 @@ PS_BRIDGE_COS_REGION
 ## 无效端口
 
 `PS_BRIDGE_PORT` 必须是 1 到 65535 之间的整数。无效值会被忽略并记录 warning。
+
+## CLI 环境变量
+
+`PS_GENERATOR_REMOTE_PASSWORD` 为 `setup-photoshop`、
+`setup-generator-settings`、`run` 和 `dev` 提供 Photoshop 远程连接密码。
+显式传入的 `--password` 优先；两者都未提供时，CLI 使用 `password`。
+该变量由 CLI 进程读取，与上文 generator 从包内 `.env` 加载变量的行为相互独立。

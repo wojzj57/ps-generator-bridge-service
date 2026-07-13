@@ -50,17 +50,24 @@ Initialization:
 export interface PluginConfig {
   port?: number;
   pluginsDir?: string;
+  maxImportImageBytes?: number;
+  maxImportImagePixels?: number;
+  allowedImportImageFormats?: string[];
+  allowLocalImagePaths?: boolean;
   [key: string]: unknown;
 }
 ```
 
 Environment overrides:
 
-| Variable                | Purpose                                                                                |
-| ----------------------- | -------------------------------------------------------------------------------------- |
-| `PS_BRIDGE_PORT`        | Overrides `PluginConfig.port`.                                                         |
-| `PS_BRIDGE_PLUGINS_DIR` | Overrides the default plugin directory when `pluginsDir` is not provided.              |
-| `PS_BRIDGE_COS_*`       | Enables optional COS-backed image upload when all required credentials are configured. |
+| Variable                    | Purpose                                                                                |
+| --------------------------- | -------------------------------------------------------------------------------------- |
+| `PS_BRIDGE_PORT`            | Overrides `PluginConfig.port`.                                                         |
+| `PS_BRIDGE_PLUGINS_DIR`     | Overrides the default plugin directory when `pluginsDir` is not provided.              |
+| `PS_BRIDGE_LOG_DIR`         | Overrides the package-local runtime log directory.                                     |
+| `PS_BRIDGE_COS_*`           | Enables optional COS-backed image upload when all required credentials are configured. |
+| `PS_BRIDGE_COS_KEY_PREFIX`  | Overrides the COS object key prefix.                                                   |
+| `PS_BRIDGE_COS_URL_EXPIRES` | Overrides the signed COS URL lifetime in seconds.                                      |
 
 `main.js` loads the package-local `.env` file before requiring the bundled
 plugin entry, so these overrides are available during host construction.

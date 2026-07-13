@@ -53,7 +53,7 @@ pnpm dlx @ps-generator-bridge/cli setup-photoshop --version 2025 --yes
 npm install @ps-generator-bridge/sdk
 ```
 
-Node 18-21 没有全局 `WebSocket`。这些运行时需要安装并注入 `ws`：
+如果 Node 运行时没有全局 `WebSocket`（例如 Node 18），需要安装并注入 `ws`：
 
 ```bash
 npm install ws

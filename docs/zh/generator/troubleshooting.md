@@ -12,7 +12,7 @@ curl http://127.0.0.1:7700/health
 
 ## Node 缺少 WebSocket
 
-Node 18-21 没有全局 `WebSocket`。需要注入：
+如果 Node 运行时没有全局 `WebSocket`（例如 Node 18），需要注入：
 
 ```ts
 import { Connection } from "@ps-generator-bridge/sdk";

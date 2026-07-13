@@ -12,7 +12,7 @@ Use this skill for changes in `packages/cli`.
 The CLI is the command-line surface for PS Generator Bridge. Its current run/dev commands are a Windows-only smoke harness that verifies the real boot path:
 
 - Photoshop is already running.
-- Adobe `generator-core` is installed under the nearest pnpm workspace root at `generator-core/`, or under the system temp fallback `ps-generator-bridge/generator-core`.
+- Adobe `generator-core` is installed under the nearest pnpm workspace root at `generator-core/`, or under the platform's stable per-user cache directory at `ps-generator-bridge/generator-core`.
 - `generator-core` can load `@ps-generator-bridge/generator`.
 - The bridge server responds on `/health` and `/plugins`.
 - The SDK can connect over WebSocket and call `getServerInfo`.
@@ -24,16 +24,25 @@ The smoke harness is not a full Photoshop workflow automation framework. It repl
 Preserve these commands:
 
 ```bash
+ps-generator-bridge setup [--dir <dir>]
+ps-generator-bridge setup-photoshop [--version <year>] [--yes] [--password <value>]
+ps-generator-bridge setup-generator-settings (--pref <path> | -pref <path>) [--password <value>]
 ps-generator-bridge setup-core [--update]
-ps-generator-bridge run (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core]
-ps-generator-bridge dev (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core]
+ps-generator-bridge run (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core] [--password <value>]
+ps-generator-bridge dev (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core] [--password <value>]
+ps-generator-bridge clean
 ```
 
+- `setup` installs a minimal generator runtime and preserves user-owned files when updating a managed target.
+- `setup-photoshop` discovers Windows Photoshop installations, installs the runtime, and updates existing Generator/Remote Connections preferences.
+- `setup-generator-settings` updates only an explicitly selected `MachinePrefs.psp` file.
 - `setup-core` clones or updates generator-core and runs `npm install`.
 - `run` starts generator-core, verifies bridge readiness, prints results, and exits.
 - `dev` starts the same harness and waits for interrupt.
+- `clean` removes only the per-user cached generator-core clone; it leaves workspace-managed clones alone.
 - `--plugin` and `--plugins-dir` are mutually exclusive.
 - `--expect-plugin` may be repeated.
+- Photoshop setup/settings and harness password resolution use `--password`, then `PS_GENERATOR_REMOTE_PASSWORD`, then the default `password`.
 
 ## Package Contract
 
@@ -61,4 +70,4 @@ pnpm --filter @ps-generator-bridge/cli typecheck
 pnpm --filter @ps-generator-bridge/cli test
 ```
 
-The package test currently maps to typecheck. Real smoke behavior requires Windows and Photoshop, so do not make ordinary CI depend on it.
+The package test runs Vitest unit tests. Real smoke behavior requires Windows and Photoshop, so do not make ordinary CI depend on it.

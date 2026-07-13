@@ -80,7 +80,8 @@ remote `event:subscribe` / `event:unsubscribe` requests. Root connections may
 subscribe to Photoshop events and main `#` events. Plugin endpoint connections
 may also subscribe to events emitted by that plugin.
 
-Node 18-21 do not provide a global `WebSocket`. Inject one when needed:
+If the Node runtime does not provide a global `WebSocket` (for example,
+Node 18), inject one:
 
 ```ts
 import { Connection } from "@ps-generator-bridge/sdk";
@@ -116,7 +117,7 @@ Breaking changes from the old facade:
 
 ## Protocol Contract
 
-`src/protocol.ts` is the source of truth for:
+`src/protocol/` is the source of truth for:
 
 - method names in `ProtocolMethod`
 - request and response shapes in `ProtocolMethods`

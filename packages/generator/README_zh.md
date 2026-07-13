@@ -50,17 +50,26 @@ init(generator, config);
 export interface PluginConfig {
   port?: number;
   pluginsDir?: string;
+  maxImportImageBytes?: number;
+  maxImportImagePixels?: number;
+  allowedImportImageFormats?: string[];
+  allowLocalImagePaths?: boolean;
   [key: string]: unknown;
 }
 ```
 
 环境变量覆盖项：
 
-| 变量                    | 作用                                       |
-| ----------------------- | ------------------------------------------ |
-| `PS_BRIDGE_PORT`        | 覆盖 `PluginConfig.port`。                 |
-| `PS_BRIDGE_PLUGINS_DIR` | 当未提供 `pluginsDir` 时覆盖默认插件目录。 |
-| `PS_BRIDGE_COS_*`       | 所需凭据齐全时启用基于 COS 的图片上传。    |
+| 变量                        | 作用                                       |
+| --------------------------- | ------------------------------------------ |
+| `PS_BRIDGE_PORT`            | 覆盖 `PluginConfig.port`。                 |
+| `PS_BRIDGE_PLUGINS_DIR`     | 当未提供 `pluginsDir` 时覆盖默认插件目录。 |
+| `PS_BRIDGE_LOG_DIR`         | 覆盖包内默认运行日志目录。                 |
+| `PS_BRIDGE_COS_*`           | 所需凭据齐全时启用基于 COS 的图片上传。    |
+| `PS_BRIDGE_COS_KEY_PREFIX`  | 覆盖 COS 对象 key 前缀。                   |
+| `PS_BRIDGE_COS_URL_EXPIRES` | 覆盖 COS 签名 URL 的有效期秒数。           |
+
+`main.js` 会在加载 bundle 入口前读取包内 `.env`，因此 host 构造时可以使用这些覆盖项。
 
 结构化运行参数优先使用 `PluginConfig`。环境变量用于部署期覆盖和密钥。
 
@@ -99,7 +108,7 @@ generator 注册的内置协议方法包括：
 传给每个插件的 host 只暴露窄接口：
 
 - `modules`：内置 layer、document、action、image、selection API
-- `events`：Photoshop 事件订阅
+- `events`：Photoshop、主事件和插件本地事件的订阅；插件通过 `events.emit(...)` 发布本地事件
 - `jsx`：作用域限定到插件自己的 `jsx` 目录，同时可访问内置 JSX
 - `cos`：配置完整时提供的可选上传能力
 

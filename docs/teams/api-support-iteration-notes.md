@@ -5,6 +5,9 @@
 Add HTTP API entry points for built-in generator module capabilities that were
 already exposed through WebSocket Protocol methods.
 
+Status: completed and committed. This file is retained as an implementation
+record; the public contract lives in the protocol and API route references.
+
 ## API Mapping
 
 | WS method                           | HTTP route                                    | Status                                            |
@@ -50,7 +53,9 @@ already exposed through WebSocket Protocol methods.
 - Added route coverage in `packages/generator/test/moduleApi.test.ts`.
 - Updated public HTTP API docs in English and Chinese.
 
-## Commands
+## Recorded Validation
+
+These results were recorded when the iteration was implemented:
 
 - `pnpm --filter @ps-generator-bridge/generator typecheck` - passed.
 - `pnpm --filter @ps-generator-bridge/generator exec vitest run test/moduleApi.test.ts --coverage=false` - passed.
@@ -83,4 +88,4 @@ Resolution:
 
 ## Remaining Work
 
-- Commit with the code-commiter flow.
+None for this completed iteration.

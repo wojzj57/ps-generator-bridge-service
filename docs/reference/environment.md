@@ -34,3 +34,11 @@ When COS is not enabled, image results use inline data URLs.
 ## Invalid Port
 
 `PS_BRIDGE_PORT` must be an integer from 1 to 65535. Invalid values are ignored and logged as warnings.
+
+## CLI Environment
+
+`PS_GENERATOR_REMOTE_PASSWORD` supplies the Photoshop Remote Connections
+password for `setup-photoshop`, `setup-generator-settings`, `run`, and `dev`.
+An explicit `--password` takes precedence; when neither is provided, the CLI
+uses `password`. This variable is read by the CLI process and is separate from
+the generator package-local `.env` loading described above.

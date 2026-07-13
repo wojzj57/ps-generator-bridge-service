@@ -22,7 +22,7 @@ Use this skill for changes in `packages/sdk`.
 - Use `RawConnection` for lower-level typed `invoke()` or custom endpoint work.
 - Keep `PsBridgeClient` compatible, but do not extend it for new public surface unless maintaining old callers.
 - Align every built-in convenience method with `ProtocolMethod` constants instead of string literals.
-- For Node 18-21 examples, inject a `WebSocket` implementation. Do not auto-import `ws` from the SDK root.
+- When a Node runtime has no global `WebSocket` (for example, Node 18), inject a `WebSocket` implementation. Do not auto-import `ws` from the SDK root.
 
 ## HTTP Helpers
 

@@ -53,7 +53,8 @@ pnpm dlx @ps-generator-bridge/cli setup-photoshop --version 2025 --yes
 npm install @ps-generator-bridge/sdk
 ```
 
-Node 18-21 do not provide a global `WebSocket`. In those runtimes, install and inject `ws`:
+If the Node runtime does not provide a global `WebSocket` (for example,
+Node 18), install and inject `ws`:
 
 ```bash
 npm install ws

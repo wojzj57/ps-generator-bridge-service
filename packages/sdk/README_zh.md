@@ -60,7 +60,7 @@ paint.on("paint:changed", (event) => {
 await paint.invoke("paint:createSession", { documentId: 1 });
 ```
 
-Node 18-21 没有全局 `WebSocket`，需要注入实现：
+如果 Node 运行时没有全局 `WebSocket`（例如 Node 18），需要注入实现：
 
 ```ts
 import { Connection } from "@ps-generator-bridge/sdk";
@@ -95,7 +95,7 @@ const connection = new Connection({
 
 ## 协议契约
 
-`src/protocol.ts` 定义：
+`src/protocol/` 定义：
 
 - `ProtocolMethod` 中的方法名
 - `ProtocolMethods` 中的请求和响应类型

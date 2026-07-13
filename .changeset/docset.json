@@ -1,12 +1,14 @@
 {
   "version": 1,
   "reviewedCommit": "50fc2974ad9131852aae6ab76f1e42083994d639",
-  "updatedAt": "2026-07-12",
+  "updatedAt": "2026-07-13",
   "surfaces": [
     "docs",
     "README.md",
     "README_zh.md",
     "packages/*/README.md",
-    "packages/*/README_zh.md"
+    "packages/*/README_zh.md",
+    "packages/generator/jsx/types/extendscript/README.md",
+    "skills"
   ]
 }

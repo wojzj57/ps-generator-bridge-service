@@ -12,7 +12,8 @@ If it does not return `{ "status": "ok" }`, verify that the generator package wa
 
 ## Missing WebSocket in Node
 
-Node 18-21 do not provide a global `WebSocket`. Inject one:
+If the Node runtime does not provide a global `WebSocket` (for example,
+Node 18), inject one:
 
 ```ts
 import { Connection } from "@ps-generator-bridge/sdk";

@@ -103,7 +103,8 @@ ps-generator-bridge setup-generator-settings -pref "C:\settings\MachinePrefs.psp
 
 ### `setup-core`
 
-克隆或更新 Adobe `generator-core`，并在该目录中执行 `npm install`。
+克隆或更新 Adobe `generator-core`，并在该目录中执行 `npm install`。如果
+`node_modules` 已存在则跳过安装；传入 `--update` 会拉取最新代码并强制重新安装。
 
 在 pnpm workspace 内运行时，`generator-core` 存放在：
 
@@ -111,11 +112,11 @@ ps-generator-bridge setup-generator-settings -pref "C:\settings\MachinePrefs.psp
 <workspace-root>/generator-core
 ```
 
-不在 pnpm workspace 内运行时，回退到：
+不在 pnpm workspace 内运行时，回退到稳定的用户缓存目录：
 
-```text
-<system-temp>/ps-generator-bridge/generator-core
-```
+- Windows：`%LOCALAPPDATA%\ps-generator-bridge\generator-core`
+- macOS：`~/Library/Caches/ps-generator-bridge/generator-core`
+- Linux：`$XDG_CACHE_HOME/ps-generator-bridge/generator-core`（未设置时使用 `~/.cache`）
 
 ### `run`
 
@@ -132,6 +133,15 @@ ps-generator-bridge run --plugin ./my-plugin --expect-plugin myPlugin --password
 ```bash
 $env:PS_GENERATOR_REMOTE_PASSWORD="custom12"
 ps-generator-bridge dev --plugins-dir ./plugins --port 7700
+```
+
+### `clean`
+
+删除用户缓存目录中的 `generator-core` clone。在 pnpm workspace 内运行时不会删除
+由 `pnpm setup` 管理的 workspace 副本。
+
+```bash
+ps-generator-bridge clean
 ```
 
 ## 插件输入

@@ -22,7 +22,11 @@ PS Generator Bridge Service is a monorepo for exposing Photoshop Generator capab
 - `@ps-generator-bridge/generator` is the Photoshop Generator plugin loaded by Adobe `generator-core`.
 - `@ps-generator-bridge/cli` provides command-line tools, including a Windows smoke harness for real Photoshop and `generator-core`.
 
-The generator package depends on the SDK contract type-only. Keep protocol changes in `packages/sdk/src/protocol/` and `ProtocolMethods` first, then implement the server behavior in `packages/generator`.
+The published generator package has no runtime dependency on the SDK package:
+its build aliases and inlines the SDK protocol and plugin-authoring source, while
+plugin-facing generator contracts cross back into the SDK as type-only exports.
+Keep protocol changes in `packages/sdk/src/protocol/` and `ProtocolMethods`
+first, then implement the server behavior in `packages/generator`.
 
 ## Packages
 
@@ -56,6 +60,7 @@ pnpm typecheck
 pnpm test
 pnpm format
 pnpm pack:check
+pnpm docs:build
 ```
 
 Use package filters for focused work:
@@ -101,11 +106,13 @@ MCP is not implemented in the current version.
 
 ## Environment Variables
 
-| Variable                | Purpose                                                                                 |
-| ----------------------- | --------------------------------------------------------------------------------------- |
-| `PS_BRIDGE_PORT`        | Overrides the generator WebSocket/HTTP port.                                            |
-| `PS_BRIDGE_PLUGINS_DIR` | Directory of external plugin packages to load.                                          |
-| `PS_BRIDGE_COS_*`       | Enables optional Tencent Cloud COS upload support when all required fields are present. |
+| Variable                       | Purpose                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------------- |
+| `PS_BRIDGE_PORT`               | Overrides the generator WebSocket/HTTP port.                                            |
+| `PS_BRIDGE_PLUGINS_DIR`        | Directory of external plugin packages to load.                                          |
+| `PS_BRIDGE_LOG_DIR`            | Directory for generator runtime logs.                                                   |
+| `PS_BRIDGE_COS_*`              | Enables optional Tencent Cloud COS upload support when all required fields are present. |
+| `PS_GENERATOR_REMOTE_PASSWORD` | Remote Connections password used by CLI Photoshop setup/settings, run, and dev.         |
 
 Structured runtime options such as `port` and `pluginsDir` should flow through `PluginConfig`; environment variables are deployment overrides.
 
