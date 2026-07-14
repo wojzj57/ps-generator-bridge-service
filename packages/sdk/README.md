@@ -98,7 +98,8 @@ const connection = new Connection({
 - `Connection` is the current public client facade. It manages reconnects, stable `clientId`, request correlation, events, JSX execution, and built-in modules.
 - `new Connection()` connects to the default root service URL, `new Connection(options)` accepts a root service URL, `new Connection(pluginId)` connects to a plugin endpoint, and `new Connection(pluginId, options)` combines both.
 - `connection.endpoint` reports whether the connection targets the root endpoint or a plugin endpoint.
-- `connection.clientId` exposes the server-assigned client id after the handshake.
+- `connection.clientId` exposes the server-assigned client id after the handshake; pass a previously stored id as `options.resume` to restore it after a process restart.
+- `connection.reconnect()` replaces the socket while preserving the logical session. `connection.close()` is terminal and disposes the server session.
 - `Connection.status()` queries `/health`; `Connection.plugins()` queries `/plugins`; `Connection.pluginHealth(id)` queries `/plugins/{id}/health`.
 - `openPhotoshopOnLightBox()` checks `/health` and opens the LightBox Photoshop entry page only when the bridge server is not healthy.
 - `connection.on()`, `connection.once()`, and `connection.off()` subscribe and unsubscribe server events through the protocol.
@@ -107,12 +108,14 @@ const connection = new Connection({
 - `RawConnection` exposes lower-level typed `invoke()` and event subscription.
 - `PsBridgeClient` is retained for compatibility and is deprecated in favor of `Connection`.
 - `createWebSocketTransport` and `Transport` are the injected transport seam used by tests and custom runtimes.
+- `ConnectionInterruptedError` identifies requests that were sent but lost their transport before a response; these requests are never replayed automatically.
 - `@ps-generator-bridge/sdk/plugin` exports plugin authoring primitives (`BasePlugin`, `ws`, `api`, `bootstrap`) and type-only host contracts.
 
 Breaking changes from the old facade:
 
 - `options.url` is now the service base URL, for example `ws://127.0.0.1:7700`; the SDK appends `/ws` or `/ws/{pluginId}`.
 - `connection.id` was removed. Use `connection.clientId`.
+- Caller-selected `options.clientId` was removed. Persist a server-issued id and pass it as `options.resume`; `RawConnection.id` is now `RawConnection.clientId`.
 - `connection.plugin` was removed. Use `Connection.plugins()` for discovery and `new Connection(pluginId)` for plugin endpoint calls.
 
 ## Protocol Contract

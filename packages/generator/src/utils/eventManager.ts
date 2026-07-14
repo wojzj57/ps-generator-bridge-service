@@ -3,7 +3,7 @@ import { MAIN_EVENTS, type MainEventMap, type MainEventName } from "@ps-generato
 import type { SubscribableDisposer, SubscribableProducer } from "@ps-generator-bridge/sdk/plugin";
 import { bridgeError } from "../errors";
 import type { PsGenerator } from "../types/generator";
-import type { ClientStore } from "./clientStore";
+import type { SessionStore } from "../server/connectionSession";
 
 // Photoshop event contract (RFC 0003). The generator owns these payload shapes
 // (they are our own protocol JSON, not Adobe PS DOM objects); the SDK re-exports
@@ -267,7 +267,7 @@ export type EventEndpointScope =
 export interface RemoteEventSubscription {
   scope: EventEndpointScope;
   clientId: string;
-  clients: ClientStore;
+  sessions: SessionStore;
   type: string;
 }
 
@@ -352,7 +352,7 @@ export class RuntimeEventManager {
     const release = await this.retainSubscribable(options.type);
     let subscribed = false;
     try {
-      subscribed = options.clients.subscribe(options.clientId, options.type, () => {
+      subscribed = options.sessions.subscribe(options.clientId, options.type, () => {
         const unbind = this.bindRemote(options, target);
         return () => {
           unbind();
@@ -365,7 +365,7 @@ export class RuntimeEventManager {
   }
 
   unsubscribeRemote(options: RemoteEventSubscription): void {
-    options.clients.unsubscribe(options.clientId, options.type);
+    options.sessions.unsubscribe(options.clientId, options.type);
   }
 
   emitMain<K extends MainEventName>(type: K, payload: MainEventMap[K]): boolean {
@@ -449,7 +449,7 @@ export class RuntimeEventManager {
     target: EventScope | EventManager
   ): () => void {
     const listener = (payload: unknown) =>
-      options.clients.emit(options.clientId, options.type, payload);
+      options.sessions.emit(options.clientId, options.type, payload);
     onRuntimeTarget(target, options.type, listener);
     return () => offRuntimeTarget(target, options.type, listener);
   }

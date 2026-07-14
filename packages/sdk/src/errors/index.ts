@@ -6,6 +6,18 @@ export interface PsBridgeErrorContext {
   pluginId?: string;
 }
 
+/**
+ * A request was written to a transport that disconnected before its response
+ * arrived. The server-side operation may already have completed, so callers
+ * must decide whether the specific method is safe to retry.
+ */
+export class ConnectionInterruptedError extends Error {
+  constructor(message = "Connection interrupted before the request completed") {
+    super(message);
+    this.name = "ConnectionInterruptedError";
+  }
+}
+
 export class PsBridgeError extends Error {
   readonly code: string;
   readonly details?: Record<string, unknown>;

@@ -1,4 +1,5 @@
 import { ProtocolMethod } from "../protocol";
+import { ConnectionInterruptedError } from "../errors";
 
 type EventListener = (data: unknown) => void;
 
@@ -108,9 +109,11 @@ export class SubscriptionManager {
           this.activeSubscriptions.add(type);
         }
       })
-      .catch((error) =>
-        console.warn(`event subscribe failed for ${type}: ${(error as Error).message}`)
-      )
+      .catch((error) => {
+        if (!(error instanceof ConnectionInterruptedError)) {
+          console.warn(`event subscribe failed for ${type}: ${(error as Error).message}`);
+        }
+      })
       .finally(() => {
         if (this.pendingSubscriptions.get(type) === pendingToken) {
           this.pendingSubscriptions.delete(type);
@@ -121,10 +124,10 @@ export class SubscriptionManager {
   private unsubscribe(type: string): void {
     this.activeSubscriptions.delete(type);
     this.pendingSubscriptions.delete(type);
-    void this.transport
-      .invoke(ProtocolMethod.EventUnsubscribe, { type })
-      .catch((error) =>
-        console.warn(`event unsubscribe failed for ${type}: ${(error as Error).message}`)
-      );
+    void this.transport.invoke(ProtocolMethod.EventUnsubscribe, { type }).catch((error) => {
+      if (!(error instanceof ConnectionInterruptedError)) {
+        console.warn(`event unsubscribe failed for ${type}: ${(error as Error).message}`);
+      }
+    });
   }
 }

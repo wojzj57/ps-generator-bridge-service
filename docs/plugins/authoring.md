@@ -76,10 +76,23 @@ if (this.plugin.cos) {
 
 ## Lifecycle
 
+An `@ws` handler may accept a second, platform-neutral context argument:
+
+```ts
+import type { WsHandlerContext } from "@ps-generator-bridge/sdk/plugin";
+
+@ws("paint:run")
+run(params: unknown, context: WsHandlerContext): unknown {
+  return { clientId: context.clientId, endpoint: context.session.endpoint };
+}
+```
+
+`context.session` exposes only `clientId` and endpoint metadata. The raw socket remains generator-internal.
+
 ```ts
 onConnect(clientId: string): void {}
 onDisconnect(clientId: string): void {}
 onDispose?(): void | Promise<void>;
 ```
 
-`onConnect` runs after a client handshakes with the plugin endpoint. `onDisconnect` runs after that client socket is removed. `onDispose` runs during host shutdown before event resources are disposed.
+`onConnect` runs once for a fresh logical session. An unexpected socket loss keeps the session resumable for 30 minutes by default, so it does not run `onDisconnect`; a successful resume also runs neither hook. `onDisconnect` runs after an explicit SDK `close()` or resume TTL expiry. `onDispose` runs during host shutdown before event resources are disposed.

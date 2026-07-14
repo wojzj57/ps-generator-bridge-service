@@ -62,4 +62,6 @@ if (isRetryableBridgeError(error)) {
 
 `ready()` rejects if reconnect attempts are exhausted or the connection is closed.
 
+An in-flight request rejects with `ConnectionInterruptedError` when its transport drops or is manually replaced before a response arrives. The request is never replayed automatically because the server-side operation may already have completed.
+
 `Connection.status()` is different from WebSocket calls: it catches fetch, HTTP, and malformed response failures and returns `{ ok: false, error }`.

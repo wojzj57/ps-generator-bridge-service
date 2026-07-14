@@ -54,20 +54,22 @@ export interface PluginConfig {
   maxImportImagePixels?: number;
   allowedImportImageFormats?: string[];
   allowLocalImagePaths?: boolean;
+  sessionResumeTtlMs?: number;
   [key: string]: unknown;
 }
 ```
 
 Environment overrides:
 
-| Variable                    | Purpose                                                                                |
-| --------------------------- | -------------------------------------------------------------------------------------- |
-| `PS_BRIDGE_PORT`            | Overrides `PluginConfig.port`.                                                         |
-| `PS_BRIDGE_PLUGINS_DIR`     | Overrides the default plugin directory when `pluginsDir` is not provided.              |
-| `PS_BRIDGE_LOG_DIR`         | Overrides the package-local runtime log directory.                                     |
-| `PS_BRIDGE_COS_*`           | Enables optional COS-backed image upload when all required credentials are configured. |
-| `PS_BRIDGE_COS_KEY_PREFIX`  | Overrides the COS object key prefix.                                                   |
-| `PS_BRIDGE_COS_URL_EXPIRES` | Overrides the signed COS URL lifetime in seconds.                                      |
+| Variable                          | Purpose                                                                                |
+| --------------------------------- | -------------------------------------------------------------------------------------- |
+| `PS_BRIDGE_PORT`                  | Overrides `PluginConfig.port`.                                                         |
+| `PS_BRIDGE_PLUGINS_DIR`           | Overrides the default plugin directory when `pluginsDir` is not provided.              |
+| `PS_BRIDGE_LOG_DIR`               | Overrides the package-local runtime log directory.                                     |
+| `PS_BRIDGE_SESSION_RESUME_TTL_MS` | Overrides the session resume TTL in milliseconds.                                      |
+| `PS_BRIDGE_COS_*`                 | Enables optional COS-backed image upload when all required credentials are configured. |
+| `PS_BRIDGE_COS_KEY_PREFIX`        | Overrides the COS object key prefix.                                                   |
+| `PS_BRIDGE_COS_URL_EXPIRES`       | Overrides the signed COS URL lifetime in seconds.                                      |
 
 `main.js` loads the package-local `.env` file before requiring the bundled
 plugin entry, so these overrides are available during host construction.
@@ -85,7 +87,7 @@ Prefer `PluginConfig` for structured run parameters. Use environment variables f
 | `WS /ws`                   | Root SDK protocol endpoint.                                                     |
 | `WS /ws/:pluginId`         | Plugin-scoped protocol endpoint with scoped-first dispatch and global fallback. |
 
-The first WebSocket frame sent by the server is a `connected` event containing `clientId`. Clients reuse that id through `?id=` on reconnect.
+The first WebSocket frame sent by the server is a `connected` event containing a server-issued `clientId`. Clients resume through `?resume={clientId}`. Missing, unknown, expired, or malformed resume ids create a new session without an error. Unexpected disconnects remain resumable for 30 minutes by default; an explicit SDK `close()` disposes the session immediately.
 
 ## Built-in Capabilities
 

@@ -7,8 +7,9 @@ import {
   parseFrame,
   isEvent,
   type ProtocolError,
+  SessionCloseCode,
 } from "../protocol";
-import { PsBridgeError } from "../errors";
+import { ConnectionInterruptedError, PsBridgeError } from "../errors";
 import { RequestTracker } from "./requestTracker";
 import { type Transport, createWebSocketTransport } from "./transport";
 
@@ -29,8 +30,8 @@ export interface RawConnectionOptions {
   maxRetries?: number;
   /** Delay between reconnect attempts in ms (default 5000). */
   retryDelayMs?: number;
-  /** Optional initial clientId to request via ?id= on first connect. */
-  clientId?: string;
+  /** Server-issued clientId to resume. Unknown or expired ids create a new session. */
+  resume?: string;
 }
 
 type EventListener = (data: unknown) => void;
@@ -57,9 +58,10 @@ export class RawConnection {
   private readonly listeners = new Map<string, Set<EventListener>>();
 
   private transport: Transport | undefined;
-  private clientId: string | undefined;
+  private assignedClientId: string | undefined;
+  private resumeId: string | undefined;
   private attempts = 0;
-  private state: "connecting" | "ready" | "failed" = "connecting";
+  private state: "connecting" | "ready" | "failed" | "closed" = "connecting";
   private failError: Error | undefined;
   private readyWaiters: ReadyWaiter[] = [];
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -68,22 +70,50 @@ export class RawConnection {
     this.maxRetries = options.maxRetries ?? 5;
     this.retryDelayMs = options.retryDelayMs ?? 5_000;
     this.requests = new RequestTracker(options.timeoutMs ?? 10_000);
-    this.clientId = options.clientId;
+    this.resumeId = options.resume;
     this.connect();
   }
 
   /** The clientId assigned by the server (undefined until the first handshake). */
-  get id(): string | undefined {
-    return this.clientId;
+  get clientId(): string | undefined {
+    return this.assignedClientId;
   }
 
   /** Resolves once connected (handshake received); rejects if retries are exhausted. */
   ready(): Promise<void> {
     if (this.state === "ready") return Promise.resolve();
-    if (this.state === "failed") return Promise.reject(this.failError);
+    if (this.state === "failed" || this.state === "closed") {
+      return Promise.reject(this.failError);
+    }
     return new Promise<void>((resolve, reject) => {
       this.readyWaiters.push({ resolve, reject });
     });
+  }
+
+  /**
+   * Replace the current socket, resume the same logical session, and wait for
+   * the next server handshake. Calls made while connecting join that attempt.
+   */
+  reconnect(): Promise<void> {
+    if (this.state === "closed") {
+      return Promise.reject(this.failError ?? new Error("Connection closed"));
+    }
+    if (this.state === "connecting") return this.ready();
+
+    this.attempts = 0;
+    this.failError = undefined;
+    this.state = "connecting";
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = undefined;
+    }
+
+    this.requests.failAll(new ConnectionInterruptedError());
+    const previous = this.transport;
+    this.transport = undefined;
+    previous?.close();
+    this.connect();
+    return this.ready();
   }
 
   /** Fetch the server's identity + (when connected to PS) its Photoshop version. */
@@ -121,14 +151,15 @@ export class RawConnection {
 
   /** Close the connection: stop reconnecting and reject all in-flight work. */
   close(): void {
-    if (this.state === "failed") return;
+    if (this.state === "closed") return;
     if (this.retryTimer) clearTimeout(this.retryTimer);
-    this.fail(new Error("Connection closed"));
-    this.transport?.close();
+    this.retryTimer = undefined;
+    this.fail(new Error("Connection closed"), "closed");
+    this.transport?.close(SessionCloseCode.Dispose, "session-dispose");
   }
 
   private connect(): void {
-    if (this.state === "failed") return;
+    if (this.state === "failed" || this.state === "closed") return;
     const url = this.buildUrl();
     const transport = this.options.transportFactory
       ? this.options.transportFactory(url)
@@ -141,15 +172,21 @@ export class RawConnection {
       settled = true;
       if (this.transport === transport) this.handleDrop();
     };
-    transport.onMessage((data) => this.handleMessage(data));
+    transport.onMessage((data) => {
+      if (this.transport === transport) this.handleMessage(data);
+    });
     transport.onClose(onDead);
     transport.ready().then(() => undefined, onDead);
   }
 
   private buildUrl(): string {
-    if (!this.clientId) return this.options.url;
-    const sep = this.options.url.includes("?") ? "&" : "?";
-    return `${this.options.url}${sep}id=${encodeURIComponent(this.clientId)}`;
+    const resume = this.assignedClientId ?? this.resumeId;
+    const url = new URL(this.options.url);
+    url.searchParams.delete("id");
+    url.searchParams.delete("clientId");
+    url.searchParams.delete("resume");
+    if (resume) url.searchParams.set("resume", resume);
+    return url.toString();
   }
 
   private handleMessage(data: string): void {
@@ -165,7 +202,8 @@ export class RawConnection {
     }
     if (isEvent(message)) {
       if (message.type === "connected") {
-        this.clientId = (message.data as { clientId: string }).clientId;
+        this.assignedClientId = (message.data as { clientId: string }).clientId;
+        this.resumeId = this.assignedClientId;
         this.attempts = 0; // a successful handshake refills the retry budget
         this.markReady();
       }
@@ -176,7 +214,8 @@ export class RawConnection {
   }
 
   private handleDrop(): void {
-    if (this.state === "failed") return;
+    if (this.state === "failed" || this.state === "closed") return;
+    this.requests.failAll(new ConnectionInterruptedError());
     this.transport = undefined;
     this.state = "connecting"; // queued + future invokes wait for the next handshake
     if (this.attempts >= this.maxRetries) {
@@ -195,8 +234,8 @@ export class RawConnection {
     for (const waiter of waiters) waiter.resolve();
   }
 
-  private fail(error: Error): void {
-    this.state = "failed";
+  private fail(error: Error, state: "failed" | "closed" = "failed"): void {
+    this.state = state;
     this.failError = error;
     const waiters = this.readyWaiters.splice(0);
     for (const waiter of waiters) waiter.reject(error);

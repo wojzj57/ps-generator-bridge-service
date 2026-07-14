@@ -7,6 +7,8 @@ import type { Transport } from "../src/connection/transport";
 export class FakeTransport implements Transport {
   readonly sent: string[] = [];
   closed = false;
+  closeCode: number | undefined;
+  closeReason: string | undefined;
   private listener: ((data: string) => void) | undefined;
   private closeListener: (() => void) | undefined;
 
@@ -26,8 +28,10 @@ export class FakeTransport implements Transport {
     this.closeListener = listener;
   }
 
-  close(): void {
+  close(code?: number, reason?: string): void {
     this.closed = true;
+    this.closeCode = code;
+    this.closeReason = reason;
     this.closeListener?.();
   }
 

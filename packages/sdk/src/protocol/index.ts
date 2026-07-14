@@ -7,3 +7,4 @@ export * from "./methods";
 export * from "./errors";
 export * from "./envelopes";
 export * from "./frames";
+export * from "./session";

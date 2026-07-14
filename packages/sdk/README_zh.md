@@ -77,7 +77,8 @@ const connection = new Connection({
 - `Connection` 是当前推荐的客户端门面，负责重连、稳定 `clientId`、请求关联、事件、JSX 执行和内置模块。
 - `new Connection()` 连接默认 root 服务 URL，`new Connection(options)` 接收 root 服务 URL，`new Connection(pluginId)` 连接插件 endpoint，`new Connection(pluginId, options)` 同时指定两者。
 - `connection.endpoint` 表示当前连接指向 root endpoint 还是插件 endpoint。
-- `connection.clientId` 在握手后暴露服务端分配的 client id。
+- `connection.clientId` 在握手后暴露服务端分配的 client id；跨进程重启时，可自行保存并通过 `options.resume` 传回。
+- `connection.reconnect()` 会替换 socket 并保留逻辑会话。`connection.close()` 是终止操作，会销毁服务端会话。
 - `Connection.status()` 查询 `/health`；`Connection.plugins()` 查询 `/plugins`；`Connection.pluginHealth(id)` 查询 `/plugins/{id}/health`。
 - `connection.on()`、`connection.once()`、`connection.off()` 通过协议订阅和取消订阅服务端事件。
 - 插件私有 API 通过插件 endpoint 连接上的 `connection.invoke(...)` 调用。
@@ -85,12 +86,14 @@ const connection = new Connection({
 - `RawConnection` 提供更底层的强类型 `invoke()` 和事件订阅。
 - `PsBridgeClient` 为兼容旧调用方保留，已废弃，推荐迁移到 `Connection`。
 - `createWebSocketTransport` 和 `Transport` 是测试与自定义运行时使用的传输层 seam。
+- `ConnectionInterruptedError` 表示请求已发出，但在收到响应前 transport 中断；SDK 不会自动重放此类请求。
 - `@ps-generator-bridge/sdk/plugin` 导出插件开发原语（`BasePlugin`、`ws`、`api`、`bootstrap`）以及 type-only 的宿主契约。
 
 旧门面的 breaking changes：
 
 - `options.url` 现在是服务 base URL，例如 `ws://127.0.0.1:7700`；SDK 会追加 `/ws` 或 `/ws/{pluginId}`。
 - `connection.id` 已移除。请使用 `connection.clientId`。
+- 可由调用方指定的 `options.clientId` 已移除。请保存服务端签发的 id，并通过 `options.resume` 传回；`RawConnection.id` 已改为 `RawConnection.clientId`。
 - `connection.plugin` 已移除。发现插件用 `Connection.plugins()`，调用插件 endpoint 用 `new Connection(pluginId)`。
 
 ## 协议契约

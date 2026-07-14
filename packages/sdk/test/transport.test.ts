@@ -10,6 +10,8 @@ class FakeWS {
   readyState = FakeWS.CONNECTING;
   readonly sent: string[] = [];
   closeCalls = 0;
+  closeCode: number | undefined;
+  closeReason: string | undefined;
   private handlers: Record<string, (event: unknown) => void> = {};
 
   constructor(public readonly url: string) {
@@ -19,8 +21,10 @@ class FakeWS {
   send(data: string): void {
     this.sent.push(data);
   }
-  close(): void {
+  close(code?: number, reason?: string): void {
     this.closeCalls += 1;
+    this.closeCode = code;
+    this.closeReason = reason;
     this.readyState = FakeWS.CLOSED;
   }
   addEventListener(type: string, cb: (event: unknown) => void): void {
@@ -77,12 +81,14 @@ describe("createWebSocketTransport", () => {
     }
     const transport = createWebSocketTransport("ws://x", Capturing as unknown as typeof WebSocket);
 
-    transport.close();
+    transport.close(4000, "dispose");
     transport.close();
     expect(socket?.closeCalls).toBe(0);
 
     await transport.ready();
     expect(socket?.closeCalls).toBe(1);
+    expect(socket?.closeCode).toBe(4000);
+    expect(socket?.closeReason).toBe("dispose");
   });
 
   it("closes immediately when already open", async () => {

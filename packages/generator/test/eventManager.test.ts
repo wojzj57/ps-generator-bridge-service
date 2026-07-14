@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EventManager, RuntimeEventManager } from "../src/utils/eventManager";
-import { ClientStore } from "../src/utils/clientStore";
+import { SessionStore } from "../src/server/connectionSession";
 import { fakeGenerator } from "./fakeGenerator";
 
 describe("RuntimeEventManager", () => {
@@ -33,10 +33,10 @@ describe("RuntimeEventManager", () => {
 
   it("awaits remote event watchers before binding the subscription", async () => {
     const runtime = new RuntimeEventManager(new EventManager(fakeGenerator()));
-    const clients = new ClientStore();
     const order: string[] = [];
     const socket = { send() {} };
-    clients.add("client-1", socket as never);
+    const sessions = new SessionStore({ endpoint: { kind: "root" }, events: runtime });
+    const clientId = sessions.connect(undefined, socket).session.clientId;
 
     runtime.registerRemoteWatcher("selection:changed", async () => {
       order.push("watch:start");
@@ -46,8 +46,8 @@ describe("RuntimeEventManager", () => {
 
     await runtime.subscribeRemote({
       scope: { kind: "root" },
-      clientId: "client-1",
-      clients,
+      clientId,
+      sessions,
       type: "selection:changed",
     });
 
@@ -59,10 +59,10 @@ describe("RuntimeEventManager", () => {
 
   it("shares a subscribable producer across remote subscribers and disposes after the last unsubscribe", async () => {
     const runtime = new RuntimeEventManager(new EventManager(fakeGenerator()));
-    const clients = new ClientStore();
     const socket = { send() {} };
-    clients.add("client-1", socket as never);
-    clients.add("client-2", socket as never);
+    const sessions = new SessionStore({ endpoint: { kind: "root" }, events: runtime });
+    const clientId1 = sessions.connect(undefined, socket).session.clientId;
+    const clientId2 = sessions.connect(undefined, socket).session.clientId;
     let starts = 0;
     let disposes = 0;
 
@@ -75,29 +75,29 @@ describe("RuntimeEventManager", () => {
 
     await runtime.subscribeRemote({
       scope: { kind: "root" },
-      clientId: "client-1",
-      clients,
+      clientId: clientId1,
+      sessions,
       type: "selection:changed",
     });
     await runtime.subscribeRemote({
       scope: { kind: "root" },
-      clientId: "client-2",
-      clients,
+      clientId: clientId2,
+      sessions,
       type: "selection:changed",
     });
 
     expect(starts).toBe(1);
     runtime.unsubscribeRemote({
       scope: { kind: "root" },
-      clientId: "client-1",
-      clients,
+      clientId: clientId1,
+      sessions,
       type: "selection:changed",
     });
     expect(disposes).toBe(0);
     runtime.unsubscribeRemote({
       scope: { kind: "root" },
-      clientId: "client-2",
-      clients,
+      clientId: clientId2,
+      sessions,
       type: "selection:changed",
     });
     expect(disposes).toBe(1);
