@@ -39,7 +39,7 @@ describe("ActionModule", () => {
 
     const res = await registry.dispatch(
       { id: "1", method: ProtocolMethod.ActionAutoCutout, params: {} },
-      { generator }
+      { generator, clientId: "test-client" }
     );
 
     expect(res).toMatchObject({ id: "1", ok: true, result: true });
@@ -55,7 +55,7 @@ describe("ActionModule", () => {
 
     const res = await registry.dispatch(
       { id: "2", method: ProtocolMethod.ActionRemoveBackground, params: {} },
-      { generator }
+      { generator, clientId: "test-client" }
     );
 
     expect(res).toMatchObject({ id: "2", ok: true, result: { success: true } });
@@ -69,7 +69,7 @@ describe("ActionModule", () => {
 
     const res = await registry.dispatch(
       { id: "3", method: ProtocolMethod.ActionAutoCutout, params: {} },
-      { generator }
+      { generator, clientId: "test-client" }
     );
 
     expect(res).toMatchObject({

@@ -8,6 +8,7 @@ import {
   bootstrap,
   type AssemblyTarget,
   type PluginHost,
+  type WsHandlerContext,
   type MethodHandler,
   type ApiRouteSpec,
   type SubscribableProducer,
@@ -43,6 +44,11 @@ class TestPlugin extends BasePlugin {
   @ws("test:echo")
   echo(params: unknown): unknown {
     return params;
+  }
+
+  @ws("test:clientId")
+  clientId(_params: unknown, context: WsHandlerContext): string {
+    return context.clientId;
   }
 
   @api("/thing")
@@ -141,7 +147,9 @@ describe("decorators + bootstrap", () => {
     expect(subscribables.has("test:changed")).toBe(true);
 
     // Handler is bound to the instance.
-    expect(methods.get("test:echo")!({ hi: 1 }, undefined)).toEqual({ hi: 1 });
+    const context = { clientId: "plugin-client" };
+    expect(methods.get("test:echo")!({ hi: 1 }, context)).toEqual({ hi: 1 });
+    expect(methods.get("test:clientId")!({}, context)).toBe("plugin-client");
   });
 
   it("supports @api({ method, url }) for selecting the verb", () => {
@@ -169,7 +177,7 @@ describe("decorators + bootstrap", () => {
     bootstrap(new Other("other", fakeHost), target);
     expect(methods.has("test:echo")).toBe(false);
     expect(methods.has("other:run")).toBe(true);
-    expect(methods.get("other:run")!({}, undefined)).toBe("ok");
+    expect(methods.get("other:run")!({}, { clientId: "plugin-client" })).toBe("ok");
   });
 
   it("includes inherited handlers via the metadata prototype chain", () => {

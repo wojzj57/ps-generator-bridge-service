@@ -6,13 +6,22 @@
  */
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
 
+/** Runtime identity supplied by the server to every WebSocket method handler. */
+export interface WsHandlerContext {
+  /** Stable logical client identity, preserved when the SDK reconnects. */
+  readonly clientId: string;
+}
+
 /**
  * A WS Request handler as seen by the plugin devkit (ADR 0006 open-ended
  * contract). params/result are `unknown` at this layer; the SDK re-applies
- * strong types for declared methods. `ctx` is opaque here — the server supplies
- * a typed HandlerContext, and a handler accepting `unknown` accepts it.
+ * strong types for declared methods. The server supplies the authoritative
+ * connection identity through `ctx.clientId`.
  */
-export type MethodHandler = (params: unknown, ctx: unknown) => Promise<unknown> | unknown;
+export type MethodHandler = (
+  params: unknown,
+  ctx: WsHandlerContext,
+) => Promise<unknown> | unknown;
 
 /**
  * An HTTP route handler as seen by the plugin devkit. request/reply are opaque

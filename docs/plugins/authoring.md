@@ -38,11 +38,20 @@ and the load diagnostic names the folder or reserved id that already claimed it.
 `@ws(name)` registers a WebSocket protocol method in the plugin-scoped registry:
 
 ```ts
+import type { WsHandlerContext } from "@ps-generator-bridge/sdk/plugin";
+
 @ws("paint:createSession")
-createSession(params: { documentId: number }) {
-  return { id: "session-1" };
+createSession(
+  params: { documentId: number },
+  context: WsHandlerContext,
+) {
+  return { id: "session-1", ownerClientId: context.clientId };
 }
 ```
+
+`context.clientId` is the server-authoritative logical client identity. It is
+stable when the SDK reconnects and should be used for per-client ownership and
+isolation. Do not accept a replacement identity in method params.
 
 Plugin endpoint dispatch is scoped-first, then global fallback. A plugin connection can call plugin methods and built-in module methods.
 

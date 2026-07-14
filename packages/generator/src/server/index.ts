@@ -112,7 +112,7 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
         events: runtimeEvents,
         scope: { kind: "root" },
       });
-      const ctx: HandlerContext = { generator, jsx, session };
+      const ctx: HandlerContext = { generator, jsx, session, clientId };
 
       socket.on("message", (data) => {
         void handleRootFrame(socket, String(data), registry, ctx);
@@ -152,7 +152,7 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
         events: runtimeEvents,
         scope: { kind: "plugin", pluginId },
       });
-      const ctx: HandlerContext = { generator, jsx, session };
+      const ctx: HandlerContext = { generator, jsx, session, clientId };
 
       socket.on("message", (data) => {
         void handlePluginFrame(socket, String(data), entry, registry, ctx);

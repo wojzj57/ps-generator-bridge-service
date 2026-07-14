@@ -2,7 +2,14 @@ import { describe, it, expect, afterEach } from "vitest";
 import WebSocket from "ws";
 import { ErrorCode, MainEvent, ProtocolMethod } from "@ps-generator-bridge/sdk";
 import { createServer, type PsBridgeServer } from "../src/server";
-import { BasePlugin, ws, api, bootstrap, type PluginHost } from "@ps-generator-bridge/sdk/plugin";
+import {
+  BasePlugin,
+  ws,
+  api,
+  bootstrap,
+  type PluginHost,
+  type WsHandlerContext,
+} from "@ps-generator-bridge/sdk/plugin";
 import { EventManager, RuntimeEventManager } from "../src/utils/eventManager";
 import { JsxRunner } from "../src/utils/jsxRunner";
 import type { Logger } from "@ps-generator-bridge/sdk/plugin";
@@ -25,6 +32,11 @@ class EchoService extends BasePlugin {
     return { pong: params?.n ?? 0 };
   }
 
+  @ws("echo:clientId")
+  clientId(_params: unknown, context: WsHandlerContext): { clientId: string } {
+    return { clientId: context.clientId };
+  }
+
   @api("/status")
   async status(): Promise<{ ok: true }> {
     return { ok: true };
@@ -41,6 +53,11 @@ class GreetModule {
   @ws("greet")
   greet(params: { name?: string }): { hello: string } {
     return { hello: params?.name ?? "world" };
+  }
+
+  @ws("clientId")
+  clientId(_params: unknown, context: WsHandlerContext): { clientId: string } {
+    return { clientId: context.clientId };
   }
 }
 
@@ -261,6 +278,17 @@ describe("per-plugin server (RFC 0004)", () => {
     expect(clientId).toBe("fixed-123");
   });
 
+  it("passes the authoritative clientId directly to scoped handlers", async () => {
+    const s = await start(echo());
+    const { ws, clientId } = await connect(s.port, "echo");
+    const response = await requestOnce(ws, {
+      id: "client-id",
+      method: "echo:clientId",
+      params: {},
+    });
+    expect(response).toEqual({ id: "client-id", ok: true, result: { clientId } });
+  });
+
   it("dispatches a scoped @ws method on /ws/{id}", async () => {
     const s = await start(echo());
     const { ws } = await connect(s.port, "echo");
@@ -424,6 +452,13 @@ describe("root /ws server", () => {
 
     const greet = await requestOnce(ws, { id: "2", method: "greet", params: { name: "ada" } });
     expect(greet).toEqual({ id: "2", ok: true, result: { hello: "ada" } });
+
+    const identity = await requestOnce(ws, { id: "2b", method: "clientId", params: {} });
+    expect(identity).toEqual({
+      id: "2b",
+      ok: true,
+      result: { clientId: "root-fixed" },
+    });
 
     const scoped = await requestOnce(ws, { id: "3", method: "echo:ping", params: { n: 1 } });
     expect(scoped).toMatchObject({ id: "3", ok: false, error: { code: "UNKNOWN_METHOD" } });

@@ -4,7 +4,7 @@ import {
   type RequestEnvelope,
   type ResponseEnvelope,
 } from "@ps-generator-bridge/sdk";
-import type { MethodHandler } from "@ps-generator-bridge/sdk/plugin";
+import type { MethodHandler, WsHandlerContext } from "@ps-generator-bridge/sdk/plugin";
 import type { PsGenerator } from "../types/generator";
 import type { JsxRunnerApi } from "../utils/jsxRunner";
 import type { EventEndpointScope } from "../utils/eventManager";
@@ -18,7 +18,7 @@ export interface ConnectionSession {
 }
 
 /** What method handlers receive: the injected PS generator + future additions. */
-export interface HandlerContext {
+export interface HandlerContext extends WsHandlerContext {
   generator: PsGenerator;
   jsx?: JsxRunnerApi;
   session?: ConnectionSession;

@@ -51,6 +51,7 @@ export type {
 
 export type {
   AssemblyTarget,
+  WsHandlerContext,
   MethodHandler,
   ApiHandler,
   ApiRouteSpec,

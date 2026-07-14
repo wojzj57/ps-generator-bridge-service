@@ -28,9 +28,12 @@ Plugin authoring subpath:
 
 ```ts
 import { BasePlugin, ws, api, bootstrap } from "@ps-generator-bridge/sdk/plugin";
+import type { WsHandlerContext } from "@ps-generator-bridge/sdk/plugin";
 ```
 
-The plugin subpath exports runtime authoring primitives and type-only host/module/event contracts.
+The plugin subpath exports runtime authoring primitives and type-only
+host/module/event contracts. `WsHandlerContext` exposes the authoritative
+`clientId` supplied to every WebSocket method handler.
 
 ## `@ps-generator-bridge/generator`
 

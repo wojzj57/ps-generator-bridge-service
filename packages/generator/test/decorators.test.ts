@@ -32,7 +32,7 @@ describe("decorators + bootstrap", () => {
     bootstrap(new SampleModule(), registry);
     const res = await registry.dispatch(
       { id: "1", method: "echo", params: { n: 1 } },
-      { generator: fakeGenerator() }
+      { generator: fakeGenerator(), clientId: "test-client" }
     );
     expect(res).toMatchObject({ id: "1", ok: true, result: { echoed: { n: 1 }, via: "hi" } });
   });
@@ -58,7 +58,7 @@ describe("decorators + bootstrap", () => {
     app = Fastify({ logger: false });
     const registry = new Registry(app);
     bootstrap(new Other(), registry);
-    const ctx = { generator: fakeGenerator() };
+    const ctx = { generator: fakeGenerator(), clientId: "test-client" };
     // 'echo' (from SampleModule) must NOT be registered on this registry.
     const echo = await registry.dispatch({ id: "2", method: "echo", params: {} }, ctx);
     expect(echo).toMatchObject({ ok: false, error: { code: "UNKNOWN_METHOD" } });

@@ -126,7 +126,7 @@ describe("LayerModule get info", () => {
         method: ProtocolMethod.LayerGetInfoBySelectionIndex,
         params: { selection: 2, options: { getChildren: true } },
       },
-      { generator }
+      { generator, clientId: "test-client" }
     );
     runtimeEvents.dispose();
     await app.close();
@@ -152,7 +152,7 @@ describe("LayerModule current preview", () => {
 
     const res = await registry.dispatch(
       { id: "preview", method: ProtocolMethod.LayerGetCurrentPreview, params: {} },
-      { generator }
+      { generator, clientId: "test-client" }
     );
     runtimeEvents.dispose();
     await app.close();
@@ -179,7 +179,7 @@ describe("LayerModule current preview", () => {
 
     const res = await registry.dispatch(
       { id: "empty", method: ProtocolMethod.LayerGetCurrentPreview, params: {} },
-      { generator }
+      { generator, clientId: "test-client" }
     );
     runtimeEvents.dispose();
     await app.close();
@@ -328,7 +328,7 @@ describe("LayerModule image import", () => {
           layerId: 11,
         },
       },
-      { generator }
+      { generator, clientId: "test-client" }
     );
     runtimeEvents.dispose();
     await app.close();
@@ -388,7 +388,7 @@ describe("LayerModule image import", () => {
           layerIndex: 2,
         },
       },
-      { generator }
+      { generator, clientId: "test-client" }
     );
     runtimeEvents.dispose();
     await app.close();
@@ -433,7 +433,7 @@ describe("LayerModule image import", () => {
             name: "Local",
           },
         },
-        { generator }
+        { generator, clientId: "test-client" }
       );
       runtimeEvents.dispose();
       await app.close();
@@ -460,7 +460,7 @@ describe("LayerModule image import", () => {
           method: ProtocolMethod.LayerImportImage,
           params: { image: filePath },
         },
-        { generator }
+        { generator, clientId: "test-client" }
       );
       runtimeEvents.dispose();
       await app.close();
@@ -490,7 +490,7 @@ describe("LayerModule image import", () => {
           method: ProtocolMethod.LayerImportImage,
           params: { image: filePath },
         },
-        { generator }
+        { generator, clientId: "test-client" }
       );
       runtimeEvents.dispose();
       await app.close();
@@ -522,7 +522,7 @@ describe("LayerModule image import", () => {
           method: ProtocolMethod.LayerImportImage,
           params: { image: filePath },
         },
-        { generator }
+        { generator, clientId: "test-client" }
       );
       runtimeEvents.dispose();
       await app.close();
@@ -548,7 +548,7 @@ describe("LayerModule image import", () => {
         method: ProtocolMethod.LayerImportImage,
         params: { image: PNG_BASE64 },
       },
-      { generator }
+      { generator, clientId: "test-client" }
     );
     runtimeEvents.dispose();
     await app.close();
@@ -576,7 +576,7 @@ describe("LayerModule image import", () => {
           method: ProtocolMethod.LayerImportImage,
           params: { image: "https://example.com/source.png" },
         },
-        { generator }
+        { generator, clientId: "test-client" }
       );
       runtimeEvents.dispose();
       await app.close();
@@ -610,7 +610,7 @@ describe("LayerModule image import", () => {
           method: ProtocolMethod.LayerImportImage,
           params: { image: "https://example.com/source.png" },
         },
-        { generator }
+        { generator, clientId: "test-client" }
       );
       runtimeEvents.dispose();
       await app.close();
@@ -640,7 +640,7 @@ describe("LayerModule image import", () => {
           layerIndex: 2,
         },
       },
-      { generator }
+      { generator, clientId: "test-client" }
     );
     runtimeEvents.dispose();
     await app.close();

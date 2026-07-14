@@ -43,7 +43,7 @@ describe("SelectionModule", () => {
 
     const res = await registry.dispatch(
       { id: "1", method: ProtocolMethod.SelectionGetArea, params: {} },
-      { generator }
+      { generator, clientId: "test-client" }
     );
     await app.close();
 
@@ -75,7 +75,7 @@ describe("SelectionModule", () => {
 
     const res = await registry.dispatch(
       { id: "2", method: ProtocolMethod.SelectionGetPath, params: { expand: 3 } },
-      { generator }
+      { generator, clientId: "test-client" }
     );
     await app.close();
 
@@ -101,7 +101,7 @@ describe("SelectionModule", () => {
 
     const watched = await registry.dispatch(
       { id: "watch", method: ProtocolMethod.SelectionWatch, params: {} },
-      { generator }
+      { generator, clientId: "test-client" }
     );
     generator._photoshop.emit("message", 1, "setd");
     await waitFor(() => seen.length > 0);

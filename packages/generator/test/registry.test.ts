@@ -44,7 +44,7 @@ describe("Registry.dispatch", () => {
     generator.psVersion = "26.1.0";
     const res = await registry.dispatch(
       { id: "1", method: "getServerInfo", params: {} },
-      { generator }
+      { generator, clientId: "test-client" }
     );
     expect(res).toMatchObject({ id: "1", ok: true });
     if (res && res.ok) {
@@ -59,7 +59,7 @@ describe("Registry.dispatch", () => {
     generator.getPhotoshopVersion = () => Promise.reject(new Error("no PS"));
     const res = await registry.dispatch(
       { id: "2", method: "getServerInfo", params: {} },
-      { generator }
+      { generator, clientId: "test-client" }
     );
     expect(res && res.ok && (res.result as { psVersion?: string }).psVersion).toBeUndefined();
   });
@@ -69,14 +69,14 @@ describe("Registry.dispatch", () => {
     registry.registerMethod("echo", (params) => params);
     const res = await registry.dispatch(
       { id: "3", method: "echo", params: { hi: true } },
-      { generator: fakeGenerator() }
+      { generator: fakeGenerator(), clientId: "test-client" }
     );
     expect(res).toMatchObject({ id: "3", ok: true, result: { hi: true } });
   });
 
   it("scoped registry uses the same method table but preserves miss fallback", async () => {
     const scoped = new ScopedRegistry();
-    const ctx = { generator: fakeGenerator() };
+    const ctx = { generator: fakeGenerator(), clientId: "test-client" };
     expect(
       await scoped.tryDispatch({ id: "s1", method: "missing", params: {} }, ctx)
     ).toBeUndefined();
@@ -96,7 +96,7 @@ describe("Registry.dispatch", () => {
     });
     const res = await registry.dispatch(
       { id: "4", method: "boom", params: {} },
-      { generator: fakeGenerator() }
+      { generator: fakeGenerator(), clientId: "test-client" }
     );
     expect(res).toMatchObject({
       id: "4",
@@ -114,7 +114,7 @@ describe("Registry.dispatch", () => {
     });
     const res = await registry.dispatch(
       { id: "4b", method: "ghost", params: {} },
-      { generator: fakeGenerator() }
+      { generator: fakeGenerator(), clientId: "test-client" }
     );
     expect(res).toMatchObject({
       id: "4b",
@@ -132,7 +132,7 @@ describe("Registry.dispatch", () => {
     });
     const res = await registry.dispatch(
       { id: "4c", method: "odd", params: {} },
-      { generator: fakeGenerator() }
+      { generator: fakeGenerator(), clientId: "test-client" }
     );
     expect(res).toMatchObject({
       id: "4c",
@@ -148,7 +148,7 @@ describe("Registry.dispatch", () => {
     });
     const res = await registry.dispatch(
       { id: "4d", method: "plain", params: {} },
-      { generator: fakeGenerator() }
+      { generator: fakeGenerator(), clientId: "test-client" }
     );
     expect(res).toMatchObject({
       id: "4d",
@@ -164,7 +164,7 @@ describe("Registry.dispatch", () => {
     });
     const res = await registry.dispatch(
       { id: "4e", method: "doc", params: {} },
-      { generator: fakeGenerator() }
+      { generator: fakeGenerator(), clientId: "test-client" }
     );
     expect(res).toMatchObject({
       id: "4e",
@@ -183,14 +183,14 @@ describe("Registry.dispatch", () => {
     const registry = newRegistry();
     const res = await registry.dispatch(
       { id: "5", method: "nope", params: {} },
-      { generator: fakeGenerator() }
+      { generator: fakeGenerator(), clientId: "test-client" }
     );
     expect(res).toMatchObject({ id: "5", ok: false, error: { code: "UNKNOWN_METHOD" } });
   });
 
   it("returns undefined for malformed frames (no id to respond to)", async () => {
     const registry = newRegistry();
-    const ctx = { generator: fakeGenerator() };
+    const ctx = { generator: fakeGenerator(), clientId: "test-client" };
     expect(await registry.dispatch({ method: "getServerInfo" }, ctx)).toBeUndefined();
     expect(await registry.dispatch("garbage", ctx)).toBeUndefined();
     expect(await registry.dispatch(null, ctx)).toBeUndefined();
