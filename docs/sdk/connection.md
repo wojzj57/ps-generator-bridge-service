@@ -43,13 +43,30 @@ Plugin endpoint connection:
 
 ## Client Identity
 
+Callers may provide a stable identity when constructing either a root or plugin
+connection:
+
+```ts
+const root = new Connection({ clientId: "lightbox-editor" });
+const paint = new Connection("paint", { clientId: "lightbox-editor" });
+```
+
 After the server handshake:
 
 ```ts
 connection.clientId;
 ```
 
-The server assigns `clientId` in the first `connected` event. During reconnect, the SDK reuses that id through `?id=` so the server can treat the new socket as the same logical client.
+When no id is supplied, the server assigns one in the first `connected` event.
+During reconnect, the SDK sends the current id through `?clientId=` so the server
+can treat the new socket as the same logical client. The legacy `?id=` spelling
+is still accepted by the server.
+
+Client ids contain 1-128 letters, numbers, or `.`, `:`, `-`, `_` characters.
+They are scoped per endpoint: the same id may be connected to root and multiple
+plugin endpoints at once. Within one endpoint, a new socket with the same id
+takes over the old socket and preserves its event subscriptions. A client id is
+an identity label, not an authentication credential.
 
 `connection.id` is not part of the public `Connection` API.
 
@@ -60,6 +77,18 @@ await connection.ready();
 ```
 
 `ready()` resolves after the `connected` handshake. Calls to `invoke()` wait for readiness and queue across transient reconnects.
+
+## Manual Reconnect
+
+```ts
+await connection.reconnect();
+```
+
+`reconnect()` immediately replaces a ready socket, reuses the current
+`clientId`, waits for the new handshake, and restores event subscriptions. Calls
+made while a connection attempt is already running join that attempt. A manual
+call can recover a connection after automatic retries are exhausted, but cannot
+reopen an instance after `close()`.
 
 ## Closing
 
@@ -81,6 +110,7 @@ connection.once(type, listener);
 connection.off(type, listener);
 connection.getServerInfo();
 connection.ready();
+connection.reconnect();
 connection.close();
 ```
 

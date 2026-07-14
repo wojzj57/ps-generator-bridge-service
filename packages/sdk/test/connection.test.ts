@@ -86,6 +86,68 @@ describe("RawConnection", () => {
     expect(conn.id).toBe("abc");
   });
 
+  it("sends a caller-supplied clientId on the first connection", () => {
+    const { conn, conns } = harness({
+      url: "ws://x/ws?token=secret&id=legacy",
+      clientId: "editor:primary",
+    });
+    const url = new URL(conns[0]!.url);
+
+    expect(url.searchParams.get("clientId")).toBe("editor:primary");
+    expect(url.searchParams.get("id")).toBeNull();
+    expect(url.searchParams.get("token")).toBe("secret");
+    conn.close();
+  });
+
+  it("manually reconnects immediately with the current clientId", async () => {
+    const { conn, conns } = harness();
+    await connected(conn, conns, "stable-client");
+
+    const reconnected = conn.reconnect();
+    expect(conns[0]!.closed).toBe(true);
+    expect(conns).toHaveLength(2);
+    expect(new URL(conns[1]!.url).searchParams.get("clientId")).toBe("stable-client");
+
+    conns[0]!.recv({ type: "connected", data: { clientId: "stale-client" } });
+    expect(conn.id).toBe("stable-client");
+
+    conns[1]!.open();
+    conns[1]!.recv({ type: "connected", data: { clientId: "stable-client" } });
+    await expect(reconnected).resolves.toBeUndefined();
+  });
+
+  it("joins the current connection attempt when reconnect is called while connecting", async () => {
+    const { conn, conns } = harness({ clientId: "stable-client" });
+
+    const first = conn.reconnect();
+    const second = conn.reconnect();
+    expect(conns).toHaveLength(1);
+
+    conns[0]!.open();
+    conns[0]!.recv({ type: "connected", data: { clientId: "stable-client" } });
+    await expect(Promise.all([first, second])).resolves.toEqual([undefined, undefined]);
+  });
+
+  it("lets a manual reconnect recover after automatic retries are exhausted", async () => {
+    const { conn, conns } = harness({ clientId: "stable-client", maxRetries: 0 });
+    const initialReady = conn.ready();
+    conns[0]!.failOpen();
+    await expect(initialReady).rejects.toThrow(/failed after 0 retries/);
+
+    const recovered = conn.reconnect();
+    expect(conns).toHaveLength(2);
+    conns[1]!.open();
+    conns[1]!.recv({ type: "connected", data: { clientId: "stable-client" } });
+    await expect(recovered).resolves.toBeUndefined();
+  });
+
+  it("does not reconnect an explicitly closed instance", async () => {
+    const { conn } = harness({ clientId: "stable-client" });
+    conn.close();
+
+    await expect(conn.reconnect()).rejects.toThrow("Connection closed");
+  });
+
   it("round-trips invoke after the handshake", async () => {
     const { conn, conns } = harness();
     await connected(conn, conns);
@@ -147,7 +209,7 @@ describe("RawConnection", () => {
     const p = conn.invoke("getServerInfo", {}); // queued: state is "connecting"
     await tick(); // retry fires -> conns[1] created
     expect(conns).toHaveLength(2);
-    expect(conns[1]!.url).toContain("id=c1"); // reconnect re-sends the clientId
+    expect(new URL(conns[1]!.url).searchParams.get("clientId")).toBe("c1");
     conns[1]!.open();
     conns[1]!.recv({ type: "connected", data: { clientId: "c1" } });
     await tick(); // ready resolves -> queued invoke sends on conns[1]

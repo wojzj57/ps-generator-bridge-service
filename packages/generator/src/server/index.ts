@@ -99,9 +99,8 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
   app.register(websocket);
   app.register(async (instance) => {
     instance.get("/ws", { websocket: true }, (socket: WebSocket, req) => {
-      const query = req.query as { id?: string } | undefined;
-      const requested = query?.id;
-      const clientId = requested && requested.length > 0 ? requested : randomUUID();
+      const clientId = resolveClientId(socket, req.query);
+      if (!clientId) return;
       rootClients.add(clientId, socket);
       log.info(`client connected: ${clientId} -> root`);
       socket.send(serializeFrame({ type: "connected", data: { clientId } }));
@@ -138,9 +137,8 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
         socket.close();
         return;
       }
-      const query = req.query as { id?: string } | undefined;
-      const requested = query?.id;
-      const clientId = requested && requested.length > 0 ? requested : randomUUID();
+      const clientId = resolveClientId(socket, req.query);
+      if (!clientId) return;
       entry.clients.add(clientId, socket);
       log.info(`client connected: ${clientId} -> plugin ${pluginId}`);
       // First frame after connect is the handshake Event carrying the clientId.
@@ -185,6 +183,27 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
     },
     close: () => app.close(),
   };
+}
+
+const CLIENT_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
+
+function resolveClientId(socket: WebSocket, query: unknown): string | undefined {
+  try {
+    const record =
+      typeof query === "object" && query !== null ? (query as Record<string, unknown>) : {};
+    const requested = record.clientId !== undefined ? record.clientId : record.id;
+    if (requested === undefined || requested === "") return randomUUID();
+    if (typeof requested !== "string" || !CLIENT_ID_PATTERN.test(requested)) {
+      throw bridgeError.badRequest(
+        "clientId must contain 1-128 letters, numbers, or '.', ':', '-', '_' characters"
+      );
+    }
+    return requested;
+  } catch (error) {
+    socket.send(serializeFrame({ type: "error", data: toProtocolError(error) }));
+    socket.close();
+    return undefined;
+  }
 }
 
 async function handleRootFrame(

@@ -34,6 +34,7 @@ import { Connection } from "@ps-generator-bridge/sdk";
 
 const connection = new Connection({
   url: "ws://127.0.0.1:7700",
+  clientId: "lightbox-editor",
 });
 
 await connection.ready();
@@ -44,6 +45,7 @@ connection.on("imageChanged", (event) => {
   console.log(event.id, event.layers);
 });
 
+await connection.reconnect();
 connection.close();
 ```
 
@@ -98,7 +100,8 @@ const connection = new Connection({
 - `Connection` is the current public client facade. It manages reconnects, stable `clientId`, request correlation, events, JSX execution, and built-in modules.
 - `new Connection()` connects to the default root service URL, `new Connection(options)` accepts a root service URL, `new Connection(pluginId)` connects to a plugin endpoint, and `new Connection(pluginId, options)` combines both.
 - `connection.endpoint` reports whether the connection targets the root endpoint or a plugin endpoint.
-- `connection.clientId` exposes the server-assigned client id after the handshake.
+- `options.clientId` requests a caller-owned stable identity; otherwise the server assigns one during the handshake.
+- `connection.clientId` exposes the server-confirmed client id, and `connection.reconnect()` immediately reconnects with that id.
 - `Connection.status()` queries `/health`; `Connection.plugins()` queries `/plugins`; `Connection.pluginHealth(id)` queries `/plugins/{id}/health`.
 - `openPhotoshopOnLightBox()` checks `/health` and opens the LightBox Photoshop entry page only when the bridge server is not healthy.
 - `connection.on()`, `connection.once()`, and `connection.off()` subscribe and unsubscribe server events through the protocol.
@@ -152,14 +155,14 @@ When adding a server capability:
 Use the plugin subpath for external plugin packages:
 
 ```ts
-import { BasePlugin, ws, api } from "@ps-generator-bridge/sdk/plugin";
+import { BasePlugin, ws, api, type WsHandlerContext } from "@ps-generator-bridge/sdk/plugin";
 
 export default class MyPlugin extends BasePlugin {
   static id = "myPlugin";
 
   @ws("myPlugin:ping")
-  ping() {
-    return { ok: true };
+  ping(_params: unknown, context: WsHandlerContext) {
+    return { ok: true, clientId: context.clientId };
   }
 
   changed(data: unknown) {
@@ -170,6 +173,8 @@ export default class MyPlugin extends BasePlugin {
 
 Plugins publish client-visible events with `this.events.emit(...)`. Direct
 `broadcast` / `send` APIs are not part of the plugin authoring surface.
+Every `@ws` handler receives the server-authoritative logical client identity
+as `context.clientId`; use it for reconnect-stable ownership and isolation.
 
 The SDK plugin subpath must stay lightweight and platform-neutral. Do not import Fastify, `ws`, Photoshop Generator internals, COS SDK types, or other Node-only implementation details into the package root.
 

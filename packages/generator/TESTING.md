@@ -44,7 +44,9 @@ RFC 0001 引入的几条新 seam，都在进程内可测、无需 Photoshop：
 - **`@api` / `@ws` 装饰器 + `bootstrap`（ADR 0006）**——`decorators.test.ts` 用一个被装饰的样例类，
   断言 `@ws` 方法经 `dispatch` 命中且绑定到实例（`this`）、`@api` 路由经真 HTTP 命中、且**类之间不串元数据**。
 - **`ClientStore` + Event 推送（ADR 0007）**——`server.test.ts` 用真 `ws` 客户端断言 `/ws` 握手回
-  `connected{clientId}`、`?id=` 接管（旧 socket 被关）、`broadcast` 到全员、`emit` 只到指定 client。
+  `connected{clientId}`、root/plugin handler 收到相同的顶层 `context.clientId`、`?clientId=` 接管
+  （旧 socket 被关且不产生伪 `onDisconnect`）、旧 `?id=` 兼容、endpoint 隔离、`broadcast` 到全员、
+  `emit` 只到指定 client。
 - **端到端（跨包）**——`e2e.test.ts` 用 sdk 的 `Connection`（注入 `ws`）连真 server：握手取 `clientId`、
   `invoke` 内建与 `@ws` 模块方法、订阅并收到 `broadcast` / 定向 `emit`。这是贯穿 protocol → Connection →
   server → Registry → module → Event 的最小垂直切片。

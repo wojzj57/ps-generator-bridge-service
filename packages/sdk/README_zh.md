@@ -27,6 +27,7 @@ import { Connection } from "@ps-generator-bridge/sdk";
 
 const connection = new Connection({
   url: "ws://127.0.0.1:7700",
+  clientId: "lightbox-editor",
 });
 
 await connection.ready();
@@ -37,6 +38,7 @@ connection.on("imageChanged", (event) => {
   console.log(event.id, event.layers);
 });
 
+await connection.reconnect();
 connection.close();
 ```
 
@@ -77,7 +79,8 @@ const connection = new Connection({
 - `Connection` 是当前推荐的客户端门面，负责重连、稳定 `clientId`、请求关联、事件、JSX 执行和内置模块。
 - `new Connection()` 连接默认 root 服务 URL，`new Connection(options)` 接收 root 服务 URL，`new Connection(pluginId)` 连接插件 endpoint，`new Connection(pluginId, options)` 同时指定两者。
 - `connection.endpoint` 表示当前连接指向 root endpoint 还是插件 endpoint。
-- `connection.clientId` 在握手后暴露服务端分配的 client id。
+- `options.clientId` 用于请求调用方指定的稳定身份；未指定时由服务端在握手期间分配。
+- `connection.clientId` 暴露服务端确认的 client id，`connection.reconnect()` 会立即使用该 id 重连。
 - `Connection.status()` 查询 `/health`；`Connection.plugins()` 查询 `/plugins`；`Connection.pluginHealth(id)` 查询 `/plugins/{id}/health`。
 - `connection.on()`、`connection.once()`、`connection.off()` 通过协议订阅和取消订阅服务端事件。
 - 插件私有 API 通过插件 endpoint 连接上的 `connection.invoke(...)` 调用。
@@ -130,17 +133,20 @@ const connection = new Connection({
 外部插件包应使用 plugin subpath：
 
 ```ts
-import { BasePlugin, ws, api } from "@ps-generator-bridge/sdk/plugin";
+import { BasePlugin, ws, api, type WsHandlerContext } from "@ps-generator-bridge/sdk/plugin";
 
 export default class MyPlugin extends BasePlugin {
   static id = "myPlugin";
 
   @ws("myPlugin:ping")
-  ping() {
-    return { ok: true };
+  ping(_params: unknown, context: WsHandlerContext) {
+    return { ok: true, clientId: context.clientId };
   }
 }
 ```
+
+每个 `@ws` handler 都会通过 `context.clientId` 收到服务端确认的逻辑客户端身份；
+需要跨重连保持所有权或隔离数据时应使用这个值。
 
 SDK plugin subpath 必须保持轻量和平台无关。不要把 Fastify、`ws`、Photoshop Generator 内部类型、COS SDK 类型或其他 Node-only 实现细节引入包根入口。
 

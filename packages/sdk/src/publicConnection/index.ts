@@ -93,6 +93,11 @@ export class Connection {
     return this.raw.ready();
   }
 
+  /** Re-establish the socket with the current clientId and wait for the handshake. */
+  reconnect(): Promise<void> {
+    return this.raw.reconnect();
+  }
+
   close(): void {
     this.raw.close();
   }

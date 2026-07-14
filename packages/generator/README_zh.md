@@ -84,7 +84,10 @@ export interface PluginConfig {
 | `WS /ws`                   | 根 SDK 协议端点。                                                 |
 | `WS /ws/:pluginId`         | 插件作用域协议端点，先查 scoped handler，再 fallback 到全局能力。 |
 
-WebSocket 连接建立后，服务端发送的第一帧是包含 `clientId` 的 `connected` 事件。客户端重连时通过 `?id=` 回传该 id。
+WebSocket 连接建立后，服务端发送的第一帧是包含 `clientId` 的 `connected` 事件。客户端通过
+`?clientId=` 指定或复用 id；服务端仍兼容旧的 `?id=`。客户端 id 由 1–128 个字母、数字或
+`.`、`:`、`-`、`_` 字符组成，并按 endpoint 隔离。同一 endpoint 内的新 socket 会接管相同 id
+的旧 socket，同时保留事件订阅。
 
 ## 内置能力
 

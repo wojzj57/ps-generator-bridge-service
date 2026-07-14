@@ -134,9 +134,13 @@ async function startRoot(): Promise<{
 function connect(
   port: number,
   pluginId: string,
-  id?: string
+  clientId?: string
 ): Promise<{ ws: WebSocket; clientId: string }> {
-  const url = `ws://127.0.0.1:${port}/ws/${pluginId}${id ? `?id=${id}` : ""}`;
+  const url = `ws://127.0.0.1:${port}/ws/${pluginId}${clientId ? `?clientId=${clientId}` : ""}`;
+  return connectUrl(url);
+}
+
+function connectUrl(url: string): Promise<{ ws: WebSocket; clientId: string }> {
   const ws = new WebSocket(url);
   openSockets.push(ws);
   return new Promise((resolve, reject) => {
@@ -149,8 +153,12 @@ function connect(
 }
 
 /** Connect to /ws/{pluginId} and resolve the first frame (for error-frame tests). */
-function firstFrame(port: number, pluginId: string): Promise<{ ws: WebSocket; frame: any }> {
-  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws/${pluginId}`);
+function firstFrame(
+  port: number,
+  pluginId: string,
+  query = ""
+): Promise<{ ws: WebSocket; frame: any }> {
+  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws/${pluginId}${query}`);
   openSockets.push(ws);
   return new Promise((resolve) => {
     ws.once("message", (data) => resolve({ ws, frame: JSON.parse(String(data)) }));
@@ -158,17 +166,12 @@ function firstFrame(port: number, pluginId: string): Promise<{ ws: WebSocket; fr
 }
 
 /** Connect to root /ws and resolve once the `connected` handshake arrives. */
-function connectRoot(port: number, id?: string): Promise<{ ws: WebSocket; clientId: string }> {
-  const url = `ws://127.0.0.1:${port}/ws${id ? `?id=${id}` : ""}`;
-  const ws = new WebSocket(url);
-  openSockets.push(ws);
-  return new Promise((resolve, reject) => {
-    ws.once("error", reject);
-    ws.once("message", (data) => {
-      const msg = JSON.parse(String(data));
-      resolve({ ws, clientId: msg.data.clientId });
-    });
-  });
+function connectRoot(
+  port: number,
+  clientId?: string
+): Promise<{ ws: WebSocket; clientId: string }> {
+  const url = `ws://127.0.0.1:${port}/ws${clientId ? `?clientId=${clientId}` : ""}`;
+  return connectUrl(url);
 }
 
 /** Send a request and resolve on its Response (a frame with an `id`), skipping events. */
@@ -285,10 +288,46 @@ describe("per-plugin server (RFC 0004)", () => {
     expect(clientId.length).toBeGreaterThan(0);
   });
 
-  it("honours a client-supplied id via ?id=", async () => {
+  it("honours a client-supplied id via ?clientId=", async () => {
     const s = await start(echo());
     const { clientId } = await connect(s.port, "echo", "fixed-123");
     expect(clientId).toBe("fixed-123");
+  });
+
+  it("accepts legacy ?id= and gives ?clientId= precedence", async () => {
+    const s = await start(echo());
+    const legacy = await connectUrl(`ws://127.0.0.1:${s.port}/ws/echo?id=legacy`);
+    expect(legacy.clientId).toBe("legacy");
+
+    const preferred = await connectUrl(
+      `ws://127.0.0.1:${s.port}/ws/echo?id=legacy&clientId=preferred`
+    );
+    expect(preferred.clientId).toBe("preferred");
+  });
+
+  it("rejects an invalid clientId with a structured handshake error", async () => {
+    const s = await start(echo());
+    const { ws, frame } = await firstFrame(s.port, "echo", "?clientId=bad%20id");
+
+    expect(frame).toMatchObject({
+      type: "error",
+      data: { code: ErrorCode.BadRequest, source: "protocol" },
+    });
+    await new Promise<void>((resolve) => ws.once("close", () => resolve()));
+  });
+
+  it("accepts 128-character clientIds, rejects longer ids, and generates for an empty value", async () => {
+    const s = await start(echo());
+    const maximum = "a".repeat(128);
+    const accepted = await connectUrl(`ws://127.0.0.1:${s.port}/ws/echo?clientId=${maximum}`);
+    expect(accepted.clientId).toBe(maximum);
+
+    const empty = await connectUrl(`ws://127.0.0.1:${s.port}/ws/echo?clientId=`);
+    expect(empty.clientId).not.toBe("");
+
+    const { ws, frame } = await firstFrame(s.port, "echo", `?clientId=${"a".repeat(129)}`);
+    expect(frame).toMatchObject({ type: "error", data: { code: ErrorCode.BadRequest } });
+    await new Promise<void>((resolve) => ws.once("close", () => resolve()));
   });
 
   it("passes the authoritative clientId directly to scoped handlers", async () => {
@@ -470,7 +509,7 @@ describe("per-plugin server (RFC 0004)", () => {
 });
 
 describe("root /ws server", () => {
-  it("handshakes, honors ?id, and dispatches global methods only", async () => {
+  it("handshakes, honors ?clientId, and dispatches global methods only", async () => {
     const { server: s } = await startRoot();
     const { ws, clientId } = await connectRoot(s.port, "root-fixed");
     expect(clientId).toBe("root-fixed");
@@ -494,6 +533,26 @@ describe("root /ws server", () => {
 
     const scoped = await requestOnce(ws, { id: "3", method: "echo:ping", params: { n: 1 } });
     expect(scoped).toMatchObject({ id: "3", ok: false, error: { code: "UNKNOWN_METHOD" } });
+  });
+
+  it("isolates the same clientId across root and plugin endpoints", async () => {
+    const { server: s } = await startRoot();
+    const root = await connectRoot(s.port, "shared-client");
+    const plugin = await connect(s.port, "echo", "shared-client");
+
+    const rootIdentity = await requestOnce(root.ws, {
+      id: "root-client-id",
+      method: "clientId",
+      params: {},
+    });
+    const pluginIdentity = await requestOnce(plugin.ws, {
+      id: "plugin-client-id",
+      method: "echo:clientId",
+      params: {},
+    });
+
+    expect(rootIdentity.result).toEqual({ clientId: "shared-client" });
+    expect(pluginIdentity.result).toEqual({ clientId: "shared-client" });
   });
 
   it("dispatches jsx builtins through the injected JsxRunner", async () => {

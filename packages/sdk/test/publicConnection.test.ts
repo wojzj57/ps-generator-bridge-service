@@ -298,6 +298,42 @@ describe("public Connection", () => {
     expect(conn.id).toBeUndefined();
   });
 
+  it("passes an initial clientId to plugin endpoint connections", () => {
+    let capturedUrl = "";
+    const conn = new Connection("paint", {
+      clientId: "editor:primary",
+      transportFactory: (url) => {
+        capturedUrl = url;
+        return new FakeTransport();
+      },
+    });
+
+    const url = new URL(capturedUrl);
+    expect(url.pathname).toBe("/ws/paint");
+    expect(url.searchParams.get("clientId")).toBe("editor:primary");
+    conn.close();
+  });
+
+  it("manually reconnects with the current clientId and replays subscriptions", async () => {
+    const { conn, transports } = harness("paint", { clientId: "plugin-client-1" });
+    await connect(conn, transports[0]!, "plugin-client-1");
+    conn.on("paint:changed", () => undefined);
+    await flush();
+    respond(transports[0]!, { ok: true });
+
+    const reconnected = conn.reconnect();
+    expect(transports[0]!.closed).toBe(true);
+    expect(transports).toHaveLength(2);
+    await connect(conn, transports[1]!, "plugin-client-1");
+    await expect(reconnected).resolves.toBeUndefined();
+    await flush();
+
+    expect(lastRequest(transports[1]!)).toMatchObject({
+      method: ProtocolMethod.EventSubscribe,
+      params: { type: "paint:changed" },
+    });
+  });
+
   it("exposes direct invoke for typed and custom ws methods", async () => {
     const { conn, transports } = harness();
     const transport = transports[0]!;

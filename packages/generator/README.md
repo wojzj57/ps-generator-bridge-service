@@ -85,7 +85,11 @@ Prefer `PluginConfig` for structured run parameters. Use environment variables f
 | `WS /ws`                   | Root SDK protocol endpoint.                                                     |
 | `WS /ws/:pluginId`         | Plugin-scoped protocol endpoint with scoped-first dispatch and global fallback. |
 
-The first WebSocket frame sent by the server is a `connected` event containing `clientId`. Clients reuse that id through `?id=` on reconnect.
+The first WebSocket frame sent by the server is a `connected` event containing
+`clientId`. Clients request or reuse an id through `?clientId=`; legacy `?id=`
+is also accepted. Client ids contain 1-128 letters, numbers, or `.`, `:`, `-`,
+`_` characters. They are scoped per endpoint, and a new socket with the same id
+takes over the old socket while preserving event subscriptions.
 
 ## Built-in Capabilities
 

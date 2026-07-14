@@ -43,13 +43,26 @@ Root 连接：
 
 ## 客户端身份
 
+调用方可以在创建 root 或插件连接时指定稳定身份：
+
+```ts
+const root = new Connection({ clientId: "lightbox-editor" });
+const paint = new Connection("paint", { clientId: "lightbox-editor" });
+```
+
 服务端握手后：
 
 ```ts
 connection.clientId;
 ```
 
-服务端在第一个 `connected` 事件中分配 `clientId`。重连时，SDK 会通过 `?id=` 复用该 id，让服务端把新 socket 识别为同一个逻辑客户端。
+未指定 id 时，服务端会在第一个 `connected` 事件中分配 `clientId`。重连时，SDK 通过
+`?clientId=` 发送当前 id，让服务端把新 socket 识别为同一个逻辑客户端。服务端仍兼容旧的
+`?id=` 写法。
+
+客户端 id 由 1–128 个字母、数字或 `.`、`:`、`-`、`_` 字符组成，并按 endpoint 隔离：
+同一个 id 可以同时连接 root 和多个插件 endpoint。在同一个 endpoint 内，新 socket 会接管相同
+id 的旧 socket，并保留事件订阅。客户端 id 只是身份标签，不是认证凭据。
 
 `connection.id` 不是公开 `Connection` API。
 
@@ -60,6 +73,16 @@ await connection.ready();
 ```
 
 `ready()` 在收到 `connected` 握手后 resolve。`invoke()` 会等待连接就绪，并在短暂重连期间排队。
+
+## 手动重连
+
+```ts
+await connection.reconnect();
+```
+
+`reconnect()` 会立即替换已就绪的 socket、复用当前 `clientId`、等待新的握手并恢复事件订阅。
+连接过程中的重复调用会等待同一轮连接。自动重试耗尽后可以手动恢复，但 `close()` 后不能重新打开
+同一个实例。
 
 ## 关闭
 
@@ -81,6 +104,7 @@ connection.once(type, listener);
 connection.off(type, listener);
 connection.getServerInfo();
 connection.ready();
+connection.reconnect();
 connection.close();
 ```
 
