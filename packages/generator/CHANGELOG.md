@@ -1,26 +1,5 @@
 # @ps-generator-bridge/generator
 
-## 0.6.0
-
-### Minor Changes
-
-- Breaking Changes
-
-  - Remove caller-selected `?id=` WebSocket identities; clients now resume only with a previously server-issued `clientId` through `?resume=`.
-
-  Features
-
-  1. Add server-issued logical WebSocket sessions with resume takeover, explicit-close disposal, and a configurable unexpected-disconnect TTL.
-  2. Expose platform-neutral client and endpoint session context to plugin WebSocket handlers without leaking the raw socket.
-
-  Fixes
-
-  1. Load plugin packages linked through symlinks or Windows junctions while preserving existing dot-directory and `node_modules` exclusions.
-
-  Documentation
-
-  1. Document session lifecycle hooks, resume behavior, TTL configuration, and handler context in the paired English and Chinese guides.
-
 ## 0.5.0
 
 ### Minor Changes

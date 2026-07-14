@@ -1,31 +1,5 @@
 # @ps-generator-bridge/cli
 
-## 0.3.0
-
-### Minor Changes
-
-- Breaking Changes
-
-  - Remove the CLI `--expect-plugin` option because the harness now validates discovered and loaded plugin counts automatically.
-
-  Features
-
-  1. Add a serialized per-user cache with independent generator runtime selection, staged updates, offline fallback, and automatic stale-lock recovery.
-  2. Add `--plugin-cwd`, direct `--plugins-dir` pass-through, and `--runtime-version` pinning or rollback for setup and harness commands.
-
-  Fixes
-
-  1. Preserve CLI-managed plugin snapshots through symlinks and Windows junctions so the generator loads the selected package without exposing sibling directories.
-
-  Documentation
-
-  1. Document the shared cache layout, locking, offline fallback, cleanup guarantees, and runtime options in the English and Chinese CLI guides.
-
-### Patch Changes
-
-- Updated dependencies
-  - @ps-generator-bridge/sdk@0.6.0
-
 ## 0.2.0
 
 ### Minor Changes
