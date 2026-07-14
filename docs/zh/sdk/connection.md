@@ -110,6 +110,8 @@ const plugins = await Connection.plugins();
 const paintHealth = await Connection.pluginHealth("paint");
 ```
 
+`Connection.pluginHealth(id)` 查询 `GET /plugins/{id}/health`，返回已加载插件的客户端数量，以及插件加载失败时的诊断信息。
+
 LightBox Photoshop 启动能力是独立 helper，不是 `Connection` 方法：
 
 ```ts
