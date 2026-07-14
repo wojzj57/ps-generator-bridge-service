@@ -1,61 +1,125 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { dirname, join, parse, resolve } from "node:path";
+import { satisfies } from "semver";
+import { appRoot, generatorCoreDir, isManagedAppRoot, type PathEnvironment } from "./appPaths";
+import type { RuntimeCache } from "./runtimeManager";
 
 const REPO = "https://github.com/adobe-photoshop/generator-core";
 
-export function generatorCoreDir(): string {
-  const workspaceRoot = findWorkspaceRoot(process.cwd());
-  if (workspaceRoot) return join(workspaceRoot, "generator-core");
-  return join(cacheRoot(), "ps-generator-bridge", "generator-core");
+export { generatorCoreDir } from "./appPaths";
+
+export interface EnsureGeneratorCoreOptions extends PathEnvironment {
+  update: boolean;
 }
 
-export async function ensureGeneratorCore(options: { update: boolean }): Promise<void> {
-  const dir = generatorCoreDir();
+export async function ensureGeneratorCore(options: EnsureGeneratorCoreOptions): Promise<void> {
+  const dir = generatorCoreDir(options);
   mkdirSync(dirname(dir), { recursive: true });
+  warnAboutWorkspaceCopy();
 
-  if (!existsSync(join(dir, ".git"))) {
-    run("git", ["clone", REPO, dir], undefined);
-  } else if (options.update) {
+  if (options.update && existsSync(join(dir, ".git"))) {
     run("git", ["pull", "--ff-only"], dir);
-  }
-
-  if (options.update || !existsSync(join(dir, "node_modules"))) {
     run("npm", ["install"], dir);
-  } else {
-    console.log(
-      "[generator-core] node_modules present; skipping npm install (use --update to refresh)"
+    if (!isGeneratorCoreUsable(dir)) installFreshCore(dir);
+    return;
+  }
+
+  if (isGeneratorCoreUsable(dir)) {
+    console.log("[generator-core] complete cache present; skipping install");
+    return;
+  }
+
+  if (
+    existsSync(join(dir, ".git")) &&
+    existsSync(join(dir, "app.js")) &&
+    !existsSync(join(dir, "node_modules"))
+  ) {
+    run("npm", ["install"], dir);
+    requireUsableCore(dir);
+    return;
+  }
+
+  installFreshCore(dir);
+}
+
+export function isGeneratorCoreUsable(dir: string): boolean {
+  return (
+    existsSync(join(dir, ".git")) &&
+    existsSync(join(dir, "app.js")) &&
+    existsSync(join(dir, "node_modules")) &&
+    existsSync(join(dir, "package.json"))
+  );
+}
+
+export function assertGeneratorCoreCompatibility(runtime: RuntimeCache, coreDir: string): void {
+  const range = runtime["generator-core-version"];
+  if (!range) {
+    throw new Error(
+      `Generator runtime ${runtime.version} does not declare generator-core-version compatibility.`
+    );
+  }
+  const packageJsonPath = join(coreDir, "package.json");
+  let coreVersion: string | undefined;
+  try {
+    const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { version?: unknown };
+    if (typeof pkg.version === "string") coreVersion = pkg.version;
+  } catch {
+    // The actionable error below covers unreadable metadata.
+  }
+  if (!coreVersion) {
+    throw new Error(`Cached generator-core has no readable version: ${packageJsonPath}`);
+  }
+  if (!satisfies(coreVersion, range, { includePrerelease: true })) {
+    throw new Error(
+      `Cached generator-core ${coreVersion} does not satisfy runtime requirement ${range}. Use run/dev --update-core or setup-core --update.`
     );
   }
 }
 
-export function cleanGeneratorCore(): void {
-  if (findWorkspaceRoot(process.cwd())) {
-    console.log(
-      "[generator-core] running inside a workspace; the generator-core clone is managed by `pnpm setup` and was not removed."
-    );
+export function cleanManagedCache(options: PathEnvironment = {}): void {
+  const root = appRoot(options);
+  if (!existsSync(root)) {
+    console.log(`[cache] nothing to clean at ${root}`);
     return;
   }
-
-  const dir = generatorCoreDir();
-  if (!existsSync(dir)) {
-    console.log(`[generator-core] nothing to clean at ${dir}`);
-    return;
+  if (!isManagedAppRoot(options)) {
+    throw new Error(`Refusing to clean an unmanaged directory: ${root}`);
   }
-
-  rmSync(dir, { recursive: true, force: true });
-  console.log(`[generator-core] removed ${dir}`);
+  rmSync(root, { recursive: true, force: true });
+  console.log(`[cache] removed ${root}`);
 }
 
-function cacheRoot(): string {
-  if (process.platform === "win32") {
-    return process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local");
+function installFreshCore(dir: string): void {
+  const parent = dirname(dir);
+  const stage = join(parent, `.generator-core-install-${process.pid}-${Date.now()}`);
+  const backup = join(parent, `.generator-core-backup-${process.pid}-${Date.now()}`);
+  rmSync(stage, { recursive: true, force: true });
+  rmSync(backup, { recursive: true, force: true });
+  let movedCurrent = false;
+  try {
+    run("git", ["clone", "--depth", "1", REPO, stage], undefined);
+    run("npm", ["install"], stage);
+    requireUsableCore(stage);
+    if (existsSync(dir)) {
+      renameSync(dir, backup);
+      movedCurrent = true;
+    }
+    renameSync(stage, dir);
+    rmSync(backup, { recursive: true, force: true });
+  } catch (error) {
+    if (movedCurrent && !existsSync(dir) && existsSync(backup)) renameSync(backup, dir);
+    throw error;
+  } finally {
+    rmSync(stage, { recursive: true, force: true });
+    if (existsSync(dir)) rmSync(backup, { recursive: true, force: true });
   }
-  if (process.platform === "darwin") {
-    return join(homedir(), "Library", "Caches");
+}
+
+function requireUsableCore(dir: string): void {
+  if (!isGeneratorCoreUsable(dir)) {
+    throw new Error(`generator-core installation is incomplete: ${dir}`);
   }
-  return process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache");
 }
 
 function run(command: string, args: string[], cwd: string | undefined): void {
@@ -65,6 +129,17 @@ function run(command: string, args: string[], cwd: string | undefined): void {
     stdio: "inherit",
     shell: process.platform === "win32",
   });
+}
+
+function warnAboutWorkspaceCopy(): void {
+  const workspaceRoot = findWorkspaceRoot(process.cwd());
+  if (!workspaceRoot) return;
+  const legacy = join(workspaceRoot, "generator-core");
+  if (existsSync(legacy)) {
+    console.warn(
+      `[generator-core] ignoring legacy workspace checkout at ${legacy}; remove it manually after verifying the shared cache.`
+    );
+  }
 }
 
 function findWorkspaceRoot(start: string): string | undefined {

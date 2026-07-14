@@ -10,5 +10,5 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   splitting: false,
-  external: ["@ps-generator-bridge/generator", "@ps-generator-bridge/sdk", "ws"],
+  external: ["@ps-generator-bridge/sdk", "ws"],
 });

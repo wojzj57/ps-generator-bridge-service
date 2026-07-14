@@ -11,10 +11,14 @@ export default defineConfig({
       // to the real-machine smoke boundary, not the cross-platform unit suite.
       exclude: [
         "src/cli.ts",
+        "src/appPaths.ts",
         "src/core.ts",
         "src/generatorCore.ts",
+        "src/npm.ts",
+        "src/operationLock.ts",
         "src/photoshop.ts",
         "src/pluginDirs.ts",
+        "src/runtimeManager.ts",
         "src/setup.ts",
         "src/setupPhotoshop.ts",
       ],

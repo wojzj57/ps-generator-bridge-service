@@ -38,12 +38,13 @@
     "clean": "rimraf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@ps-generator-bridge/generator": "workspace:*",
     "@ps-generator-bridge/sdk": "workspace:*",
+    "semver": "^7.7.2",
     "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.5",
+    "@types/semver": "^7.7.0",
     "@types/ws": "^8.5.12",
     "rimraf": "^6.0.1",
     "tsup": "^8.3.5",

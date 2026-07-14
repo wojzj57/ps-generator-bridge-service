@@ -1,5 +1,3 @@
-import { execFileSync } from "node:child_process";
-import { createRequire } from "node:module";
 import {
   cpSync,
   existsSync,
@@ -10,9 +8,12 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import {
+  ensureGeneratorRuntime,
+  GENERATOR_PACKAGE,
+  type RuntimePackageJson,
+} from "./runtimeManager";
 
-const require = createRequire(import.meta.url);
-const GENERATOR_PACKAGE = "@ps-generator-bridge/generator";
 const DEFAULT_INSTALL_DIR = "generator-bridge";
 const RUNTIME_FILES = [
   "dist",
@@ -28,6 +29,7 @@ const MANAGED_ENTRIES = [...RUNTIME_FILES, "node_modules"] as const;
 export interface SetupOptions {
   dir?: string;
   overwriteUnmanaged?: boolean;
+  runtimeVersion?: string;
 }
 
 export interface RuntimeInstallResult {
@@ -37,37 +39,19 @@ export interface RuntimeInstallResult {
 
 export type RuntimeTargetState = "missing" | "empty" | "managed" | "unmanaged";
 
-interface GeneratorPackageJson {
-  name: string;
-  version: string;
-  description?: string;
-  license?: string;
-  homepage?: string;
-  repository?: unknown;
-  bugs?: unknown;
-  keywords?: string[];
-  main?: string;
-  types?: string;
-  exports?: unknown;
-  dependencies?: Record<string, string>;
-  "generator-core-version"?: string;
-}
+type GeneratorPackageJson = RuntimePackageJson;
 
 export function setupGeneratorRuntime(options: SetupOptions = {}): RuntimeInstallResult {
-  const sourceDir = resolveGeneratorPackageDir();
+  const sourceDir = ensureGeneratorRuntime({ version: options.runtimeVersion }).packageDir;
   const sourcePackage = readPackageJson(join(sourceDir, "package.json"));
   const targetDir = resolve(options.dir ?? DEFAULT_INSTALL_DIR);
 
   validateRuntimeFiles(sourceDir);
   prepareRuntimeTarget(targetDir, options.overwriteUnmanaged ?? false);
   copyRuntimeFiles(sourceDir, targetDir, sourcePackage);
-  installProductionDependencies(targetDir);
+  copyRuntimeDependencies(sourceDir, targetDir);
 
   return { targetDir, version: sourcePackage.version };
-}
-
-function resolveGeneratorPackageDir(): string {
-  return resolve(require.resolve(`${GENERATOR_PACKAGE}/package.json`), "..");
 }
 
 function readPackageJson(path: string): GeneratorPackageJson {
@@ -152,43 +136,22 @@ function copyRuntimeFiles(
   writeFileSync(join(targetDir, "package.json"), `${JSON.stringify(runtimePackage, null, 2)}\n`);
 }
 
-function installProductionDependencies(targetDir: string): void {
-  const npmCli = resolveNpmCli();
-  if (npmCli) {
-    execFileSync(
-      process.execPath,
-      [npmCli, "install", "--omit=dev", "--package-lock=false", "--no-audit", "--no-fund"],
-      {
-        cwd: targetDir,
-        stdio: "inherit",
-      }
-    );
-    return;
+export function copyRuntimeDependencies(sourceDir: string, targetDir: string): void {
+  const runtimeRoot = dirname(dirname(dirname(sourceDir)));
+  const sourceNodeModules = join(runtimeRoot, "node_modules");
+  if (!existsSync(sourceNodeModules)) {
+    throw new Error(`Generator runtime cache has no installed dependencies: ${sourceNodeModules}`);
   }
 
-  execFileSync(
-    "npm",
-    ["install", "--omit=dev", "--package-lock=false", "--no-audit", "--no-fund"],
-    {
-      cwd: targetDir,
-      stdio: "inherit",
-    }
-  );
-}
+  const targetNodeModules = join(targetDir, "node_modules");
+  cpSync(sourceNodeModules, targetNodeModules, { recursive: true });
+  rmSync(join(targetNodeModules, "@ps-generator-bridge", "generator"), {
+    recursive: true,
+    force: true,
+  });
 
-function resolveNpmCli(): string | undefined {
-  const npmExecPath = process.env.npm_execpath;
-  if (npmExecPath && /npm-cli\.js$/i.test(npmExecPath) && existsSync(npmExecPath)) {
-    return npmExecPath;
-  }
-
-  const nodeDir = dirname(process.execPath);
-  const bundledNpm = join(nodeDir, "node_modules", "npm", "bin", "npm-cli.js");
-  if (existsSync(bundledNpm)) return bundledNpm;
-
-  try {
-    return require.resolve("npm/bin/npm-cli.js");
-  } catch {
-    return undefined;
+  const nestedDependencies = join(sourceDir, "node_modules");
+  if (existsSync(nestedDependencies)) {
+    cpSync(nestedDependencies, targetNodeModules, { recursive: true });
   }
 }

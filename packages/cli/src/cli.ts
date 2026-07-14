@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs, USAGE } from "./cliArgs";
 import { runClean, runDev, runHarness, setupGeneratorCore } from "./core";
+import { withOperationLock } from "./operationLock";
 import { setupGeneratorRuntime } from "./setup";
 import { setupGeneratorSettings } from "./setupGeneratorSettings";
 import { setupPhotoshop } from "./setupPhotoshop";
@@ -9,19 +10,6 @@ async function main(): Promise<void> {
   const parsed = parseArgs(process.argv.slice(2));
   if (parsed.command === "help") {
     console.log(USAGE);
-    return;
-  }
-  if (parsed.command === "clean") {
-    await runClean();
-    return;
-  }
-  if (parsed.command === "setup") {
-    const result = setupGeneratorRuntime(parsed.options);
-    console.log(`Installed generator runtime ${result.version}: ${result.targetDir}`);
-    return;
-  }
-  if (parsed.command === "setup-photoshop") {
-    await setupPhotoshop(parsed.options);
     return;
   }
   if (parsed.command === "setup-generator-settings") {
@@ -37,15 +25,34 @@ async function main(): Promise<void> {
     }
     return;
   }
-  if (parsed.command === "setup-core") {
-    await setupGeneratorCore({ update: parsed.options.updateCore ?? parsed.options.update });
-    return;
-  }
-  if (parsed.command === "run") {
-    await runHarness(parsed.options);
-    return;
-  }
-  await runDev(parsed.options);
+
+  await withOperationLock(
+    async () => {
+      if (parsed.command === "clean") {
+        await runClean();
+        return;
+      }
+      if (parsed.command === "setup") {
+        const result = setupGeneratorRuntime(parsed.options);
+        console.log(`Installed generator runtime ${result.version}: ${result.targetDir}`);
+        return;
+      }
+      if (parsed.command === "setup-photoshop") {
+        await setupPhotoshop(parsed.options);
+        return;
+      }
+      if (parsed.command === "setup-core") {
+        await setupGeneratorCore({ update: parsed.options.updateCore ?? parsed.options.update });
+        return;
+      }
+      if (parsed.command === "run") {
+        await runHarness(parsed.options);
+        return;
+      }
+      await runDev(parsed.options);
+    },
+    { command: parsed.command }
+  );
 }
 
 main().catch((error) => {

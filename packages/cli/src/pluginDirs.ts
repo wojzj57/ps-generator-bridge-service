@@ -2,41 +2,46 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
-  mkdtempSync,
-  realpathSync,
+  readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   symlinkSync,
+  writeFileSync,
 } from "node:fs";
-import { basename, join, resolve } from "node:path";
-import { tmpdir } from "node:os";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
+import { PLUGINS_MARKER, pluginsSnapshotDir } from "./appPaths";
+import type { PathEnvironment } from "./appPaths";
 import type { HarnessOptions } from "./core";
+
+const MARKER_CONTENT = "ps-generator-bridge plugins snapshot\n";
 
 export interface PluginSource {
   pluginsDir: string;
-  cleanupDir?: string;
+  linkPath?: string;
 }
 
-export async function preparePluginSource(options: HarnessOptions): Promise<PluginSource> {
+export async function preparePluginSource(
+  options: HarnessOptions,
+  paths: PathEnvironment = {}
+): Promise<PluginSource> {
   if (options.pluginsDir) {
-    const pluginsDir = requireDirectory(options.pluginsDir, "--plugins-dir");
-    return { pluginsDir };
+    return { pluginsDir: requireDirectory(options.pluginsDir, "--plugins-dir") };
   }
 
-  const pluginDir = requireDirectory(options.plugin, "--plugin");
+  const input = options.pluginCwd ? process.cwd() : options.plugin;
+  const flag = options.pluginCwd ? "--plugin-cwd" : "--plugin";
+  const pluginDir = requireDirectory(input, flag);
   requirePackageEntry(pluginDir);
-  const tempRoot = mkdtempSync(join(tmpdir(), "ps-generator-bridge-"));
-  const pluginsDir = join(tempRoot, "plugins");
-  const linkName = safeName(basename(pluginDir));
-  const linkPath = join(pluginsDir, linkName);
-  rmSync(pluginsDir, { recursive: true, force: true });
-  mkdirSync(pluginsDir, { recursive: true });
+  requireOutsideSnapshot(pluginDir, pluginsSnapshotDir(paths));
+  const pluginsDir = resetManagedSnapshot(paths);
+  const linkPath = join(pluginsDir, safeName(basename(pluginDir)));
   symlinkSync(pluginDir, linkPath, process.platform === "win32" ? "junction" : "dir");
-  return { pluginsDir, cleanupDir: tempRoot };
+  return { pluginsDir, linkPath };
 }
 
 export async function cleanupPluginSource(source: PluginSource): Promise<void> {
-  if (source.cleanupDir) rmSync(source.cleanupDir, { recursive: true, force: true });
+  if (source.linkPath) rmSync(source.linkPath, { recursive: true, force: true });
 }
 
 export function scanPluginCandidates(pluginsDir: string): string[] {
@@ -52,9 +57,43 @@ export function scanPluginCandidates(pluginsDir: string): string[] {
     .sort();
 }
 
+function resetManagedSnapshot(paths: PathEnvironment): string {
+  const dir = pluginsSnapshotDir(paths);
+  if (existsSync(dir)) {
+    const entries = readdirSync(dir);
+    const marker = join(dir, PLUGINS_MARKER);
+    if (entries.length > 0 && !isValidMarker(marker)) {
+      throw new Error(
+        `Refusing to replace a non-empty plugins directory not managed by the CLI: ${dir}`
+      );
+    }
+    for (const name of entries) rmSync(join(dir, name), { recursive: true, force: true });
+  } else {
+    mkdirSync(dir, { recursive: true });
+  }
+  writeFileSync(join(dir, PLUGINS_MARKER), MARKER_CONTENT);
+  return dir;
+}
+
+function isValidMarker(path: string): boolean {
+  return existsSync(path) && readFileSync(path, "utf8") === MARKER_CONTENT;
+}
+
+function requireOutsideSnapshot(pluginDir: string, snapshotDir: string): void {
+  const relation = relative(resolve(snapshotDir), resolve(pluginDir));
+  if (relation === "" || (!relation.startsWith("..") && !isAbsolute(relation))) {
+    throw new Error(`--plugin must not point inside the managed plugins directory: ${pluginDir}`);
+  }
+}
+
 function requireDirectory(input: string | undefined, flag: string): string {
   if (!input) throw new Error(`${flag} is required`);
-  const dir = realpathSync(resolve(input));
+  let dir: string;
+  try {
+    dir = realpathSync(resolve(input));
+  } catch {
+    throw new Error(`${flag} must point to an existing directory: ${input}`);
+  }
   if (!lstatSync(dir).isDirectory()) throw new Error(`${flag} must point to a directory: ${input}`);
   return dir;
 }
