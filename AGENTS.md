@@ -11,15 +11,15 @@ PS Generator Bridge Service 是一个 Photoshop Generator monorepo：`generator`
 
 ## 按任务快速导航
 
-| 你的任务                        | 先去这里                                                | 说明                                                                 |
-| ------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------- |
-| **了解整体术语与边界**          | `CONTEXT.md`                                            | Ubiquitous language，先统一 server / plugin / module / protocol 等词 |
-| **改协议或新增能力**            | `packages/sdk/src/protocol/`                            | `ProtocolMethods` 是服务能力的 source of truth                       |
-| **改 Photoshop Generator host** | `packages/generator/` + `packages/generator/TESTING.md` | Generator 插件、Fastify/WebSocket server、模块、插件加载与测试边界   |
-| **改 SDK client**               | `packages/sdk/`                                         | 保持 browser-safe / Node-free；不要把 server 类型泄漏进 SDK root     |
-| **改 CLI / smoke harness**      | `packages/cli/`                                         | Windows Photoshop + `generator-core` smoke 工具                      |
-| **写公开文档**                  | `docs/` + package README                                | GitHub 与 GitHub Pages 的公共文档来源                                |
-| **查包导出边界**                | `docs/reference/package-exports.md`                     | SDK root、SDK plugin subpath、generator CJS 入口的公开面             |
+| 你的任务                        | 先去这里                                                | 说明                                                                                                       |
+| ------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **了解整体术语与边界**          | `CONTEXT.md`                                            | Ubiquitous language，先统一 server / plugin / module / protocol 等词                                       |
+| **改协议或新增能力**            | `packages/sdk/src/protocol/`                            | `ProtocolMethods` 是服务能力的 source of truth                                                             |
+| **改 Photoshop Generator host** | `packages/generator/` + `packages/generator/TESTING.md` | `@ps-generator-bridge/generator`；In-PS Generator 插件、Fastify/WebSocket server、模块、插件加载与测试边界 |
+| **改 SDK client**               | `packages/sdk/`                                         | `@ps-generator-bridge/sdk`；同构客户端，保持 browser-safe / Node-free，不要把 server 类型泄漏进 SDK root   |
+| **改 CLI / smoke harness**      | `packages/cli/`                                         | `@ps-generator-bridge/cli`；Windows Photoshop + `generator-core` smoke harness                             |
+| **写公开文档**                  | `docs/` + package README                                | GitHub 与 GitHub Pages 的公共文档来源                                                                      |
+| **查包导出边界**                | `docs/reference/package-exports.md`                     | SDK root、SDK plugin subpath、generator CJS 入口的公开面                                                   |
 
 ---
 
@@ -62,37 +62,19 @@ PS Generator Bridge Service 是一个 Photoshop Generator monorepo：`generator`
 
 ---
 
-## Logger 规范
+## Log规范
 
-Logger 只从 `@ps-generator-bridge/sdk/plugin` 使用。模块内统一顶层创建 `log`：
-
-```ts
-import { useLogger } from "@ps-generator-bridge/sdk/plugin";
-
-const log = useLogger("selection");
-
-log.warn("selection event registration failed", error);
-```
-
-不要混用 `logger`、`console.*`、`this.plugin.logger`。name 用短小稳定的领域名，如 `selection`、`image`、`plugin-loader`。
+Logger 统一从 `@ps-generator-bridge/sdk/plugin` 导入 `useLogger`，在模块顶层以短小稳定的领域名（如 `selection`、`image`、`plugin-loader`）创建 `const log = useLogger("<name>")`，并仅使用 `log`，不要混用 `logger`、`console.*` 或 `this.plugin.logger`。
 
 ---
 
 ## 文档边界
 
+- 开发代码、新增功能或修复 Bug 时不需要同步更新文档，文档更新由独立流程处理。
+
 - `docs/` 是 GitHub 和 GitHub Pages 的公共文档来源。
 - `notes/` 是本地私有开发知识库，gitignored；默认不要读，也不要作为公共文档依据。
 - 公共文档必须基于 repository source、tests、package README、公开 docs 和用户提供的需求，而不是私有 notes。
-
----
-
-## 包速查
-
-| Package              | npm                              | Role                                                                       |
-| -------------------- | -------------------------------- | -------------------------------------------------------------------------- |
-| `packages/sdk`       | `@ps-generator-bridge/sdk`       | Isomorphic client + protocol contract。零 PS/Node coupling，browser-safe。 |
-| `packages/generator` | `@ps-generator-bridge/generator` | In-PS Generator plugin + WebSocket service，由 `generator-core` 加载。     |
-| `packages/cli`       | `@ps-generator-bridge/cli`       | 命令行工具，包括 Windows PS + `generator-core` smoke harness。             |
 
 ---
 
