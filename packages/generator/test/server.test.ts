@@ -47,6 +47,19 @@ class EchoService extends BasePlugin {
   }
 }
 
+class LifecycleEchoService extends EchoService {
+  readonly lifecycle: string[] = [];
+
+  override onConnect(clientId: string): void {
+    this.lifecycle.push(`connect:${clientId}`);
+    this.publish("lifecycle:connect", { reconnected: clientId });
+  }
+
+  override onDisconnect(clientId: string): void {
+    this.lifecycle.push(`disconnect:${clientId}`);
+  }
+}
+
 // A plain decorated module exercising global fallback dispatch from a plugin
 // connection (scoped miss -> global Registry hit).
 class GreetModule {
@@ -390,20 +403,39 @@ describe("per-plugin server (RFC 0004)", () => {
     expect(otherGotIt).toBe(false);
   });
 
-  it("takes over the entry when the same id reconnects and preserves subscriptions", async () => {
-    const s = await start((events) => echo(events));
+  it("takes over the same clientId without a stale disconnect and preserves subscriptions", async () => {
+    let plugin!: LifecycleEchoService;
+    const s = await start((events) => {
+      plugin = new LifecycleEchoService("echo", {
+        events: events.createPluginFacade("echo"),
+      } as unknown as PluginHost);
+      return plugin;
+    });
     const first = await connect(s.port, "echo", "dup");
     await requestOnce(first.ws, {
       id: "sub",
       method: ProtocolMethod.EventSubscribe,
       params: { type: "ping" },
     });
+    await requestOnce(first.ws, {
+      id: "sub-lifecycle",
+      method: ProtocolMethod.EventSubscribe,
+      params: { type: "lifecycle:connect" },
+    });
     const oldClosed = new Promise<void>((resolve) => first.ws.once("close", () => resolve()));
     const second = await connect(s.port, "echo", "dup");
     await oldClosed; // old socket was closed by the takeover
+    expect(second.clientId).toBe("dup");
+    expect(plugin.lifecycle).toEqual(["connect:dup", "connect:dup"]);
     const got = nextEvent(second.ws, "ping");
-    (s.pluginManager.get("echo")!.plugin as EchoService).publish("ping", { n: 3 });
+    plugin.publish("ping", { n: 3 });
     expect((await got).data).toEqual({ n: 3 });
+
+    const currentClosed = new Promise<void>((resolve) => second.ws.once("close", () => resolve()));
+    second.ws.close();
+    await currentClosed;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(plugin.lifecycle).toEqual(["connect:dup", "connect:dup", "disconnect:dup"]);
   });
 
   it("sends an error frame and closes on an unknown plugin id", async () => {

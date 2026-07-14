@@ -120,7 +120,7 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
       socket.on("close", () => {
         const removed = rootClients.remove(clientId, socket);
         rootClients.releaseSubscriptions(removed);
-        log.info(`client disconnected: ${clientId} -> root`);
+        if (removed) log.info(`client disconnected: ${clientId} -> root`);
       });
       socket.on("error", (error) => log.error("socket error", error));
     });
@@ -142,10 +142,10 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
       const requested = query?.id;
       const clientId = requested && requested.length > 0 ? requested : randomUUID();
       entry.clients.add(clientId, socket);
-      entry.plugin.onConnect(clientId);
       log.info(`client connected: ${clientId} -> plugin ${pluginId}`);
       // First frame after connect is the handshake Event carrying the clientId.
       socket.send(serializeFrame({ type: "connected", data: { clientId } }));
+      entry.plugin.onConnect(clientId);
       const session = createEventSession({
         clientId,
         clients: entry.clients,
@@ -160,8 +160,10 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
       socket.on("close", () => {
         const removed = entry.clients.remove(clientId, socket);
         entry.clients.releaseSubscriptions(removed);
-        entry.plugin.onDisconnect(clientId);
-        log.info(`client disconnected: ${clientId} -> plugin ${pluginId}`);
+        if (removed) {
+          entry.plugin.onDisconnect(clientId);
+          log.info(`client disconnected: ${clientId} -> plugin ${pluginId}`);
+        }
       });
       socket.on("error", (error) => log.error("socket error", error));
     });
