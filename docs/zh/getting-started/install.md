@@ -20,7 +20,7 @@ pnpm install
 pnpm setup
 ```
 
-`pnpm setup` 会把 Adobe `generator-core` 克隆到 `./generator-core`。该目录被 git 忽略，只在通过 Photoshop 运行 generator 时需要。
+`pnpm setup` 会在用户级统一缓存中准备 Adobe `generator-core` 和 npm 上最新的 generator runtime。Windows 下位于 `%LOCALAPPDATA%\ps-generator-bridge`，仓库内的 core checkout 会被忽略。
 
 ## Generator Runtime 安装
 

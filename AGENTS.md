@@ -27,7 +27,7 @@ PS Generator Bridge Service 是一个 Photoshop Generator monorepo：`generator`
 
 - **包管理器**：`pnpm` workspace。
 - **核心命令**：`pnpm build`、`pnpm typecheck`、`pnpm test`。
-- **真实 PS 运行准备**：`pnpm setup` 会 clone Adobe `generator-core` 到 `./generator-core`。
+- **真实 PS 运行准备**：`pnpm setup` 会在用户级统一缓存中准备 Adobe `generator-core` 和最新 generator runtime。
 - **协议真相源**：新增服务能力先改 `packages/sdk/src/protocol/`，再实现 generator server。
 - **SDK root 约束**：`@ps-generator-bridge/sdk` 必须保持 browser-safe，不引入 Node/server/Fastify/COS SDK 类型或 runtime。
 - **插件开发面**：外部子插件使用 `@ps-generator-bridge/sdk/plugin`。
@@ -44,7 +44,6 @@ PS Generator Bridge Service 是一个 Photoshop Generator monorepo：`generator`
 │   └── cli/         @ps-generator-bridge/cli，Windows PS + generator-core smoke harness
 ├── docs/            公开 VitePress 文档
 ├── CONTEXT.md       术语表 / ubiquitous language
-├── generator-core/  本地 clone 的 Adobe generator-core（gitignored）
 └── notes/           本地私有开发笔记（gitignored，默认不要读取）
 ```
 

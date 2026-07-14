@@ -11,7 +11,7 @@ pnpm setup
 pnpm --filter @ps-generator-bridge/generator build
 ```
 
-`pnpm setup` prepares `./generator-core`. The generator package itself exposes a CommonJS `main.js` entry for generator-core.
+`pnpm setup` prepares the shared per-user `generator-core` and latest published generator runtime caches. The runtime exposes the CommonJS `main.js` entry loaded by generator-core.
 
 ## Runtime Defaults
 

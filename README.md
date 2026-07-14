@@ -50,7 +50,7 @@ pnpm install
 pnpm setup
 ```
 
-`pnpm setup` clones Adobe `generator-core` into `./generator-core`. The directory is ignored by git and is only required for running the generator inside Photoshop.
+`pnpm setup` prepares Adobe `generator-core` and the latest published generator runtime in the shared per-user `ps-generator-bridge` cache. On Windows the root is `%LOCALAPPDATA%\ps-generator-bridge`; repository-local `./generator-core` checkouts are no longer used.
 
 ## Common Commands
 
