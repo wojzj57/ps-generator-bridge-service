@@ -1,5 +1,22 @@
 # @ps-generator-bridge/sdk
 
+## 0.6.0
+
+### Minor Changes
+
+- Breaking Changes
+
+  - Remove caller-selected `options.clientId` and `RawConnection.id`; persist the server-issued `connection.clientId` and pass it through `options.resume` when identity must survive a process restart.
+
+  Features
+
+  1. Add server-issued connection identity, automatic and manual resume, interrupted-request errors, and subscription replay after reconnect.
+  2. Export platform-neutral `WsSession` and `WsHandlerContext` contracts for plugin WebSocket handlers.
+
+  Documentation
+
+  1. Document identity persistence, reconnect behavior, request interruption semantics, and the client-id migration in the paired English and Chinese guides.
+
 ## 0.5.0
 
 ### Minor Changes
