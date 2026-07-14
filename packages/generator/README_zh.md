@@ -54,20 +54,22 @@ export interface PluginConfig {
   maxImportImagePixels?: number;
   allowedImportImageFormats?: string[];
   allowLocalImagePaths?: boolean;
+  sessionResumeTtlMs?: number;
   [key: string]: unknown;
 }
 ```
 
 环境变量覆盖项：
 
-| 变量                        | 作用                                       |
-| --------------------------- | ------------------------------------------ |
-| `PS_BRIDGE_PORT`            | 覆盖 `PluginConfig.port`。                 |
-| `PS_BRIDGE_PLUGINS_DIR`     | 当未提供 `pluginsDir` 时覆盖默认插件目录。 |
-| `PS_BRIDGE_LOG_DIR`         | 覆盖包内默认运行日志目录。                 |
-| `PS_BRIDGE_COS_*`           | 所需凭据齐全时启用基于 COS 的图片上传。    |
-| `PS_BRIDGE_COS_KEY_PREFIX`  | 覆盖 COS 对象 key 前缀。                   |
-| `PS_BRIDGE_COS_URL_EXPIRES` | 覆盖 COS 签名 URL 的有效期秒数。           |
+| 变量                              | 作用                                       |
+| --------------------------------- | ------------------------------------------ |
+| `PS_BRIDGE_PORT`                  | 覆盖 `PluginConfig.port`。                 |
+| `PS_BRIDGE_PLUGINS_DIR`           | 当未提供 `pluginsDir` 时覆盖默认插件目录。 |
+| `PS_BRIDGE_LOG_DIR`               | 覆盖包内默认运行日志目录。                 |
+| `PS_BRIDGE_SESSION_RESUME_TTL_MS` | 覆盖会话恢复 TTL（毫秒）。                 |
+| `PS_BRIDGE_COS_*`                 | 所需凭据齐全时启用基于 COS 的图片上传。    |
+| `PS_BRIDGE_COS_KEY_PREFIX`        | 覆盖 COS 对象 key 前缀。                   |
+| `PS_BRIDGE_COS_URL_EXPIRES`       | 覆盖 COS 签名 URL 的有效期秒数。           |
 
 `main.js` 会在加载 bundle 入口前读取包内 `.env`，因此 host 构造时可以使用这些覆盖项。
 
@@ -84,7 +86,7 @@ export interface PluginConfig {
 | `WS /ws`                   | 根 SDK 协议端点。                                                 |
 | `WS /ws/:pluginId`         | 插件作用域协议端点，先查 scoped handler，再 fallback 到全局能力。 |
 
-WebSocket 连接建立后，服务端发送的第一帧是包含 `clientId` 的 `connected` 事件。客户端重连时通过 `?id=` 回传该 id。
+WebSocket 连接建立后，服务端发送的第一帧是包含服务端签发 `clientId` 的 `connected` 事件。客户端通过 `?resume={clientId}` 恢复会话。缺少、未知、过期或格式错误的 resume id 都不会报错，而是创建新会话。意外断线默认可恢复 30 分钟；SDK 显式调用 `close()` 会立即销毁会话。
 
 ## 内置能力
 

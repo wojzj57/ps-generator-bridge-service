@@ -1,12 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { RawConnection, type RawConnectionOptions } from "../src/connection";
-import { isPsBridgeError } from "../src/errors";
+import { ConnectionInterruptedError, isPsBridgeError } from "../src/errors";
+import { SessionCloseCode } from "../src/protocol";
 import type { Transport } from "../src/connection/transport";
 
 /** A transport the test drives by hand: open/fail/recv/drop. */
 class FakeConn implements Transport {
   readonly sent: string[] = [];
   closed = false;
+  closeCode: number | undefined;
+  closeReason: string | undefined;
   private msg: ((d: string) => void) | undefined;
   private onCloseCb: (() => void) | undefined;
   private resolveOpen!: () => void;
@@ -32,8 +35,10 @@ class FakeConn implements Transport {
   onClose(cb: () => void): void {
     this.onCloseCb = cb;
   }
-  close(): void {
+  close(code?: number, reason?: string): void {
     this.closed = true;
+    this.closeCode = code;
+    this.closeReason = reason;
     this.onCloseCb?.();
   }
   // --- test controls ---
@@ -82,8 +87,23 @@ async function connected(conn: RawConnection, conns: FakeConn[], clientId = "c1"
 describe("RawConnection", () => {
   it("becomes ready on the connected handshake and records the clientId", async () => {
     const { conn, conns } = harness();
+    expect(conn.clientId).toBeUndefined();
     await connected(conn, conns, "abc");
-    expect(conn.id).toBe("abc");
+    expect(conn.clientId).toBe("abc");
+    expect("id" in conn).toBe(false);
+  });
+
+  it("uses only ?resume for a caller-restored server-issued id", () => {
+    const { conns } = harness({
+      url: "ws://x/ws?id=free&clientId=also-free&keep=1",
+      resume: "server-issued",
+    });
+    const url = new URL(conns[0]!.url);
+
+    expect(url.searchParams.get("resume")).toBe("server-issued");
+    expect(url.searchParams.get("id")).toBeNull();
+    expect(url.searchParams.get("clientId")).toBeNull();
+    expect(url.searchParams.get("keep")).toBe("1");
   });
 
   it("round-trips invoke after the handshake", async () => {
@@ -147,7 +167,7 @@ describe("RawConnection", () => {
     const p = conn.invoke("getServerInfo", {}); // queued: state is "connecting"
     await tick(); // retry fires -> conns[1] created
     expect(conns).toHaveLength(2);
-    expect(conns[1]!.url).toContain("id=c1"); // reconnect re-sends the clientId
+    expect(conns[1]!.url).toContain("resume=c1");
     conns[1]!.open();
     conns[1]!.recv({ type: "connected", data: { clientId: "c1" } });
     await tick(); // ready resolves -> queued invoke sends on conns[1]
@@ -155,6 +175,31 @@ describe("RawConnection", () => {
     expect(sent.method).toBe("getServerInfo");
     conns[1]!.recv({ id: sent.id, ok: true, result: { ok: true } });
     await expect(p).resolves.toEqual({ ok: true });
+  });
+
+  it("rejects requests already sent when the socket is interrupted", async () => {
+    const { conn, conns } = harness();
+    await connected(conn, conns);
+    const pending = conn.invoke("getServerInfo", {});
+    await tick();
+
+    conns[0]!.drop();
+
+    await expect(pending).rejects.toBeInstanceOf(ConnectionInterruptedError);
+  });
+
+  it("supports an explicit reconnect without disposing the server session", async () => {
+    const { conn, conns } = harness();
+    await connected(conn, conns, "c1");
+
+    const reconnecting = conn.reconnect();
+    expect(conns[0]!.closed).toBe(true);
+    expect(conns[0]!.closeCode).toBeUndefined();
+    expect(conns[1]!.url).toContain("resume=c1");
+    conns[1]!.open();
+    conns[1]!.recv({ type: "connected", data: { clientId: "c1" } });
+
+    await expect(reconnecting).resolves.toBeUndefined();
   });
 
   it("fails terminally after exhausting retries, rejecting ready and pending invokes", async () => {
@@ -203,5 +248,8 @@ describe("RawConnection", () => {
     conn.close();
     await expect(p).rejects.toThrow(/closed/i);
     expect(conns[0]!.closed).toBe(true);
+    expect(conns[0]!.closeCode).toBe(SessionCloseCode.Dispose);
+    expect(conns[0]!.closeReason).toBe("session-dispose");
+    await expect(conn.reconnect()).rejects.toThrow(/closed/i);
   });
 });

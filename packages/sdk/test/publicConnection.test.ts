@@ -288,6 +288,21 @@ describe("public Connection", () => {
     conn.close();
   });
 
+  it("places a caller-restored clientId in the resume query", () => {
+    let capturedUrl = "";
+    const conn = new Connection("paint", {
+      url: "https://host:7700",
+      resume: "stored-client-id",
+      transportFactory: (url) => {
+        capturedUrl = url;
+        return new FakeTransport();
+      },
+    });
+
+    expect(capturedUrl).toBe("wss://host:7700/ws/paint?resume=stored-client-id");
+    conn.close();
+  });
+
   it("exposes clientId from the handshake without the old id getter", async () => {
     const { conn, transports } = harness("paint");
     await connect(conn, transports[0]!, "plugin-client-1");
@@ -505,6 +520,26 @@ describe("public Connection", () => {
     expect(transports).toHaveLength(2);
     await connect(conn, transports[1]!, "root-1");
     await flush();
+    expect(lastRequest(transports[1]!).method).toBe(ProtocolMethod.EventSubscribe);
+    expect(lastRequest(transports[1]!).params).toEqual({ type: "paint:changed" });
+    respond(transports[1]!, { ok: true });
+  });
+
+  it("supports manual reconnect and replays active subscriptions", async () => {
+    const { conn, transports } = harness();
+    await connect(conn, transports[0]!, "root-1");
+    conn.on("paint:changed", () => undefined);
+    await flush();
+    respond(transports[0]!, { ok: true });
+
+    const reconnecting = conn.reconnect();
+    expect(transports[0]!.closed).toBe(true);
+    expect(transports[0]!.closeCode).toBeUndefined();
+    expect(transports).toHaveLength(2);
+    await connect(conn, transports[1]!, "root-1");
+    await reconnecting;
+    await flush();
+
     expect(lastRequest(transports[1]!).method).toBe(ProtocolMethod.EventSubscribe);
     expect(lastRequest(transports[1]!).params).toEqual({ type: "paint:changed" });
     respond(transports[1]!, { ok: true });

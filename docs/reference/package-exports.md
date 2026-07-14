@@ -21,6 +21,8 @@ Important exports:
 - `openPhotoshopOnLightBox`
 - `createWebSocketTransport`
 - `PsBridgeError`
+- `ConnectionInterruptedError`
+- `SessionCloseCode`
 - protocol constants and types
 - Photoshop event and module result types
 
@@ -30,7 +32,7 @@ Plugin authoring subpath:
 import { BasePlugin, ws, api, bootstrap } from "@ps-generator-bridge/sdk/plugin";
 ```
 
-The plugin subpath exports runtime authoring primitives and type-only host/module/event contracts.
+The plugin subpath exports runtime authoring primitives and type-only host/module/event contracts, including `WsSession`, `WsEndpoint`, and `WsHandlerContext`.
 
 ## `@ps-generator-bridge/generator`
 

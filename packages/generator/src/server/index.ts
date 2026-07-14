@@ -1,18 +1,21 @@
 import Fastify from "fastify";
 import websocket from "@fastify/websocket";
 import cors from "@fastify/cors";
-import { randomUUID } from "node:crypto";
 import type { WebSocket } from "ws";
-import { ErrorCode, parseFrame, serializeFrame } from "@ps-generator-bridge/sdk";
+import { ErrorCode, SessionCloseCode, parseFrame, serializeFrame } from "@ps-generator-bridge/sdk";
 import { Registry } from "./registry";
 import { registerBuiltins } from "./builtins";
 import { PluginManager, type PluginEntry, type PluginInfo } from "../plugins";
-import type { ConnectionSession, HandlerContext } from "./dispatch";
-import { ClientStore } from "../utils/clientStore";
+import type { HandlerContext } from "./dispatch";
+import {
+  DEFAULT_SESSION_RESUME_TTL_MS,
+  SessionStore,
+  type ConnectionSession,
+} from "./connectionSession";
 import { setGeneratorLogger, useLogger, type Logger } from "@ps-generator-bridge/sdk/plugin";
 import type { PsGenerator } from "../types/generator";
 import type { JsxRunnerApi } from "../utils/jsxRunner";
-import { EventManager, RuntimeEventManager, type EventEndpointScope } from "../utils/eventManager";
+import { EventManager, RuntimeEventManager } from "../utils/eventManager";
 import { bridgeError, toProtocolError } from "../errors";
 
 const log = useLogger("server");
@@ -29,6 +32,8 @@ export interface StartServerOptions {
   events?: EventManager;
   runtimeEvents?: RuntimeEventManager;
   logger: Logger;
+  /** How long an unexpectedly disconnected logical session remains resumable. */
+  sessionResumeTtlMs?: number;
 }
 
 export interface PsBridgeServer {
@@ -51,12 +56,19 @@ export interface PsBridgeServer {
  * `/ws/{pluginId}` and performs the clientId handshake (ADR 0007 / RFC 0004).
  *
  * The single param route `/ws/:pluginId` serves every plugin: it looks the
- * plugin up in the manager, handshakes against that plugin's own ClientStore, and
+ * plugin up in the manager, handshakes against that plugin's own SessionStore, and
  * dispatches scoped-first with global fallback. An unknown plugin id gets an
  * error frame then a close (not a bare 404).
  */
 export function createServer(options: StartServerOptions): PsBridgeServer {
-  const { port, host = "127.0.0.1", generator, jsx, events } = options;
+  const {
+    port,
+    host = "127.0.0.1",
+    generator,
+    jsx,
+    events,
+    sessionResumeTtlMs = DEFAULT_SESSION_RESUME_TTL_MS,
+  } = options;
   setGeneratorLogger(options.logger);
 
   // Fastify's own pino logger is disabled: server logs flow through the bridge
@@ -76,10 +88,14 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
 
   const runtimeEvents =
     options.runtimeEvents ?? new RuntimeEventManager(events ?? new EventManager(generator));
-  const pluginManager = new PluginManager(app, runtimeEvents);
+  const pluginManager = new PluginManager(app, runtimeEvents, sessionResumeTtlMs);
   const registry = new Registry(app, runtimeEvents);
   registerBuiltins(registry, () => pluginManager.list());
-  const rootClients = new ClientStore();
+  const rootSessions = new SessionStore({
+    endpoint: Object.freeze({ kind: "root" }),
+    events: runtimeEvents,
+    resumeTtlMs: sessionResumeTtlMs,
+  });
 
   app.get("/health", async () => ({ status: "ok" }));
   app.get("/plugins", async () => ({ plugins: pluginManager.list() }));
@@ -99,28 +115,19 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
   app.register(websocket);
   app.register(async (instance) => {
     instance.get("/ws", { websocket: true }, (socket: WebSocket, req) => {
-      const query = req.query as { id?: string } | undefined;
-      const requested = query?.id;
-      const clientId = requested && requested.length > 0 ? requested : randomUUID();
-      rootClients.add(clientId, socket);
-      log.info(`client connected: ${clientId} -> root`);
-      socket.send(serializeFrame({ type: "connected", data: { clientId } }));
+      const { session } = rootSessions.connect(resumeFromQuery(req.query), socket);
+      log.info(`client connected: ${session.clientId} -> root`);
+      socket.send(serializeFrame({ type: "connected", data: { clientId: session.clientId } }));
 
-      const session = createEventSession({
-        clientId,
-        clients: rootClients,
-        events: runtimeEvents,
-        scope: { kind: "root" },
-      });
-      const ctx: HandlerContext = { generator, jsx, session };
+      const ctx: HandlerContext = { generator, jsx, session, clientId: session.clientId };
 
       socket.on("message", (data) => {
+        if (!session.isCurrentSocket(socket)) return;
         void handleRootFrame(socket, String(data), registry, ctx);
       });
-      socket.on("close", () => {
-        const removed = rootClients.remove(clientId, socket);
-        rootClients.releaseSubscriptions(removed);
-        log.info(`client disconnected: ${clientId} -> root`);
+      socket.on("close", (code) => {
+        const removed = rootSessions.disconnect(session, socket, code === SessionCloseCode.Dispose);
+        if (removed) log.info(`client disconnected: ${session.clientId} -> root`);
       });
       socket.on("error", (error) => log.error("socket error", error));
     });
@@ -138,30 +145,26 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
         socket.close();
         return;
       }
-      const query = req.query as { id?: string } | undefined;
-      const requested = query?.id;
-      const clientId = requested && requested.length > 0 ? requested : randomUUID();
-      entry.clients.add(clientId, socket);
-      entry.plugin.onConnect(clientId);
-      log.info(`client connected: ${clientId} -> plugin ${pluginId}`);
+      const { session, created } = entry.sessions.connect(resumeFromQuery(req.query), socket);
+      log.info(`client connected: ${session.clientId} -> plugin ${pluginId}`);
       // First frame after connect is the handshake Event carrying the clientId.
-      socket.send(serializeFrame({ type: "connected", data: { clientId } }));
-      const session = createEventSession({
-        clientId,
-        clients: entry.clients,
-        events: runtimeEvents,
-        scope: { kind: "plugin", pluginId },
-      });
-      const ctx: HandlerContext = { generator, jsx, session };
+      socket.send(serializeFrame({ type: "connected", data: { clientId: session.clientId } }));
+      if (created) entry.plugin.onConnect(session.clientId);
+      const ctx: HandlerContext = { generator, jsx, session, clientId: session.clientId };
 
       socket.on("message", (data) => {
+        if (!session.isCurrentSocket(socket)) return;
         void handlePluginFrame(socket, String(data), entry, registry, ctx);
       });
-      socket.on("close", () => {
-        const removed = entry.clients.remove(clientId, socket);
-        entry.clients.releaseSubscriptions(removed);
-        entry.plugin.onDisconnect(clientId);
-        log.info(`client disconnected: ${clientId} -> plugin ${pluginId}`);
+      socket.on("close", (code) => {
+        const removed = entry.sessions.disconnect(
+          session,
+          socket,
+          code === SessionCloseCode.Dispose
+        );
+        if (removed) {
+          log.info(`client disconnected: ${session.clientId} -> plugin ${pluginId}`);
+        }
       });
       socket.on("error", (error) => log.error("socket error", error));
     });
@@ -181,7 +184,11 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
         `PS Generator Bridge server listening on http://${host}:${boundPort} (ws + /health + /plugins)`
       );
     },
-    close: () => app.close(),
+    close: async () => {
+      rootSessions.clear();
+      pluginManager.clearSessions();
+      await app.close();
+    },
   };
 }
 
@@ -199,7 +206,7 @@ async function handleRootFrame(
     return;
   }
   const response = await registry.dispatch(parsed, ctx);
-  if (response) {
+  if (response && ctx.session?.isCurrentSocket(socket)) {
     socket.send(serializeFrame(response));
   }
 }
@@ -232,7 +239,7 @@ async function handlePluginFrame(
   // handles modules/builtins or returns UnknownMethod.
   const response =
     (await entry.scoped.tryDispatch(parsed, ctx)) ?? (await registry.dispatch(parsed, ctx));
-  if (response) {
+  if (response && ctx.session?.isCurrentSocket(socket)) {
     socket.send(serializeFrame(response));
   }
 }
@@ -240,32 +247,9 @@ async function handlePluginFrame(
 // Re-export so callers that previously imported this from here keep working.
 export type { PluginInfo };
 
-function createEventSession(options: {
-  clientId: string;
-  clients: ClientStore;
-  events: RuntimeEventManager;
-  scope: EventEndpointScope;
-}): ConnectionSession {
-  return {
-    clientId: options.clientId,
-    scope: options.scope,
-    subscribe: (type) => {
-      return options.events.subscribeRemote({
-        scope: options.scope,
-        clientId: options.clientId,
-        clients: options.clients,
-        type,
-      });
-    },
-    unsubscribe: (type) => {
-      options.events.unsubscribeRemote({
-        scope: options.scope,
-        clientId: options.clientId,
-        clients: options.clients,
-        type,
-      });
-    },
-  };
+function resumeFromQuery(query: unknown): unknown {
+  if (typeof query !== "object" || query === null) return undefined;
+  return (query as Record<string, unknown>).resume;
 }
 
 function statusForProtocolError(code: string): number {

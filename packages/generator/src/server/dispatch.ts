@@ -4,23 +4,20 @@ import {
   type RequestEnvelope,
   type ResponseEnvelope,
 } from "@ps-generator-bridge/sdk";
-import type { MethodHandler } from "@ps-generator-bridge/sdk/plugin";
+import type { MethodHandler, WsHandlerContext } from "@ps-generator-bridge/sdk/plugin";
 import type { PsGenerator } from "../types/generator";
 import type { JsxRunnerApi } from "../utils/jsxRunner";
-import type { EventEndpointScope } from "../utils/eventManager";
+import type { ConnectionSession } from "./connectionSession";
 import { toProtocolError } from "../errors";
 
-export interface ConnectionSession {
-  readonly clientId: string;
-  readonly scope: EventEndpointScope;
-  subscribe(type: string): Promise<void>;
-  unsubscribe(type: string): void;
-}
-
-/** What method handlers receive: the injected PS generator + future additions. */
+/**
+ * Internal dispatch context. Session identity is optional only for direct
+ * in-process module tests; every WebSocket route supplies both fields.
+ */
 export interface HandlerContext {
   generator: PsGenerator;
   jsx?: JsxRunnerApi;
+  clientId?: string;
   session?: ConnectionSession;
 }
 
@@ -49,7 +46,7 @@ export async function runMethod(
   ctx: HandlerContext
 ): Promise<ResponseEnvelope> {
   try {
-    const result = await handler(message.params, ctx);
+    const result = await handler(message.params, ctx as WsHandlerContext);
     // Open-ended contract (ADR 0006): result type is unknown at this layer; the
     // SDK re-applies strong types for declared methods.
     return { id: message.id, ok: true, result } as ResponseEnvelope;

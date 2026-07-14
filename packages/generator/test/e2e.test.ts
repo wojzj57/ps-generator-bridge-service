@@ -60,7 +60,7 @@ describe("end-to-end: Connection <-> per-plugin server", () => {
     });
 
     await conn.ready();
-    expect(conn.id).toBeTruthy();
+    expect(conn.clientId).toBeTruthy();
 
     // scoped @ws method on the plugin
     const pong = await conn.invoke("echo:ping", { n: 7 });

@@ -49,7 +49,17 @@ Root 连接：
 connection.clientId;
 ```
 
-服务端在第一个 `connected` 事件中分配 `clientId`。重连时，SDK 会通过 `?id=` 复用该 id，让服务端把新 socket 识别为同一个逻辑客户端。
+服务端在第一个 `connected` 事件中分配 `clientId`，客户端不能自行指定。重连时，SDK 会通过 `?resume=` 回传最近一次由服务端签发的 id，以恢复同一个逻辑会话。未知、过期或格式错误的 resume id 不会报错，而是创建新会话。
+
+如果宿主需要跨进程或插件重启保留身份，请在 `ready()` 后自行保存 `connection.clientId`，下次连接时显式传回：
+
+```ts
+const connection = new Connection("paint", { resume: storedClientId });
+await connection.ready();
+saveClientId(connection.clientId);
+```
+
+SDK 不限定持久化方式。
 
 `connection.id` 不是公开 `Connection` API。
 
@@ -61,13 +71,21 @@ await connection.ready();
 
 `ready()` 在收到 `connected` 握手后 resolve。`invoke()` 会等待连接就绪，并在短暂重连期间排队。
 
+使用 `reconnect()` 替换当前 socket，同时保留逻辑会话：
+
+```ts
+await connection.reconnect();
+```
+
+断线前已经发送的请求会以 `ConnectionInterruptedError` reject，且不会自动重放，因为服务端操作可能已经完成。重连期间新发起的调用会等待下一次握手。活跃事件订阅会在重连后重新注册。
+
 ## 关闭
 
 ```ts
 connection.close();
 ```
 
-`close()` 会停止重连并拒绝未完成的工作。
+`close()` 是终止操作：它会停止重连、拒绝未完成的工作，并通知服务端立即销毁会话。关闭后的 `Connection` 不能再次重连。
 
 ## 公开表面
 
@@ -81,6 +99,7 @@ connection.once(type, listener);
 connection.off(type, listener);
 connection.getServerInfo();
 connection.ready();
+connection.reconnect();
 connection.close();
 ```
 
@@ -90,6 +109,8 @@ connection.close();
 const plugins = await Connection.plugins();
 const paintHealth = await Connection.pluginHealth("paint");
 ```
+
+`Connection.pluginHealth(id)` 查询 `GET /plugins/{id}/health`，返回已加载插件的客户端数量，以及插件加载失败时的诊断信息。
 
 LightBox Photoshop 启动能力是独立 helper，不是 `Connection` 方法：
 

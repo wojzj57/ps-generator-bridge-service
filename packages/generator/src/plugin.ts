@@ -59,6 +59,8 @@ export interface PluginConfig {
   allowedImportImageFormats?: string[];
   /** Whether public layer import accepts local file paths and file:// URLs. */
   allowLocalImagePaths?: boolean;
+  /** Milliseconds an unexpectedly disconnected session remains resumable. */
+  sessionResumeTtlMs?: number;
   [key: string]: unknown;
 }
 
@@ -186,6 +188,7 @@ export class PsBridgeHost implements PluginHost {
       events: this._events,
       runtimeEvents: this._runtimeEvents,
       logger: this.hostLogger,
+      sessionResumeTtlMs: sessionResumeTtlFromEnv() ?? this.config.sessionResumeTtlMs,
     });
     this.server = server;
     // Plugins are loaded entirely from `pluginsDir`: scan its direct child
@@ -214,7 +217,7 @@ export class PsBridgeHost implements PluginHost {
       });
     }
     this.plugins = loaded.map((l) => l.plugin);
-    // Register every plugin (scoped table + per-plugin ClientStore + bus +
+    // Register every plugin (scoped table + per-plugin SessionStore + events +
     // /ws/{id} dispatch + prefixed @api) before module bootstrap, so plugin ids
     // are reserved first path segments — a module @api cannot then steal a
     // plugin's namespace (RFC 0004). All routes land before `listen` (fastify).
@@ -279,5 +282,14 @@ function portFromEnv(): number | undefined {
   const port = Number(raw);
   if (Number.isInteger(port) && port > 0 && port <= 65535) return port;
   log.warn(`ignoring invalid PS_BRIDGE_PORT: ${raw}`);
+  return undefined;
+}
+
+function sessionResumeTtlFromEnv(): number | undefined {
+  const raw = process.env.PS_BRIDGE_SESSION_RESUME_TTL_MS;
+  if (!raw) return undefined;
+  const ttl = Number(raw);
+  if (Number.isInteger(ttl) && ttl >= 0) return ttl;
+  log.warn(`ignoring invalid PS_BRIDGE_SESSION_RESUME_TTL_MS: ${raw}`);
   return undefined;
 }

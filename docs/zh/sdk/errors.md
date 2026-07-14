@@ -62,4 +62,6 @@ if (isRetryableBridgeError(error)) {
 
 如果重连次数耗尽或连接被关闭，`ready()` 会 reject。
 
+如果请求已经写入 transport，但在收到响应前连接中断或被手动替换，该请求会以 `ConnectionInterruptedError` reject。SDK 不会自动重放，因为服务端操作可能已经完成。
+
 `Connection.status()` 不同于 WebSocket 调用：它会捕获 fetch、HTTP 和 malformed response 错误，并返回 `{ ok: false, error }`。

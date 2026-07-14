@@ -9,9 +9,15 @@ import {
   type AssemblyTarget,
   type PluginHost,
   type MethodHandler,
+  type WsHandlerContext,
   type ApiRouteSpec,
   type SubscribableProducer,
 } from "../src/plugin";
+
+const handlerContext: WsHandlerContext = {
+  clientId: "test-client",
+  session: { clientId: "test-client", endpoint: { kind: "root" } },
+};
 
 // A minimal PluginHost stand-in: the devkit tests exercise BasePlugin and
 // the decorators, neither of which reaches the host, so a bare cast suffices.
@@ -141,7 +147,7 @@ describe("decorators + bootstrap", () => {
     expect(subscribables.has("test:changed")).toBe(true);
 
     // Handler is bound to the instance.
-    expect(methods.get("test:echo")!({ hi: 1 }, undefined)).toEqual({ hi: 1 });
+    expect(methods.get("test:echo")!({ hi: 1 }, handlerContext)).toEqual({ hi: 1 });
   });
 
   it("supports @api({ method, url }) for selecting the verb", () => {
@@ -169,7 +175,7 @@ describe("decorators + bootstrap", () => {
     bootstrap(new Other("other", fakeHost), target);
     expect(methods.has("test:echo")).toBe(false);
     expect(methods.has("other:run")).toBe(true);
-    expect(methods.get("other:run")!({}, undefined)).toBe("ok");
+    expect(methods.get("other:run")!({}, handlerContext)).toBe("ok");
   });
 
   it("includes inherited handlers via the metadata prototype chain", () => {

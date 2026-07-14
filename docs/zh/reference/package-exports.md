@@ -21,6 +21,8 @@ import {
 - `openPhotoshopOnLightBox`
 - `createWebSocketTransport`
 - `PsBridgeError`
+- `ConnectionInterruptedError`
+- `SessionCloseCode`
 - 协议常量和类型
 - Photoshop 事件和模块结果类型
 
@@ -30,7 +32,7 @@ import {
 import { BasePlugin, ws, api, bootstrap } from "@ps-generator-bridge/sdk/plugin";
 ```
 
-插件子路径导出运行时 authoring 原语，以及 type-only 的 host、module、event 契约。
+插件子路径导出运行时 authoring 原语，以及 type-only 的 host、module、event 契约，包括 `WsSession`、`WsEndpoint` 和 `WsHandlerContext`。
 
 ## `@ps-generator-bridge/generator`
 

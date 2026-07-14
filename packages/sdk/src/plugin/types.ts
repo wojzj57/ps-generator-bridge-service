@@ -6,13 +6,33 @@
  */
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
 
+/** Endpoint identity exposed to plugin WebSocket handlers. */
+export type WsEndpoint =
+  | Readonly<{ kind: "root" }>
+  | Readonly<{ kind: "plugin"; pluginId: string }>;
+
+/** Public, platform-neutral view of one logical WebSocket session. */
+export interface WsSession {
+  readonly clientId: string;
+  readonly endpoint: WsEndpoint;
+}
+
+/** Runtime identity supplied by the server to every WebSocket handler. */
+export interface WsHandlerContext {
+  readonly clientId: string;
+  readonly session: WsSession;
+}
+
 /**
  * A WS Request handler as seen by the plugin devkit (ADR 0006 open-ended
  * contract). params/result are `unknown` at this layer; the SDK re-applies
- * strong types for declared methods. `ctx` is opaque here — the server supplies
- * a typed HandlerContext, and a handler accepting `unknown` accepts it.
+ * strong types for declared methods. The server supplies the logical client and
+ * endpoint through the platform-neutral handler context.
  */
-export type MethodHandler = (params: unknown, ctx: unknown) => Promise<unknown> | unknown;
+export type MethodHandler = (
+  params: unknown,
+  context: WsHandlerContext
+) => Promise<unknown> | unknown;
 
 /**
  * An HTTP route handler as seen by the plugin devkit. request/reply are opaque

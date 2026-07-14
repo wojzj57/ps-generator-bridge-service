@@ -1,8 +1,15 @@
 import { describe, it, expect, afterEach } from "vitest";
 import WebSocket from "ws";
-import { ErrorCode, MainEvent, ProtocolMethod } from "@ps-generator-bridge/sdk";
+import { ErrorCode, MainEvent, ProtocolMethod, SessionCloseCode } from "@ps-generator-bridge/sdk";
 import { createServer, type PsBridgeServer } from "../src/server";
-import { BasePlugin, ws, api, bootstrap, type PluginHost } from "@ps-generator-bridge/sdk/plugin";
+import {
+  BasePlugin,
+  ws,
+  api,
+  bootstrap,
+  type PluginHost,
+  type WsHandlerContext,
+} from "@ps-generator-bridge/sdk/plugin";
 import { EventManager, RuntimeEventManager } from "../src/utils/eventManager";
 import { JsxRunner } from "../src/utils/jsxRunner";
 import type { Logger } from "@ps-generator-bridge/sdk/plugin";
@@ -25,6 +32,15 @@ class EchoService extends BasePlugin {
     return { pong: params?.n ?? 0 };
   }
 
+  @ws("echo:context")
+  context(_params: unknown, context: WsHandlerContext): unknown {
+    return {
+      clientId: context.clientId,
+      sessionClientId: context.session.clientId,
+      endpoint: context.session.endpoint,
+    };
+  }
+
   @api("/status")
   async status(): Promise<{ ok: true }> {
     return { ok: true };
@@ -32,6 +48,18 @@ class EchoService extends BasePlugin {
 
   publish(type: string, data: unknown): boolean {
     return this.events.emit(type, data);
+  }
+}
+
+class LifecycleEchoService extends EchoService {
+  readonly lifecycle: string[] = [];
+
+  override onConnect(clientId: string): void {
+    this.lifecycle.push(`connect:${clientId}`);
+  }
+
+  override onDisconnect(clientId: string): void {
+    this.lifecycle.push(`disconnect:${clientId}`);
   }
 }
 
@@ -61,9 +89,22 @@ afterEach(async () => {
 type PluginFixture = BasePlugin | ((events: RuntimeEventManager) => BasePlugin);
 
 async function start(...plugins: PluginFixture[]): Promise<PsBridgeServer> {
+  return startWithTtl(undefined, ...plugins);
+}
+
+async function startWithTtl(
+  sessionResumeTtlMs: number | undefined,
+  ...plugins: PluginFixture[]
+): Promise<PsBridgeServer> {
   const generator = fakeGenerator();
   const events = new RuntimeEventManager(new EventManager(generator));
-  const s = createServer({ port: 0, generator, runtimeEvents: events, logger: silentLogger });
+  const s = createServer({
+    port: 0,
+    generator,
+    runtimeEvents: events,
+    logger: silentLogger,
+    sessionResumeTtlMs,
+  });
   for (const svc of plugins) {
     s.pluginManager.register(typeof svc === "function" ? svc(events) : svc);
   }
@@ -104,9 +145,14 @@ async function startRoot(): Promise<{
 function connect(
   port: number,
   pluginId: string,
-  id?: string
+  resume?: string
 ): Promise<{ ws: WebSocket; clientId: string }> {
-  const url = `ws://127.0.0.1:${port}/ws/${pluginId}${id ? `?id=${id}` : ""}`;
+  const url = new URL(`ws://127.0.0.1:${port}/ws/${pluginId}`);
+  if (resume !== undefined) url.searchParams.set("resume", resume);
+  return connectUrl(url);
+}
+
+function connectUrl(url: string | URL): Promise<{ ws: WebSocket; clientId: string }> {
   const ws = new WebSocket(url);
   openSockets.push(ws);
   return new Promise((resolve, reject) => {
@@ -128,17 +174,14 @@ function firstFrame(port: number, pluginId: string): Promise<{ ws: WebSocket; fr
 }
 
 /** Connect to root /ws and resolve once the `connected` handshake arrives. */
-function connectRoot(port: number, id?: string): Promise<{ ws: WebSocket; clientId: string }> {
-  const url = `ws://127.0.0.1:${port}/ws${id ? `?id=${id}` : ""}`;
-  const ws = new WebSocket(url);
-  openSockets.push(ws);
-  return new Promise((resolve, reject) => {
-    ws.once("error", reject);
-    ws.once("message", (data) => {
-      const msg = JSON.parse(String(data));
-      resolve({ ws, clientId: msg.data.clientId });
-    });
-  });
+function connectRoot(port: number, resume?: string): Promise<{ ws: WebSocket; clientId: string }> {
+  const url = new URL(`ws://127.0.0.1:${port}/ws`);
+  if (resume !== undefined) url.searchParams.set("resume", resume);
+  return connectUrl(url);
+}
+
+function closed(ws: WebSocket): Promise<void> {
+  return new Promise((resolve) => ws.once("close", () => resolve()));
 }
 
 /** Send a request and resolve on its Response (a frame with an `id`), skipping events. */
@@ -251,14 +294,25 @@ describe("per-plugin server (RFC 0004)", () => {
   it("sends a connected handshake with a generated clientId on /ws/{id}", async () => {
     const s = await start(echo());
     const { clientId } = await connect(s.port, "echo");
-    expect(typeof clientId).toBe("string");
-    expect(clientId.length).toBeGreaterThan(0);
+    expect(clientId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    );
   });
 
-  it("honours a client-supplied id via ?id=", async () => {
+  it("ignores freely supplied ids and treats invalid resume values as new connections", async () => {
     const s = await start(echo());
-    const { clientId } = await connect(s.port, "echo", "fixed-123");
-    expect(clientId).toBe("fixed-123");
+    const supplied = await connectUrl(
+      `ws://127.0.0.1:${s.port}/ws/echo?id=fixed-id&clientId=fixed-client`
+    );
+    const invalidResume = await connect(s.port, "echo", "fixed-resume");
+    const unknownResumeId = "00000000-0000-4000-8000-000000000000";
+    const unknownResume = await connect(s.port, "echo", unknownResumeId);
+
+    expect(supplied.clientId).not.toBe("fixed-id");
+    expect(supplied.clientId).not.toBe("fixed-client");
+    expect(invalidResume.clientId).not.toBe("fixed-resume");
+    expect(invalidResume.clientId).not.toBe(supplied.clientId);
+    expect(unknownResume.clientId).not.toBe(unknownResumeId);
   });
 
   it("dispatches a scoped @ws method on /ws/{id}", async () => {
@@ -266,6 +320,22 @@ describe("per-plugin server (RFC 0004)", () => {
     const { ws } = await connect(s.port, "echo");
     const response = await requestOnce(ws, { id: "1", method: "echo:ping", params: { n: 7 } });
     expect(response).toEqual({ id: "1", ok: true, result: { pong: 7 } });
+  });
+
+  it("passes the server-issued clientId and public session to @ws handlers", async () => {
+    const s = await start(echo());
+    const { ws, clientId } = await connect(s.port, "echo");
+    const response = await requestOnce(ws, { id: "context", method: "echo:context", params: {} });
+
+    expect(response).toEqual({
+      id: "context",
+      ok: true,
+      result: {
+        clientId,
+        sessionClientId: clientId,
+        endpoint: { kind: "plugin", pluginId: "echo" },
+      },
+    });
   });
 
   it("falls back to the global Registry for module methods", async () => {
@@ -362,20 +432,82 @@ describe("per-plugin server (RFC 0004)", () => {
     expect(otherGotIt).toBe(false);
   });
 
-  it("takes over the entry when the same id reconnects and preserves subscriptions", async () => {
-    const s = await start((events) => echo(events));
-    const first = await connect(s.port, "echo", "dup");
+  it("resumes the session atomically, closes the stale socket, and requires subscription replay", async () => {
+    let plugin!: LifecycleEchoService;
+    const s = await start((events) => {
+      plugin = new LifecycleEchoService("echo", {
+        events: events.createPluginFacade("echo"),
+      } as unknown as PluginHost);
+      return plugin;
+    });
+    const first = await connect(s.port, "echo");
     await requestOnce(first.ws, {
       id: "sub",
       method: ProtocolMethod.EventSubscribe,
       params: { type: "ping" },
     });
-    const oldClosed = new Promise<void>((resolve) => first.ws.once("close", () => resolve()));
-    const second = await connect(s.port, "echo", "dup");
+    const oldClosed = closed(first.ws);
+    const second = await connect(s.port, "echo", first.clientId);
     await oldClosed; // old socket was closed by the takeover
+    expect(second.clientId).toBe(first.clientId);
+    expect(plugin.lifecycle).toEqual([`connect:${first.clientId}`]);
+
+    await requestOnce(second.ws, {
+      id: "replay-sub",
+      method: ProtocolMethod.EventSubscribe,
+      params: { type: "ping" },
+    });
     const got = nextEvent(second.ws, "ping");
-    (s.pluginManager.get("echo")!.plugin as EchoService).publish("ping", { n: 3 });
+    plugin.publish("ping", { n: 3 });
     expect((await got).data).toEqual({ n: 3 });
+  });
+
+  it("keeps unexpected disconnects resumable but disposes explicitly closed sessions", async () => {
+    let plugin!: LifecycleEchoService;
+    const s = await start((events) => {
+      plugin = new LifecycleEchoService("echo", {
+        events: events.createPluginFacade("echo"),
+      } as unknown as PluginHost);
+      return plugin;
+    });
+    const first = await connect(s.port, "echo");
+    const firstClosed = closed(first.ws);
+    first.ws.terminate();
+    await firstClosed;
+    expect(plugin.lifecycle).toEqual([`connect:${first.clientId}`]);
+
+    const resumed = await connect(s.port, "echo", first.clientId);
+    expect(resumed.clientId).toBe(first.clientId);
+    expect(plugin.lifecycle).toEqual([`connect:${first.clientId}`]);
+
+    const resumedClosed = closed(resumed.ws);
+    resumed.ws.close(SessionCloseCode.Dispose, "session-dispose");
+    await resumedClosed;
+    await expect
+      .poll(() => plugin.lifecycle)
+      .toEqual([`connect:${first.clientId}`, `disconnect:${first.clientId}`]);
+
+    const afterDispose = await connect(s.port, "echo", first.clientId);
+    expect(afterDispose.clientId).not.toBe(first.clientId);
+  });
+
+  it("expires an unexpectedly disconnected session after the configured TTL", async () => {
+    let plugin!: LifecycleEchoService;
+    const s = await startWithTtl(10, (events) => {
+      plugin = new LifecycleEchoService("echo", {
+        events: events.createPluginFacade("echo"),
+      } as unknown as PluginHost);
+      return plugin;
+    });
+    const first = await connect(s.port, "echo");
+    const firstClosed = closed(first.ws);
+    first.ws.terminate();
+    await firstClosed;
+    await expect
+      .poll(() => plugin.lifecycle)
+      .toEqual([`connect:${first.clientId}`, `disconnect:${first.clientId}`]);
+    const afterExpiry = await connect(s.port, "echo", first.clientId);
+    expect(afterExpiry.clientId).not.toBe(first.clientId);
   });
 
   it("sends an error frame and closes on an unknown plugin id", async () => {
@@ -410,10 +542,14 @@ describe("per-plugin server (RFC 0004)", () => {
 });
 
 describe("root /ws server", () => {
-  it("handshakes, honors ?id, and dispatches global methods only", async () => {
+  it("handshakes with a server-issued id, resumes it, and dispatches global methods only", async () => {
     const { server: s } = await startRoot();
-    const { ws, clientId } = await connectRoot(s.port, "root-fixed");
-    expect(clientId).toBe("root-fixed");
+    const first = await connectRoot(s.port);
+    const firstClosed = closed(first.ws);
+    first.ws.terminate();
+    await firstClosed;
+    const { ws, clientId } = await connectRoot(s.port, first.clientId);
+    expect(clientId).toBe(first.clientId);
 
     const info = await requestOnce(ws, {
       id: "1",
@@ -500,6 +636,24 @@ describe("root /ws server", () => {
     await closed;
     await new Promise((resolve) => setTimeout(resolve, 20));
 
+    expect(generator.listeners.get("imageChanged")).toHaveLength(0);
+  });
+
+  it("releases old subscriptions immediately when a live session is resumed", async () => {
+    const { server: s, generator } = await startRoot();
+    const first = await connectRoot(s.port);
+    await requestOnce(first.ws, {
+      id: "takeover-sub",
+      method: ProtocolMethod.EventSubscribe,
+      params: { type: "imageChanged" },
+    });
+    expect(generator.listeners.get("imageChanged")).toHaveLength(1);
+
+    const firstClosed = closed(first.ws);
+    const resumed = await connectRoot(s.port, first.clientId);
+    await firstClosed;
+
+    expect(resumed.clientId).toBe(first.clientId);
     expect(generator.listeners.get("imageChanged")).toHaveLength(0);
   });
 

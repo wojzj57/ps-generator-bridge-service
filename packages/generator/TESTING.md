@@ -43,8 +43,9 @@ RFC 0001 引入的几条新 seam，都在进程内可测、无需 Photoshop：
   畸形帧→`undefined`。构造时传一个不 listen 的 fastify 实例即可。
 - **`@api` / `@ws` 装饰器 + `bootstrap`（ADR 0006）**——`decorators.test.ts` 用一个被装饰的样例类，
   断言 `@ws` 方法经 `dispatch` 命中且绑定到实例（`this`）、`@api` 路由经真 HTTP 命中、且**类之间不串元数据**。
-- **`ClientStore` + Event 推送（ADR 0007）**——`server.test.ts` 用真 `ws` 客户端断言 `/ws` 握手回
-  `connected{clientId}`、`?id=` 接管（旧 socket 被关）、`broadcast` 到全员、`emit` 只到指定 client。
+- **`ConnectionSession` / `SessionStore` + Event 推送（ADR 0007）**——`server.test.ts` 用真 `ws` 客户端断言
+  server 签发 `connected{clientId}`、`?resume=` 接管（旧 socket 被关）、意外断线恢复、显式关闭销毁、TTL
+  到期，以及断线时立即释放订阅。
 - **端到端（跨包）**——`e2e.test.ts` 用 sdk 的 `Connection`（注入 `ws`）连真 server：握手取 `clientId`、
   `invoke` 内建与 `@ws` 模块方法、订阅并收到 `broadcast` / 定向 `emit`。这是贯穿 protocol → Connection →
   server → Registry → module → Event 的最小垂直切片。

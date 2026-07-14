@@ -86,11 +86,16 @@ export class Connection {
   }
 
   get clientId(): string | undefined {
-    return this.raw.id;
+    return this.raw.clientId;
   }
 
   ready(): Promise<void> {
     return this.raw.ready();
+  }
+
+  /** Replace the socket and resume the current server-issued logical session. */
+  reconnect(): Promise<void> {
+    return this.raw.reconnect();
   }
 
   close(): void {

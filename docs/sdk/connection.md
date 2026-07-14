@@ -49,7 +49,17 @@ After the server handshake:
 connection.clientId;
 ```
 
-The server assigns `clientId` in the first `connected` event. During reconnect, the SDK reuses that id through `?id=` so the server can treat the new socket as the same logical client.
+The server assigns `clientId` in the first `connected` event. Clients cannot choose this id. During reconnect, the SDK sends the last server-issued id through `?resume=` so the server can restore the logical session. Unknown, expired, or malformed resume ids simply create a new session.
+
+If your host needs to preserve identity across process or plugin restarts, store `connection.clientId` after `ready()` and pass it back explicitly:
+
+```ts
+const connection = new Connection("paint", { resume: storedClientId });
+await connection.ready();
+saveClientId(connection.clientId);
+```
+
+The SDK does not choose a persistence mechanism.
 
 `connection.id` is not part of the public `Connection` API.
 
@@ -61,13 +71,21 @@ await connection.ready();
 
 `ready()` resolves after the `connected` handshake. Calls to `invoke()` wait for readiness and queue across transient reconnects.
 
+Use `reconnect()` to replace the current socket without disposing its logical session:
+
+```ts
+await connection.reconnect();
+```
+
+Requests already written before an interruption reject with `ConnectionInterruptedError`; they are not replayed because the server operation may already have completed. Calls started while reconnecting wait for the next handshake. Active event subscriptions are replayed after reconnect.
+
 ## Closing
 
 ```ts
 connection.close();
 ```
 
-`close()` stops reconnecting and rejects in-flight work.
+`close()` is terminal. It stops reconnecting, rejects in-flight work, and tells the server to dispose the session immediately. A closed `Connection` cannot be reconnected.
 
 ## Public Surfaces
 
@@ -81,6 +99,7 @@ connection.once(type, listener);
 connection.off(type, listener);
 connection.getServerInfo();
 connection.ready();
+connection.reconnect();
 connection.close();
 ```
 

@@ -10,7 +10,7 @@ export interface Transport {
   onMessage(listener: (data: string) => void): void;
   /** Fired when the underlying connection drops (used by Connection to reconnect). */
   onClose(listener: () => void): void;
-  close(): void;
+  close(code?: number, reason?: string): void;
 }
 
 /**
@@ -27,6 +27,8 @@ export function createWebSocketTransport(url: string, WebSocketImpl?: typeof Web
 
   let opened = false;
   let closeRequested = false;
+  let requestedCloseCode: number | undefined;
+  let requestedCloseReason: string | undefined;
   let resolveReady!: () => void;
   let rejectReady!: (err: unknown) => void;
   const readyPromise = new Promise<void>((resolve, reject) => {
@@ -39,7 +41,7 @@ export function createWebSocketTransport(url: string, WebSocketImpl?: typeof Web
   ws.addEventListener("open", () => {
     opened = true;
     resolveReady();
-    if (closeRequested) ws.close();
+    if (closeRequested) ws.close(requestedCloseCode, requestedCloseReason);
   });
   ws.addEventListener("error", () => {
     if (!opened) rejectReady(new Error(`WebSocket connection to ${url} failed`));
@@ -54,11 +56,13 @@ export function createWebSocketTransport(url: string, WebSocketImpl?: typeof Web
     onClose: (listener) => {
       closeListener = listener;
     },
-    close: () => {
+    close: (code, reason) => {
       if (closeRequested) return;
       closeRequested = true;
+      requestedCloseCode = code;
+      requestedCloseReason = reason;
       if (ws.readyState === Ctor.CONNECTING) return;
-      if (ws.readyState === Ctor.OPEN || ws.readyState === Ctor.CLOSING) ws.close();
+      if (ws.readyState === Ctor.OPEN || ws.readyState === Ctor.CLOSING) ws.close(code, reason);
     },
   };
 }

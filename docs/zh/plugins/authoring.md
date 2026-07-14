@@ -75,10 +75,23 @@ if (this.plugin.cos) {
 
 ## 生命周期
 
+`@ws` handler 可以接收第二个与平台无关的上下文参数：
+
+```ts
+import type { WsHandlerContext } from "@ps-generator-bridge/sdk/plugin";
+
+@ws("paint:run")
+run(params: unknown, context: WsHandlerContext): unknown {
+  return { clientId: context.clientId, endpoint: context.session.endpoint };
+}
+```
+
+`context.session` 只暴露 `clientId` 和 endpoint 元数据，原始 socket 保留在 generator 内部。
+
 ```ts
 onConnect(clientId: string): void {}
 onDisconnect(clientId: string): void {}
 onDispose?(): void | Promise<void>;
 ```
 
-客户端与插件 endpoint 完成握手后会调用 `onConnect`。客户端 socket 被移除后会调用 `onDisconnect`。宿主关闭时、事件资源释放前会调用 `onDispose`。
+新逻辑会话完成握手后只调用一次 `onConnect`。意外断线默认保留 30 分钟用于恢复，因此不会调用 `onDisconnect`；恢复成功也不会调用两个 hook。显式调用 SDK `close()` 或恢复 TTL 到期后调用 `onDisconnect`。宿主关闭时、事件资源释放前调用 `onDispose`。

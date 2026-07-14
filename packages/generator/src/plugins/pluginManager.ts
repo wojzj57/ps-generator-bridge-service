@@ -2,15 +2,15 @@ import type { FastifyInstance, HTTPMethods, RouteHandlerMethod } from "fastify";
 import type { PluginHealth, ProtocolError } from "@ps-generator-bridge/sdk";
 import type { BasePlugin } from "@ps-generator-bridge/sdk/plugin";
 import { bootstrap } from "@ps-generator-bridge/sdk/plugin";
-import { ClientStore } from "../utils/clientStore";
+import { SessionStore } from "../server/connectionSession";
 import { ScopedRegistry } from "./scopedRegistry";
 import type { RuntimeEventManager } from "../utils/eventManager";
 
-/** One loaded plugin's runtime state: the instance, its scoped table, its clients. */
+/** One loaded plugin's runtime state: the instance, scoped table, and sessions. */
 export interface PluginEntry {
   plugin: BasePlugin;
   scoped: ScopedRegistry;
-  clients: ClientStore;
+  sessions: SessionStore;
   loadedAt: number;
 }
 
@@ -26,7 +26,7 @@ export interface PluginFailure {
 
 /**
  * Owns the loaded plugins and their per-plugin runtime state (RFC 0004). Each
- * plugin gets its own scoped method table and ClientStore; `register` wires
+ * plugin gets its own scoped method table and SessionStore; `register` wires
  * them up: creates the plugin event scope, bootstraps the
  * plugin's `@ws`/`@api` metadata into the scoped table, and flushes `@api`
  * routes to fastify under `/{pluginId}/{path}`. All before `listen()`.
@@ -41,7 +41,8 @@ export class PluginManager {
 
   constructor(
     private readonly app: FastifyInstance,
-    private readonly events?: RuntimeEventManager
+    private readonly events: RuntimeEventManager,
+    private readonly sessionResumeTtlMs: number
   ) {}
 
   /** All registered plugin ids, in registration order. */
@@ -65,7 +66,7 @@ export class PluginManager {
       return {
         id,
         status: "loaded",
-        clients: entry.clients.count,
+        clients: entry.sessions.count,
         loadedAt: entry.loadedAt,
         checks: { runtime: "ok" },
       };
@@ -90,8 +91,13 @@ export class PluginManager {
     this.failures.set(failure.id, failure);
   }
 
+  /** Release sockets, subscriptions, and resume timers during server shutdown. */
+  clearSessions(): void {
+    for (const entry of this.plugins.values()) entry.sessions.clear();
+  }
+
   /**
-   * Register a plugin: build its scoped table + ClientStore, create its event
+   * Register a plugin: build its scoped table + SessionStore, create its event
    * scope, bootstrap its handlers, and flush its `@api` routes to fastify. Throws
    * on a duplicate or illegal id. Must run before `listen()`.
    */
@@ -105,7 +111,12 @@ export class PluginManager {
     }
 
     const scoped = new ScopedRegistry();
-    const clients = new ClientStore();
+    const sessions = new SessionStore({
+      endpoint: Object.freeze({ kind: "plugin", pluginId: id }),
+      events: this.events,
+      resumeTtlMs: this.sessionResumeTtlMs,
+      onDispose: (clientId) => plugin.onDisconnect(clientId),
+    });
     this.events?.createPluginScope(id);
     bootstrap(plugin, scoped);
 
@@ -117,7 +128,7 @@ export class PluginManager {
       });
     }
 
-    const entry: PluginEntry = { plugin, scoped, clients, loadedAt: Date.now() };
+    const entry: PluginEntry = { plugin, scoped, sessions, loadedAt: Date.now() };
     this.plugins.set(id, entry);
     this.failures.delete(id);
     return entry;

@@ -13,7 +13,12 @@ export { PsBridgeClient } from "./connection/client";
 export type { PsBridgeClientOptions } from "./connection/client";
 export { createWebSocketTransport } from "./connection/transport";
 export type { Transport } from "./connection/transport";
-export { PsBridgeError, isPsBridgeError, isRetryableBridgeError } from "./errors";
+export {
+  ConnectionInterruptedError,
+  PsBridgeError,
+  isPsBridgeError,
+  isRetryableBridgeError,
+} from "./errors";
 export {
   PROTOCOL_VERSION,
   ProtocolMethod,
@@ -25,6 +30,7 @@ export {
   isRequest,
   isResponse,
   isEvent,
+  SessionCloseCode,
 } from "./protocol";
 export type {
   ProtocolMethods,
