@@ -18,10 +18,7 @@ export interface WsHandlerContext {
  * strong types for declared methods. The server supplies the authoritative
  * connection identity through `ctx.clientId`.
  */
-export type MethodHandler = (
-  params: unknown,
-  ctx: WsHandlerContext,
-) => Promise<unknown> | unknown;
+export type MethodHandler = (params: unknown, ctx: WsHandlerContext) => Promise<unknown> | unknown;
 
 /**
  * An HTTP route handler as seen by the plugin devkit. request/reply are opaque
