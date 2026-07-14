@@ -12,7 +12,6 @@ import {
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { PLUGINS_MARKER, pluginsSnapshotDir } from "./appPaths";
 import type { PathEnvironment } from "./appPaths";
-import type { HarnessOptions } from "./core";
 
 const MARKER_CONTENT = "ps-generator-bridge plugins snapshot\n";
 
@@ -21,8 +20,14 @@ export interface PluginSource {
   linkPath?: string;
 }
 
+export interface PluginSourceOptions {
+  plugin?: string;
+  pluginCwd?: boolean;
+  pluginsDir?: string;
+}
+
 export async function preparePluginSource(
-  options: HarnessOptions,
+  options: PluginSourceOptions,
   paths: PathEnvironment = {}
 ): Promise<PluginSource> {
   if (options.pluginsDir) {
