@@ -48,12 +48,13 @@ export interface LoadResult {
 }
 
 /**
- * Plugin loader. Scans the *direct* child folders of `pluginsDir` (flat, one
- * level — `node_modules` and dotfolders are ignored), and treats each as an npm
- * package: it reads the folder's `package.json`, resolves the `main` entry, and
- * loads it via dynamic `import()` with CJS interop (`mod.default ?? mod`). The
- * default export must be a `BasePlugin` subclass with a legal, unique `static
- * id`; it is constructed with `(id, host)`.
+ * Plugin loader. Scans the *direct* child folders and directory links of
+ * `pluginsDir` (flat, one level — `node_modules` and dotfolders are ignored),
+ * and treats each as an npm package: it reads the folder's `package.json`,
+ * resolves the `main` entry, and loads it via dynamic `import()` with CJS
+ * interop (`mod.default ?? mod`). The default export must be a `BasePlugin`
+ * subclass with a legal, unique `static id`; it is constructed with `(id,
+ * host)`.
  *
  * A plugin's own dependencies resolve from its own `node_modules` via Node's
  * native module resolution (the entry's requires walk up from the entry file),
@@ -186,13 +187,21 @@ async function loadOne(
 }
 
 /**
- * List the direct child folder names of `pluginsDir`, sorted for deterministic
- * load order. `node_modules` and dotfolders are skipped. Throws if `pluginsDir`
- * itself is missing (caller treats that as "no plugins installed").
+ * List the direct child folder or directory-link names of `pluginsDir`, sorted
+ * for deterministic load order. Links are included so the CLI's managed
+ * one-plugin junction snapshot is loadable. A broken link or a link to a file is
+ * passed to `loadOne`, which reports its missing package.json as a normal plugin
+ * load failure. `node_modules` and dotfolders are skipped. Throws if
+ * `pluginsDir` itself is missing (caller treats that as "no plugins installed").
  */
 function scanPluginDirs(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && e.name !== "node_modules" && !e.name.startsWith("."))
-    .map((e) => e.name)
+    .filter(
+      (entry) =>
+        (entry.isDirectory() || entry.isSymbolicLink()) &&
+        entry.name !== "node_modules" &&
+        !entry.name.startsWith(".")
+    )
+    .map((entry) => entry.name)
     .sort();
 }

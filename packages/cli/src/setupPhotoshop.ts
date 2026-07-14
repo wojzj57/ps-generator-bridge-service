@@ -12,6 +12,7 @@ export interface SetupPhotoshopOptions {
   version?: string;
   yes?: boolean;
   password?: string;
+  runtimeVersion?: string;
 }
 
 export interface PhotoshopInstall {
@@ -54,7 +55,11 @@ export async function setupPhotoshop(options: SetupPhotoshopOptions = {}): Promi
     patchMachinePrefs(readFileSync(validatedPrefs), password);
   }
 
-  const result = setupGeneratorRuntime({ dir: targetDir, overwriteUnmanaged });
+  const result = setupGeneratorRuntime({
+    dir: targetDir,
+    overwriteUnmanaged,
+    runtimeVersion: options.runtimeVersion,
+  });
   console.log(`Installed generator runtime ${result.version}: ${result.targetDir}`);
 
   if (!preferencesExist) {

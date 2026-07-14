@@ -73,3 +73,61 @@ describe("password arguments on existing commands", () => {
     );
   });
 });
+
+describe("run and dev plugin sources", () => {
+  it.each([
+    ["--plugin", "plugin"],
+    ["--plugins-dir", "plugins"],
+  ])("accepts %s with a path", (option, value) => {
+    const parsed = parseArgs(["run", option, value]);
+
+    expect(parsed.command).toBe("run");
+  });
+
+  it("treats --plugin-cwd as a value-less plugin source", () => {
+    const parsed = parseArgs(["dev", "--plugin-cwd"]);
+
+    expect(parsed.options.pluginCwd).toBe(true);
+  });
+
+  it("requires exactly one plugin source", () => {
+    expect(() => parseArgs(["run"])).toThrow("Exactly one of");
+    expect(() => parseArgs(["run", "--plugin-cwd", "--plugins-dir", "plugins"])).toThrow(
+      "Exactly one of"
+    );
+  });
+
+  it("rejects the removed --expect-plugin option", () => {
+    expect(() => parseArgs(["run", "--plugin-cwd", "--expect-plugin", "legacy"])).toThrow(
+      "Unknown option: --expect-plugin"
+    );
+  });
+});
+
+describe("runtime version arguments", () => {
+  it.each([
+    ["setup", []],
+    ["setup-photoshop", ["--version", "2025"]],
+    ["run", ["--plugin-cwd"]],
+    ["dev", ["--plugins-dir", "plugins"]],
+  ] as const)("accepts --runtime-version for %s", (command, requiredArgs) => {
+    const parsed = parseArgs([command, ...requiredArgs, "--runtime-version", "0.6.0"]);
+
+    expect(parsed.options.runtimeVersion).toBe("0.6.0");
+  });
+
+  it("rejects runtime versions for unrelated commands", () => {
+    expect(() => parseArgs(["setup-core", "--runtime-version", "latest"])).toThrow(
+      "setup-core only accepts --update"
+    );
+    expect(() =>
+      parseArgs([
+        "setup-generator-settings",
+        "--pref",
+        "MachinePrefs.psp",
+        "--runtime-version",
+        "latest",
+      ])
+    ).toThrow("only accepts --pref");
+  });
+});

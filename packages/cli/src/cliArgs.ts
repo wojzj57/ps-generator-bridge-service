@@ -22,25 +22,23 @@ export interface ParsedArgs {
 }
 
 export const USAGE = `Usage:
-  ps-generator-bridge setup [--dir <dir>]
-  ps-generator-bridge setup-photoshop [--version <year>] [--yes] [--password <value>]
+  ps-generator-bridge setup [--dir <dir>] [--runtime-version <version-or-tag>]
+  ps-generator-bridge setup-photoshop [--version <year>] [--yes] [--password <value>] [--runtime-version <version-or-tag>]
   ps-generator-bridge setup-generator-settings (--pref <path> | -pref <path>) [--password <value>]
   ps-generator-bridge setup-core [--update]
-  ps-generator-bridge run (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core] [--password <value>]
-  ps-generator-bridge dev (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core] [--password <value>]
+  ps-generator-bridge run (--plugin <dir> | --plugin-cwd | --plugins-dir <dir>) [--runtime-version <version-or-tag>] [--port <number>] [--timeout <ms>] [--update-core] [--password <value>]
+  ps-generator-bridge dev (--plugin <dir> | --plugin-cwd | --plugins-dir <dir>) [--runtime-version <version-or-tag>] [--port <number>] [--timeout <ms>] [--update-core] [--password <value>]
   ps-generator-bridge clean`;
 
 export function parseArgs(args: string[]): ParsedArgs {
   if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
-    return { command: "help", options: { expectPlugins: [] } };
+    return { command: "help", options: {} };
   }
 
   const command = args.shift();
-  if (!isCommand(command)) {
-    throw usage(`Unknown command: ${command ?? "(missing)"}`);
-  }
+  if (!isCommand(command)) throw usage(`Unknown command: ${command ?? "(missing)"}`);
 
-  const options: CliOptions = { expectPlugins: [] };
+  const options: CliOptions = {};
   if (command === "clean") {
     if (args.length > 0) throw usage(`clean does not accept any options: ${args[0]}`);
     return { command, options };
@@ -51,18 +49,23 @@ export function parseArgs(args: string[]): ParsedArgs {
     const arg = args[index];
     switch (arg) {
       case "--update":
+        markOnce(seen, "update", arg);
         options.update = true;
         break;
       case "--update-core":
+        markOnce(seen, "updateCore", arg);
         options.updateCore = true;
         break;
       case "--dir":
+        markOnce(seen, "dir", arg);
         options.dir = readValue(args, ++index, arg);
         break;
       case "--version":
+        markOnce(seen, "version", arg);
         options.version = readValue(args, ++index, arg);
         break;
       case "--yes":
+        markOnce(seen, "yes", arg);
         options.yes = true;
         break;
       case "--pref":
@@ -75,18 +78,27 @@ export function parseArgs(args: string[]): ParsedArgs {
         options.password = readValue(args, ++index, arg);
         break;
       case "--plugin":
+        markOnce(seen, "plugin", arg);
         options.plugin = readValue(args, ++index, arg);
         break;
+      case "--plugin-cwd":
+        markOnce(seen, "pluginCwd", arg);
+        options.pluginCwd = true;
+        break;
       case "--plugins-dir":
+        markOnce(seen, "pluginsDir", arg);
         options.pluginsDir = readValue(args, ++index, arg);
         break;
-      case "--expect-plugin":
-        options.expectPlugins.push(readValue(args, ++index, arg));
+      case "--runtime-version":
+        markOnce(seen, "runtimeVersion", arg);
+        options.runtimeVersion = readValue(args, ++index, arg);
         break;
       case "--port":
+        markOnce(seen, "port", arg);
         options.port = readNumber(readValue(args, ++index, arg), arg);
         break;
       case "--timeout":
+        markOnce(seen, "timeout", arg);
         options.timeoutMs = readNumber(readValue(args, ++index, arg), arg);
         break;
       case "--help":
@@ -108,16 +120,26 @@ function validateCommandOptions(command: Command, options: CliOptions): void {
       options.yes ||
       options.pref ||
       options.password !== undefined ||
-      hasHarnessOrUpdateOptions(options)
+      options.update ||
+      options.updateCore ||
+      hasPluginOrHarnessOptions(options)
     ) {
-      throw usage("setup only accepts --dir");
+      throw usage("setup only accepts --dir and --runtime-version");
     }
     return;
   }
 
   if (command === "setup-photoshop") {
-    if (options.dir || options.pref || hasHarnessOrUpdateOptions(options)) {
-      throw usage("setup-photoshop only accepts --version, --yes, and --password");
+    if (
+      options.dir ||
+      options.pref ||
+      options.update ||
+      options.updateCore ||
+      hasPluginOrHarnessOptions(options)
+    ) {
+      throw usage(
+        "setup-photoshop only accepts --version, --yes, --password, and --runtime-version"
+      );
     }
     return;
   }
@@ -130,11 +152,8 @@ function validateCommandOptions(command: Command, options: CliOptions): void {
       options.yes ||
       options.update ||
       options.updateCore ||
-      options.plugin ||
-      options.pluginsDir ||
-      options.port ||
-      options.timeoutMs ||
-      options.expectPlugins.length > 0
+      options.runtimeVersion ||
+      hasPluginOrHarnessOptions(options)
     ) {
       throw usage("setup-generator-settings only accepts --pref, -pref, and --password");
     }
@@ -148,11 +167,9 @@ function validateCommandOptions(command: Command, options: CliOptions): void {
       options.yes ||
       options.pref ||
       options.password !== undefined ||
-      options.plugin ||
-      options.pluginsDir ||
-      options.port ||
-      options.timeoutMs ||
-      options.expectPlugins.length > 0
+      options.updateCore ||
+      options.runtimeVersion ||
+      hasPluginOrHarnessOptions(options)
     ) {
       throw usage("setup-core only accepts --update");
     }
@@ -162,23 +179,17 @@ function validateCommandOptions(command: Command, options: CliOptions): void {
   if (options.dir || options.version || options.yes || options.pref || options.update) {
     throw usage(`${command} does not accept setup options`);
   }
-  if (options.plugin && options.pluginsDir) {
-    throw usage("--plugin and --plugins-dir are mutually exclusive");
-  }
-  if (!options.plugin && !options.pluginsDir) {
-    throw usage("Either --plugin or --plugins-dir is required");
+  const pluginSourceCount = [options.plugin, options.pluginCwd, options.pluginsDir].filter(
+    Boolean
+  ).length;
+  if (pluginSourceCount !== 1) {
+    throw usage("Exactly one of --plugin, --plugin-cwd, or --plugins-dir is required");
   }
 }
 
-function hasHarnessOrUpdateOptions(options: CliOptions): boolean {
+function hasPluginOrHarnessOptions(options: CliOptions): boolean {
   return Boolean(
-    options.update ||
-    options.updateCore ||
-    options.plugin ||
-    options.pluginsDir ||
-    options.port ||
-    options.timeoutMs ||
-    options.expectPlugins.length > 0
+    options.plugin || options.pluginCwd || options.pluginsDir || options.port || options.timeoutMs
   );
 }
 

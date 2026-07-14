@@ -1,102 +1,89 @@
 # `@ps-generator-bridge/cli`
 
-Command-line tools for PS Generator Bridge. The CLI can install the minimal Photoshop Generator runtime, configure a local Photoshop install on Windows, and run the Windows-only `generator-core` smoke harness.
+Command-line tools for installing the Photoshop Generator runtime, configuring Photoshop on Windows, and running the real Photoshop + `generator-core` smoke harness.
 
 Online documentation:
 
 - English: https://wojzj57.github.io/ps-generator-bridge-service/generator/photoshop-setup
 - Chinese: https://wojzj57.github.io/ps-generator-bridge-service/zh/generator/photoshop-setup
 
-Related public docs:
-
-- [Photoshop Setup](../../docs/generator/photoshop-setup.md)
-- [Troubleshooting](../../docs/generator/troubleshooting.md)
-
-## Install
-
-You can run the published CLI without installing it into your project:
-
-```bash
-pnpm dlx @ps-generator-bridge/cli setup
-pnpm dlx @ps-generator-bridge/cli setup-photoshop
-```
-
-For local development, install it as a dev dependency:
-
-```bash
-npm install -D @ps-generator-bridge/cli
-```
-
-In this monorepo:
-
-```bash
-pnpm --filter @ps-generator-bridge/cli build
-pnpm --filter @ps-generator-bridge/cli typecheck
-```
-
 ## Requirements
 
 - Node.js >=18
 - `setup-photoshop`, `setup-generator-settings`, `run`, and `dev` require Windows
-- `setup` and `setup-photoshop` require npm to install generator runtime dependencies
-- `run` and `dev` require Photoshop already running, Generator enabled, Remote Connections enabled, and Git/npm available for installing Adobe `generator-core`
+- npm is required for the first generator runtime install and later updates; a complete cache supports offline fallback
+- Git and npm are required when the shared `generator-core` cache must be created or updated
+- `run` and `dev` require Photoshop running with Generator and Remote Connections enabled
 
 ## Commands
 
-```bash
-ps-generator-bridge setup [--dir <dir>]
-ps-generator-bridge setup-photoshop [--version <year>] [--yes] [--password <value>]
+```text
+ps-generator-bridge setup [--dir <dir>] [--runtime-version <version-or-tag>]
+ps-generator-bridge setup-photoshop [--version <year>] [--yes] [--password <value>] [--runtime-version <version-or-tag>]
 ps-generator-bridge setup-generator-settings (--pref <path> | -pref <path>) [--password <value>]
 ps-generator-bridge setup-core [--update]
-ps-generator-bridge run (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core] [--password <value>]
-ps-generator-bridge dev (--plugin <dir> | --plugins-dir <dir>) [--expect-plugin <id>] [--port <number>] [--timeout <ms>] [--update-core] [--password <value>]
+ps-generator-bridge run (--plugin <dir> | --plugin-cwd | --plugins-dir <dir>) [--runtime-version <version-or-tag>] [--port <number>] [--timeout <ms>] [--update-core] [--password <value>]
+ps-generator-bridge dev (--plugin <dir> | --plugin-cwd | --plugins-dir <dir>) [--runtime-version <version-or-tag>] [--port <number>] [--timeout <ms>] [--update-core] [--password <value>]
 ps-generator-bridge clean
 ```
 
-### `setup`
+All commands that use the shared cache are serialized. A second command fails with the PID and command of the active owner; stale locks from dead processes are reclaimed automatically.
 
-Installs the minimal generator runtime into `./generator-bridge` by default. Pass `--dir` to choose another location.
+## Shared Cache
 
-```bash
-ps-generator-bridge setup --dir D:\Tools\generator-bridge
-```
+The CLI, including this repository's `pnpm setup`, uses one per-user cache:
 
-The installed runtime contains `dist`, `jsx`, `node_modules`, `main.js`, `.env.example`, `CHANGELOG.md`, `package.json`, `README.md`, and `README_zh.md`.
+| Platform | Root                                                              |
+| -------- | ----------------------------------------------------------------- |
+| Windows  | `%LOCALAPPDATA%\ps-generator-bridge`                              |
+| macOS    | `~/Library/Caches/ps-generator-bridge`                            |
+| Linux    | `$XDG_CACHE_HOME/ps-generator-bridge`, falling back to `~/.cache` |
 
-Re-running `setup` against a runtime previously installed by this CLI replaces only installer-managed files. It preserves package-local `.env`, `logs/`, `plugins/`, and other user-owned files. A non-empty directory that is not a managed runtime is never replaced by `setup`.
-
-### `setup-photoshop`
-
-Finds installed Photoshop versions from the Windows registry, asks which one to configure, installs the generator runtime, and updates that user's existing `MachinePrefs.psp` in place. Photoshop must be closed before this command runs.
-
-```bash
-ps-generator-bridge setup-photoshop
-ps-generator-bridge setup-photoshop --version 2025 --yes
-ps-generator-bridge setup-photoshop --version 2025 --password custom12
-```
-
-The plugin is installed at:
+The root contains:
 
 ```text
-<Photoshop install dir>\Plug-ins\Generator\generator-bridge
+ps-generator-bridge/
+├── generator-core/
+├── generator-runtime/
+│   └── node_modules/@ps-generator-bridge/generator/
+└── plugins/
 ```
 
-Updating a runtime previously installed by this CLI preserves package-local `.env`, `logs/`, `plugins/`, and other user-owned files. If the target `generator-bridge` directory contains files not managed by this CLI, the command asks before replacing it; `--yes` authorizes that replacement without prompting.
+Legacy `<workspace-root>/generator-core` checkouts are ignored and never moved or deleted automatically.
 
-The command parses `MachinePrefs.psp` and changes only `generatorEnabled`, `srvE`, and `srvK`. This enables Generator and Remote Connections and sets the Remote Connections password used by this CLI to connect Adobe `generator-core`. The file is validated in memory and atomically replaced without creating a backup. If Photoshop has never created the settings file, the runtime is still installed; open Photoshop once, close it completely, and rerun the command with the same password option or environment variable. A complete preference file is never copied over the user's settings.
+### Runtime versions
 
-### `setup-generator-settings`
+The CLI and generator runtime have independent versions. `setup`, `setup-photoshop`, `run`, and `dev` query the npm `latest` dist-tag on every invocation and update the shared runtime only when the resolved version changes. Installation is staged and validated before replacing the current cache.
 
-Updates an explicitly selected `MachinePrefs.psp` without discovering Photoshop, reading the registry, or installing the generator runtime. Photoshop must be completely closed. The target must already exist, must be a regular file rather than a symbolic link, and its filename must be `MachinePrefs.psp` (case-insensitive).
+If npm is unavailable, a valid cached runtime is used with a warning. A first install without npm fails. If an update fails, the previous valid runtime is preserved. Pass `--runtime-version <version-or-tag>` to pin or roll back; an explicit request is never replaced by a different cached version.
 
-```bash
-ps-generator-bridge setup-generator-settings --pref "C:\Users\me\AppData\Roaming\Adobe\Adobe Photoshop 2025\Adobe Photoshop 2025 Settings\MachinePrefs.psp"
-ps-generator-bridge setup-generator-settings -pref "C:\settings\MachinePrefs.psp" --password custom12
+### `generator-core`
+
+`setup-core` creates the shared core checkout. A cache is reused without network access only when `.git`, `app.js`, `package.json`, and `node_modules` are present. Pass `--update` to pull and reinstall it. `run` and `dev` expose the same behavior through `--update-core`.
+
+The generator runtime's `generator-core-version` range is checked before startup. An incompatible cache stops startup and asks for `--update-core`; core is never updated silently.
+
+## Runtime installation
+
+`setup` installs the selected runtime into `./generator-bridge` by default. Pass `--dir` to choose another location:
+
+```powershell
+ps-generator-bridge setup --dir D:\Tools\generator-bridge
+ps-generator-bridge setup --dir D:\Tools\generator-bridge --runtime-version 0.6.0
 ```
 
-The command atomically updates `generatorEnabled`, `srvE`, and `srvK` together. It does not change `srvN`, insert missing fields, or create a backup. An already configured file is a successful no-op.
+Re-running `setup` replaces only installer-managed runtime files. It preserves `.env`, `logs/`, `plugins/`, and other user-owned files. A non-empty unmanaged directory is never replaced.
 
-### Remote Connections Password
+`setup-photoshop` discovers installed Photoshop versions, installs the selected runtime into `<Photoshop install dir>\Plug-ins\Generator\generator-bridge`, and updates the current user's existing `MachinePrefs.psp`. Photoshop must be closed. Replacing an unmanaged target requires interactive confirmation or `--yes`.
+
+```powershell
+ps-generator-bridge setup-photoshop --version 2025 --yes
+ps-generator-bridge setup-photoshop --version 2025 --runtime-version latest
+```
+
+`setup-generator-settings` changes only `generatorEnabled`, `srvE`, and `srvK` in an explicitly selected existing preferences file. It does not discover Photoshop or install a runtime.
+
+## Remote Connections password
 
 `setup-photoshop`, `setup-generator-settings`, `run`, and `dev` resolve the password in this order:
 
@@ -104,68 +91,31 @@ The command atomically updates `generatorEnabled`, `srvE`, and `srvK` together. 
 2. `PS_GENERATOR_REMOTE_PASSWORD`
 3. `password`
 
-Passwords must contain 6-128 visible, non-whitespace Unicode characters, cannot contain control characters, and cannot start with `--`. The CLI never logs the password. Adobe `generator-core` receives it through its `-P` process argument, so it may still be visible to local process-inspection tools.
+Passwords must contain 6-128 visible, non-whitespace Unicode characters, cannot contain control characters, and cannot start with `--`. The CLI does not log the password, but `generator-core` receives it through its local `-P` process argument.
 
-### `setup-core`
+## Run and dev
 
-Clones or updates Adobe `generator-core`, then runs `npm install`. The install is skipped when `node_modules` already exists; pass `--update` to pull the latest `generator-core` and force a fresh install.
+`run` starts `generator-core`, validates health and plugin discovery, performs an SDK `getServerInfo` smoke call, prints the result, and exits. `dev` performs the same checks and keeps the process running until interrupted.
 
-When run inside a pnpm workspace, `generator-core` is stored at:
+Exactly one plugin source is required:
 
-```text
-<workspace-root>/generator-core
-```
+- `--plugin <dir>` links one package into the managed snapshot directory
+- `--plugin-cwd` is equivalent to `--plugin <current-working-directory>`
+- `--plugins-dir <dir>` passes an existing collection directory directly through without modifying it
 
-Outside a pnpm workspace, it falls back to a stable per-user cache directory under `ps-generator-bridge/generator-core`:
-
-- Windows: `%LOCALAPPDATA%\ps-generator-bridge\generator-core`
-- macOS: `~/Library/Caches/ps-generator-bridge/generator-core`
-- Linux: `$XDG_CACHE_HOME/ps-generator-bridge/generator-core` (falling back to `~/.cache`)
-
-### `run`
-
-Starts `generator-core`, waits for `GET /health`, validates `GET /plugins`, runs an SDK `getServerInfo` smoke call, prints the result, and exits.
-
-```bash
-ps-generator-bridge run --plugin ./my-plugin --expect-plugin myPlugin --password custom12
-```
-
-### `dev`
-
-Starts the same harness and keeps `generator-core` running until interrupted.
+On Windows, single-plugin sources use a directory junction under the shared `plugins` directory. The snapshot is replaced at startup and its link is removed on normal exit. A marker protects non-CLI directories from deletion. Plugin sources inside the managed snapshot are rejected.
 
 ```powershell
-$env:PS_GENERATOR_REMOTE_PASSWORD="custom12"
-ps-generator-bridge dev --plugins-dir ./plugins --port 7700
+ps-generator-bridge run --plugin .\my-plugin --password custom12
+Set-Location .\my-plugin
+ps-generator-bridge dev --plugin-cwd --port 7700
+ps-generator-bridge dev --plugins-dir D:\plugins --runtime-version 0.6.0
 ```
 
-### `clean`
+The harness verifies that the number of loaded plugins matches the candidate package directories. The removed `--expect-plugin` option is not supported.
 
-Removes the cached `generator-core` clone from the per-user cache directory. When run inside a pnpm workspace it does nothing, because the workspace copy is managed by `pnpm setup`.
+## Clean
 
-```bash
-ps-generator-bridge clean
-```
+`clean` removes the complete CLI-managed cache root, including core, runtime, plugin snapshots, and stale installation artifacts. It refuses to run while another shared-cache command is active and never touches a legacy workspace checkout.
 
-## Plugin Inputs
-
-Use exactly one of:
-
-- `--plugin <dir>` for a single plugin package directory
-- `--plugins-dir <dir>` for a directory whose direct children are plugin package directories
-
-`--expect-plugin <id>` can be repeated. The harness fails if any expected id is missing from `/plugins`.
-
-## What the Harness Verifies
-
-1. Photoshop is running.
-2. `generator-core` is installed and can start.
-3. The generator package can be loaded by `generator-core`.
-4. The bridge server becomes healthy.
-5. The number of loaded plugins matches the candidate plugin directories.
-6. Expected plugin ids are present.
-7. The SDK can connect over WebSocket and call `getServerInfo`.
-
-## Limits
-
-This CLI does not expose a public import API. The current smoke harness is not a full integration test framework; it does not drive Photoshop documents or assert plugin-specific UI/workflow behavior. Use package unit tests for deterministic logic and use this CLI to verify the real Photoshop boot path.
+This package does not expose a public import API. The smoke harness validates the real Photoshop boot path; it is not a full Photoshop workflow automation framework.

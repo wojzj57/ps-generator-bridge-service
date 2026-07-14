@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { inspectRuntimeTarget, prepareRuntimeTarget } from "../src/setup";
+import { copyRuntimeDependencies, inspectRuntimeTarget, prepareRuntimeTarget } from "../src/setup";
 import { confirmRuntimeReplacement } from "../src/setupPhotoshop";
 
 const roots: string[] = [];
@@ -67,6 +67,32 @@ describe("prepareRuntimeTarget", () => {
     expect(existsSync(target)).toBe(true);
     expect(existsSync(join(target, "remove.txt"))).toBe(false);
     expect(inspectRuntimeTarget(target)).toBe("empty");
+  });
+});
+
+describe("copyRuntimeDependencies", () => {
+  it("materializes cached root and nested dependencies without copying the generator package", () => {
+    const root = mkdtempSync(join(tmpdir(), "ps-bridge-runtime-source-"));
+    roots.push(root);
+    const sourceDir = join(
+      root,
+      "generator-runtime",
+      "node_modules",
+      "@ps-generator-bridge",
+      "generator"
+    );
+    const targetDir = join(root, "target");
+    write(join(root, "generator-runtime", "node_modules", "root-dependency", "index.js"));
+    write(join(sourceDir, "main.js"));
+    write(join(sourceDir, "node_modules", "nested-dependency", "index.js"));
+
+    copyRuntimeDependencies(sourceDir, targetDir);
+
+    expect(existsSync(join(targetDir, "node_modules", "root-dependency", "index.js"))).toBe(true);
+    expect(existsSync(join(targetDir, "node_modules", "nested-dependency", "index.js"))).toBe(true);
+    expect(
+      existsSync(join(targetDir, "node_modules", "@ps-generator-bridge", "generator", "main.js"))
+    ).toBe(false);
   });
 });
 

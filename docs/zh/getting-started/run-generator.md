@@ -11,7 +11,7 @@ pnpm setup
 pnpm --filter @ps-generator-bridge/generator build
 ```
 
-`pnpm setup` 会准备 `./generator-core`。generator 包通过 CommonJS `main.js` 入口被 generator-core 加载。
+`pnpm setup` 会准备用户级共享的 `generator-core` 与最新 generator runtime 缓存。runtime 通过 CommonJS `main.js` 入口被 generator-core 加载。
 
 ## 运行时默认值
 

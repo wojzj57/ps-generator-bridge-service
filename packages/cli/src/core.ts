@@ -1,21 +1,26 @@
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { Connection, type PluginInfo } from "@ps-generator-bridge/sdk";
 import WebSocketImpl from "ws";
-import { cleanGeneratorCore, ensureGeneratorCore, generatorCoreDir } from "./generatorCore";
+import {
+  assertGeneratorCoreCompatibility,
+  cleanManagedCache,
+  ensureGeneratorCore,
+  generatorCoreDir,
+} from "./generatorCore";
 import { ensurePhotoshopRunning } from "./photoshop";
 import { cleanupPluginSource, preparePluginSource, scanPluginCandidates } from "./pluginDirs";
 import { resolveRemotePassword } from "./remotePassword";
+import { ensureGeneratorRuntime } from "./runtimeManager";
 
 const DEFAULT_PORT = 7700;
 const DEFAULT_TIMEOUT_MS = 60_000;
-const require = createRequire(import.meta.url);
 
 export interface HarnessOptions {
   plugin?: string;
+  pluginCwd?: boolean;
   pluginsDir?: string;
-  expectPlugins: string[];
+  runtimeVersion?: string;
   port?: number;
   timeoutMs?: number;
   updateCore?: boolean;
@@ -27,7 +32,7 @@ export async function setupGeneratorCore(options: { update?: boolean } = {}): Pr
 }
 
 export async function runClean(): Promise<void> {
-  cleanGeneratorCore();
+  cleanManagedCache();
 }
 
 export async function runHarness(options: HarnessOptions): Promise<void> {
@@ -54,7 +59,9 @@ async function withHarness(
   ensureWindows();
   ensurePhotoshopRunning();
   const password = resolveRemotePassword(options.password);
+  const runtime = ensureGeneratorRuntime({ version: options.runtimeVersion });
   await ensureGeneratorCore({ update: options.updateCore ?? false });
+  assertGeneratorCoreCompatibility(runtime, generatorCoreDir());
 
   const port = options.port ?? DEFAULT_PORT;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -66,13 +73,13 @@ async function withHarness(
     child = startGeneratorCore({
       port,
       pluginsDir: pluginSource.pluginsDir,
-      hostPluginDir: resolveHostGeneratorDir(),
+      hostPluginDir: runtime.packageDir,
       password,
     });
     await waitForHealth(port, timeoutMs);
     const plugins = await readPlugins(port);
-    assertPlugins({ plugins, expectedCount, expectPlugins: options.expectPlugins });
-    const info = await smokeServerInfo(port, timeoutMs);
+    assertPlugins({ plugins, expectedCount });
+    const info = await smokeServerInfo(port, timeoutMs, runtime.version);
     console.log(
       `Server info: ${info.name} ${info.version}${info.psVersion ? `, Photoshop ${info.psVersion}` : ""}`
     );
@@ -151,7 +158,7 @@ async function readPlugins(port: number): Promise<PluginInfo[]> {
   return Array.isArray(body.plugins) ? body.plugins : [];
 }
 
-async function smokeServerInfo(port: number, timeoutMs: number) {
+async function smokeServerInfo(port: number, timeoutMs: number, runtimeVersion: string) {
   const connection = new Connection({
     url: `ws://127.0.0.1:${port}`,
     WebSocket: WebSocketImpl as unknown as typeof WebSocket,
@@ -160,29 +167,25 @@ async function smokeServerInfo(port: number, timeoutMs: number) {
   });
   try {
     return await connection.getServerInfo();
+  } catch (error) {
+    throw sdkCompatibilityError(runtimeVersion, error);
   } finally {
     connection.close();
   }
 }
 
-function assertPlugins(options: {
-  plugins: PluginInfo[];
-  expectedCount: number;
-  expectPlugins: string[];
-}): void {
-  const ids = new Set(options.plugins.map((plugin) => plugin.id));
+export function sdkCompatibilityError(runtimeVersion: string, cause: unknown): Error {
+  return new Error(
+    `SDK getServerInfo failed against generator runtime ${runtimeVersion}. The runtime may be incompatible with this CLI; upgrade @ps-generator-bridge/cli and retry. ${cause instanceof Error ? cause.message : String(cause)}`
+  );
+}
+
+function assertPlugins(options: { plugins: PluginInfo[]; expectedCount: number }): void {
   if (options.plugins.length !== options.expectedCount) {
     throw new Error(
       `Expected ${options.expectedCount} plugin(s), but host loaded ${options.plugins.length}: ${formatPlugins(options.plugins)}`
     );
   }
-  for (const id of options.expectPlugins) {
-    if (!ids.has(id)) throw new Error(`Expected plugin '${id}' was not loaded.`);
-  }
-}
-
-function resolveHostGeneratorDir(): string {
-  return dirname(require.resolve("@ps-generator-bridge/generator"));
 }
 
 function stopProcessTree(child: ChildProcess): void {
