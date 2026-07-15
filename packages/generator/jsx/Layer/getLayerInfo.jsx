@@ -193,7 +193,7 @@ var selection = params.selection;
 
 if (layerID == undefined) {
   if (layerIndex == undefined && selection != undefined) {
-    layerIndex = hasBackgroundLayer() ? selection + 1 : selection;
+    layerIndex = hasBackgroundLayer() ? selection : selection + 1;
   }
   if (layerIndex != undefined) {
     var idRef = new ActionReference();
