@@ -1,5 +1,13 @@
 # @ps-generator-bridge/sdk
 
+## 0.6.1
+
+### Patch Changes
+
+- Fixes
+
+  1. Correct selection-driven layer lookup for documents with or without a background layer by mapping Generator selection indices to Photoshop Action Manager indices with the appropriate base.
+
 ## 0.6.0
 
 ### Minor Changes
