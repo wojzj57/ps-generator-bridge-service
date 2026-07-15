@@ -109,7 +109,7 @@ describe("generator runtime cache", () => {
     );
   });
 
-  it("rejects a cache whose declared runtime dependencies are missing", () => {
+  it("rejects a legacy cache that still declares runtime dependencies", () => {
     const paths = newPaths();
     ensureGeneratorRuntime({
       ...paths,
@@ -123,9 +123,51 @@ describe("generator runtime cache", () => {
         name: GENERATOR_PACKAGE,
         version: "1.0.0",
         main: "main.js",
+        os: ["win32"],
+        cpu: ["x64"],
         "generator-core-version": ">=1.0.0",
-        dependencies: { "missing-runtime-dependency": "1.0.0" },
+        dependencies: { fastify: "4.29.1" },
       })
+    );
+
+    expect(inspectRuntimeCache(paths)).toBeUndefined();
+  });
+
+  it("rejects a runtime that does not target Windows x64", () => {
+    const paths = newPaths();
+    ensureGeneratorRuntime({
+      ...paths,
+      npm: fakeNpm("1.0.0", (cwd, version) => writeRuntime(cwd, version)),
+    });
+    const cached = inspectRuntimeCache(paths);
+    expect(cached).toBeDefined();
+    writeFileSync(
+      join(cached?.packageDir as string, "package.json"),
+      JSON.stringify({ ...cached, cpu: ["arm64"], packageDir: undefined })
+    );
+
+    expect(inspectRuntimeCache(paths)).toBeUndefined();
+  });
+
+  it("rejects a runtime with an incomplete package-private sharp vendor", () => {
+    const paths = newPaths();
+    ensureGeneratorRuntime({
+      ...paths,
+      npm: fakeNpm("1.0.0", (cwd, version) => writeRuntime(cwd, version)),
+    });
+    const cached = inspectRuntimeCache(paths);
+    expect(cached).toBeDefined();
+    rmSync(
+      join(
+        cached?.packageDir as string,
+        "vendor",
+        "node_modules",
+        "sharp",
+        "build",
+        "Release",
+        "sharp-win32-x64.node"
+      ),
+      { force: true }
     );
 
     expect(inspectRuntimeCache(paths)).toBeUndefined();
@@ -159,13 +201,32 @@ function writeRuntime(runtimeRoot: string, version: string): void {
   const packageDir = join(runtimeRoot, "node_modules", "@ps-generator-bridge", "generator");
   mkdirSync(join(packageDir, "dist"), { recursive: true });
   mkdirSync(join(packageDir, "jsx"), { recursive: true });
+  mkdirSync(join(packageDir, "vendor", "node_modules", "sharp"), { recursive: true });
+  mkdirSync(join(packageDir, "vendor", "node_modules", "sharp", "build", "Release"), {
+    recursive: true,
+  });
   writeFileSync(join(packageDir, "main.js"), "module.exports = {};\n");
+  writeFileSync(join(packageDir, "vendor", "package.json"), '{"private":true}\n');
+  writeFileSync(
+    join(packageDir, "vendor", "node_modules", "sharp", "package.json"),
+    '{"name":"sharp","version":"0.32.6"}\n'
+  );
+  writeFileSync(
+    join(packageDir, "vendor", "node_modules", "sharp", "build", "Release", "sharp-win32-x64.node"),
+    "native"
+  );
+  writeFileSync(
+    join(packageDir, "vendor", "node_modules", "sharp", "build", "Release", "libvips-42.dll"),
+    "native"
+  );
   writeFileSync(
     join(packageDir, "package.json"),
     JSON.stringify({
       name: GENERATOR_PACKAGE,
       version,
       main: "main.js",
+      os: ["win32"],
+      cpu: ["x64"],
       "generator-core-version": ">=1.0.0",
     })
   );

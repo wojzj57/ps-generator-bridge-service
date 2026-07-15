@@ -10,19 +10,19 @@ const MAIN_JS = path.resolve(__dirname, "../main.js");
 async function executeMainEntry(
   packageDir: string,
   env: Record<string, string | undefined> = {},
-  onDotEnvConfig: (
-    options: { path: string; quiet: boolean },
+  onLoadEnvironment: (
+    packageDir: string,
     processEnv: Record<string, string | undefined>
   ) => void = () => undefined
 ): Promise<{
   bundleEnv: Record<string, string | undefined>;
-  dotenvConfigCalls: Array<{ path: string; quiet: boolean }>;
+  environmentCalls: string[];
   exports: unknown;
 }> {
   const code = fs.readFileSync(MAIN_JS, "utf8");
   const module = { exports: undefined as unknown };
   let bundleEnv: Record<string, string | undefined> = {};
-  const dotenvConfigCalls: Array<{ path: string; quiet: boolean }> = [];
+  const environmentCalls: string[] = [];
   const processLike = { env: { ...env } };
 
   const context = vm.createContext({
@@ -31,12 +31,11 @@ async function executeMainEntry(
     exports: module.exports,
     process: processLike,
     require(request: string) {
-      if (request === "dotenv") {
+      if (request === "./dist/environment.js") {
         return {
-          config(options: { path: string; quiet: boolean }) {
-            dotenvConfigCalls.push(options);
-            onDotEnvConfig(options, processLike.env);
-            return { parsed: {} };
+          loadEnvironment(dir: string) {
+            environmentCalls.push(dir);
+            onLoadEnvironment(dir, processLike.env);
           },
         };
       }
@@ -53,7 +52,7 @@ async function executeMainEntry(
 
   return {
     bundleEnv,
-    dotenvConfigCalls,
+    environmentCalls,
     exports: module.exports,
   };
 }
@@ -69,7 +68,7 @@ describe("generator main entry", () => {
     });
 
     expect(result.exports).toEqual({ init: "bundle" });
-    expect(result.dotenvConfigCalls).toEqual([{ path: path.join(dir, ".env"), quiet: true }]);
+    expect(result.environmentCalls).toEqual([dir]);
     expect(result.bundleEnv).toMatchObject({
       PS_BRIDGE_PORT: "8800",
       PS_BRIDGE_COS_SECRET_ID: "from-env",

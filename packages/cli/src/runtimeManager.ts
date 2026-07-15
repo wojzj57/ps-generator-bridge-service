@@ -1,5 +1,4 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { valid } from "semver";
 import { generatorRuntimeDir, generatorRuntimePackageDir, type PathEnvironment } from "./appPaths";
@@ -20,6 +19,8 @@ export interface RuntimePackageJson {
   repository?: unknown;
   bugs?: unknown;
   keywords?: string[];
+  os?: string[];
+  cpu?: string[];
   types?: string;
   exports?: unknown;
 }
@@ -97,7 +98,9 @@ export function inspectRuntimePackage(packageDir: string): RuntimeCache | undefi
       !existsSync(join(packageDir, pkg.main ?? "main.js")) ||
       !existsSync(join(packageDir, "dist")) ||
       !existsSync(join(packageDir, "jsx")) ||
-      !hasRuntimeDependencies(packageDir, pkg.dependencies ?? {})
+      !pkg.os?.includes("win32") ||
+      !pkg.cpu?.includes("x64") ||
+      !isStandaloneRuntime(packageDir, pkg.dependencies ?? {})
     ) {
       return undefined;
     }
@@ -107,14 +110,26 @@ export function inspectRuntimePackage(packageDir: string): RuntimeCache | undefi
   }
 }
 
-function hasRuntimeDependencies(packageDir: string, dependencies: Record<string, string>): boolean {
-  const runtimeRequire = createRequire(join(packageDir, "package.json"));
-  try {
-    for (const name of Object.keys(dependencies)) runtimeRequire.resolve(name);
-    return true;
-  } catch {
-    return false;
-  }
+function isStandaloneRuntime(packageDir: string, dependencies: Record<string, string>): boolean {
+  return (
+    Object.keys(dependencies).length === 0 &&
+    existsSync(join(packageDir, "vendor", "package.json")) &&
+    existsSync(join(packageDir, "vendor", "node_modules", "sharp", "package.json")) &&
+    existsSync(
+      join(
+        packageDir,
+        "vendor",
+        "node_modules",
+        "sharp",
+        "build",
+        "Release",
+        "sharp-win32-x64.node"
+      )
+    ) &&
+    existsSync(
+      join(packageDir, "vendor", "node_modules", "sharp", "build", "Release", "libvips-42.dll")
+    )
+  );
 }
 
 function installRuntimeVersion(

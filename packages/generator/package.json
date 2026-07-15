@@ -22,6 +22,12 @@
   "publishConfig": {
     "access": "public"
   },
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
   "main": "main.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -41,6 +47,7 @@
     "main.js",
     "dist",
     "jsx",
+    "vendor",
     ".env.example",
     "CHANGELOG.md",
     "README.md",
@@ -48,33 +55,32 @@
   ],
   "generator-core-version": ">=1.0.0",
   "scripts": {
-    "prepare": "rimraf dist && tsup",
     "build": "rimraf dist && tsup",
     "build:watch": "tsup --watch",
+    "prepack": "pnpm build && tsx scripts/runtimePack.ts prepare",
+    "verify:packed-runtime": "node scripts/verifyPackedRuntime.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "dev": "tsx test/devServer.ts",
-    "clean": "rimraf dist logs coverage *.tsbuildinfo"
-  },
-  "dependencies": {
-    "@fastify/cors": "^9.0.1",
-    "@fastify/websocket": "^10.0.1",
-    "cos-nodejs-sdk-v5": "^2.15.4",
-    "dotenv": "^17.4.2",
-    "fastify": "^4.29.1",
-    "sharp": "^0.35.2",
-    "ws": "^8.18.0"
+    "clean": "rimraf dist vendor logs coverage *.tsbuildinfo"
   },
   "devDependencies": {
     "@ps-generator-bridge/sdk": "workspace:*",
+    "@fastify/cors": "^9.0.1",
+    "@fastify/websocket": "^10.0.1",
     "@types/node": "^22.13.5",
     "@types/ws": "^8.5.12",
     "@vitest/coverage-v8": "^2.1.9",
+    "cos-nodejs-sdk-v5": "^2.15.4",
+    "dotenv": "^17.4.2",
+    "fastify": "^4.29.1",
     "rimraf": "^6.0.1",
+    "sharp": "0.32.6",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typescript": "^5.9.3",
-    "vitest": "^2.1.9"
+    "vitest": "^2.1.9",
+    "ws": "^8.18.0"
   }
 }

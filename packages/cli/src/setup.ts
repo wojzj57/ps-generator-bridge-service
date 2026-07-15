@@ -7,7 +7,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import {
   ensureGeneratorRuntime,
   GENERATOR_PACKAGE,
@@ -18,6 +18,7 @@ const DEFAULT_INSTALL_DIR = "generator-bridge";
 const RUNTIME_FILES = [
   "dist",
   "jsx",
+  "vendor",
   "main.js",
   ".env.example",
   "CHANGELOG.md",
@@ -49,7 +50,6 @@ export function setupGeneratorRuntime(options: SetupOptions = {}): RuntimeInstal
   validateRuntimeFiles(sourceDir);
   prepareRuntimeTarget(targetDir, options.overwriteUnmanaged ?? false);
   copyRuntimeFiles(sourceDir, targetDir, sourcePackage);
-  copyRuntimeDependencies(sourceDir, targetDir);
 
   return { targetDir, version: sourcePackage.version };
 }
@@ -127,31 +127,12 @@ function copyRuntimeFiles(
     repository: sourcePackage.repository,
     bugs: sourcePackage.bugs,
     keywords: sourcePackage.keywords,
+    os: sourcePackage.os,
+    cpu: sourcePackage.cpu,
     main: sourcePackage.main ?? "main.js",
     types: sourcePackage.types,
     exports: sourcePackage.exports,
-    dependencies: sourcePackage.dependencies ?? {},
     "generator-core-version": sourcePackage["generator-core-version"],
   };
   writeFileSync(join(targetDir, "package.json"), `${JSON.stringify(runtimePackage, null, 2)}\n`);
-}
-
-export function copyRuntimeDependencies(sourceDir: string, targetDir: string): void {
-  const runtimeRoot = dirname(dirname(dirname(sourceDir)));
-  const sourceNodeModules = join(runtimeRoot, "node_modules");
-  if (!existsSync(sourceNodeModules)) {
-    throw new Error(`Generator runtime cache has no installed dependencies: ${sourceNodeModules}`);
-  }
-
-  const targetNodeModules = join(targetDir, "node_modules");
-  cpSync(sourceNodeModules, targetNodeModules, { recursive: true });
-  rmSync(join(targetNodeModules, "@ps-generator-bridge", "generator"), {
-    recursive: true,
-    force: true,
-  });
-
-  const nestedDependencies = join(sourceDir, "node_modules");
-  if (existsSync(nestedDependencies)) {
-    cpSync(nestedDependencies, targetNodeModules, { recursive: true });
-  }
 }
