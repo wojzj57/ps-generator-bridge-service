@@ -1,16 +1,29 @@
-import type { FastifyInstance, HTTPMethods, RouteHandlerMethod } from "fastify";
+import type { FastifyInstance, HTTPMethods } from "fastify";
 import type { PluginHealth, ProtocolError } from "@ps-generator-bridge/sdk";
-import type { BasePlugin } from "@ps-generator-bridge/sdk/plugin";
+import type { ApiHandler, BasePlugin } from "@ps-generator-bridge/sdk/plugin";
 import { bootstrap } from "@ps-generator-bridge/sdk/plugin";
+import { bridgeError } from "../errors";
 import { SessionStore } from "../server/connectionSession";
-import { ScopedRegistry } from "./scopedRegistry";
 import type { RuntimeEventManager } from "../utils/eventManager";
+import { PluginLifecycleBoundary } from "./pluginLifecycle";
+import { ScopedRegistry } from "./scopedRegistry";
+
+export interface PluginRuntimeState {
+  lastError?: ProtocolError;
+}
+
+interface RouteActivation {
+  active: boolean;
+  failure?: ProtocolError;
+}
 
 /** One loaded plugin's runtime state: the instance, scoped table, and sessions. */
 export interface PluginEntry {
   plugin: BasePlugin;
   scoped: ScopedRegistry;
   sessions: SessionStore;
+  lifecycle: PluginLifecycleBoundary;
+  runtime: PluginRuntimeState;
   loadedAt: number;
 }
 
@@ -22,18 +35,17 @@ export interface PluginInfo {
 export interface PluginFailure {
   id: string;
   lastError: ProtocolError;
+  checks?: PluginHealth["checks"];
 }
 
+export type PluginRegistrationResult =
+  | Readonly<{ ok: true; entry: PluginEntry }>
+  | Readonly<{ ok: false; error: ProtocolError }>;
+
 /**
- * Owns the loaded plugins and their per-plugin runtime state (RFC 0004). Each
- * plugin gets its own scoped method table and SessionStore; `register` wires
- * them up: creates the plugin event scope, bootstraps the
- * plugin's `@ws`/`@api` metadata into the scoped table, and flushes `@api`
- * routes to fastify under `/{pluginId}/{path}`. All before `listen()`.
- *
- * The WS endpoint `/ws/{pluginId}` is a single param route owned by the server
- * (see `createServer`); it looks the plugin up here and dispatches scoped-first
- * with global fallback. This manager does not register WS routes itself.
+ * Owns loaded plugins and their failure diagnostics. Registration is logically
+ * transactional: routes stay behind an activation guard until every route has
+ * registered, so a partial Fastify commit can never invoke a failed plugin.
  */
 export class PluginManager {
   private readonly plugins = new Map<string, PluginEntry>();
@@ -45,19 +57,20 @@ export class PluginManager {
     private readonly sessionResumeTtlMs: number
   ) {}
 
-  /** All registered plugin ids, in registration order. */
   get ids(): string[] {
     return [...this.plugins.keys()];
   }
 
-  /** The discovery list surfaced at `GET /plugins` and in `getServerInfo`. */
   list(): PluginInfo[] {
-    return [...this.plugins.values()].map((e) => ({ id: e.plugin.id }));
+    return [...this.plugins.values()].map((entry) => ({ id: entry.plugin.id }));
   }
 
-  /** Look up a loaded plugin by id (used by the `/ws/:pluginId` route). */
   get(id: string): PluginEntry | undefined {
     return this.plugins.get(id);
+  }
+
+  failure(id: string): PluginFailure | undefined {
+    return this.failures.get(id);
   }
 
   health(id: string): PluginHealth | undefined {
@@ -68,22 +81,20 @@ export class PluginManager {
         status: "loaded",
         clients: entry.sessions.count,
         loadedAt: entry.loadedAt,
-        checks: { runtime: "ok" },
+        lastError: entry.runtime.lastError,
+        checks: { runtime: entry.runtime.lastError ? "failed" : "ok" },
       };
     }
 
     const failure = this.failures.get(id);
-    if (failure) {
-      return {
-        id,
-        status: "failed",
-        clients: 0,
-        lastError: failure.lastError,
-        checks: { load: "failed" },
-      };
-    }
-
-    return undefined;
+    if (!failure) return undefined;
+    return {
+      id,
+      status: "failed",
+      clients: 0,
+      lastError: failure.lastError,
+      checks: failure.checks ?? { load: "failed" },
+    };
   }
 
   recordFailure(failure: PluginFailure): void {
@@ -91,47 +102,92 @@ export class PluginManager {
     this.failures.set(failure.id, failure);
   }
 
-  /** Release sockets, subscriptions, and resume timers during server shutdown. */
   clearSessions(): void {
     for (const entry of this.plugins.values()) entry.sessions.clear();
   }
 
+  async disposeAll(): Promise<void> {
+    for (const entry of [...this.plugins.values()].reverse()) {
+      await entry.lifecycle.dispose();
+    }
+  }
+
   /**
-   * Register a plugin: build its scoped table + SessionStore, create its event
-   * scope, bootstrap its handlers, and flush its `@api` routes to fastify. Throws
-   * on a duplicate or illegal id. Must run before `listen()`.
+   * Prepare and commit one plugin. Plugin-originated failures are returned and
+   * recorded instead of escaping into host startup.
    */
-  register(plugin: BasePlugin): PluginEntry {
+  async register(plugin: BasePlugin): Promise<PluginRegistrationResult> {
     const id = plugin.id;
+    const ownsEventResources = !this.plugins.has(id);
+    const runtime: PluginRuntimeState = {};
+    const lifecycle = new PluginLifecycleBoundary(plugin, {
+      onFailure: (error) => {
+        runtime.lastError = error;
+      },
+    });
+    const activation: RouteActivation = { active: false };
+
+    try {
+      this.validateRegistrationId(id);
+      const scoped = new ScopedRegistry();
+      bootstrap(plugin, scoped);
+
+      for (const route of scoped.routes) {
+        const handler = route.handler;
+        this.app.route({
+          method: route.method as HTTPMethods | HTTPMethods[],
+          url: `/${id}${route.url}`,
+          handler: async (request, reply) => {
+            if (!activation.active) {
+              return reply.code(503).send(activation.failure);
+            }
+            return (handler as ApiHandler)(request, reply);
+          },
+        });
+      }
+
+      const sessions = new SessionStore({
+        endpoint: Object.freeze({ kind: "plugin", pluginId: id }),
+        events: this.events,
+        resumeTtlMs: this.sessionResumeTtlMs,
+        onDispose: (clientId) => lifecycle.disconnect(clientId),
+      });
+      this.events.createPluginScope(id);
+      const entry: PluginEntry = {
+        plugin,
+        scoped,
+        sessions,
+        lifecycle,
+        runtime,
+        loadedAt: Date.now(),
+      };
+      this.plugins.set(id, entry);
+      this.failures.delete(id);
+      activation.active = true;
+      return { ok: true, entry };
+    } catch (cause) {
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      const error: ProtocolError = {
+        ...bridgeError.pluginRegistrationFailed(id, reason).toProtocolError(),
+        pluginId: id,
+      };
+      activation.failure = error;
+      await lifecycle.dispose(false);
+      if (ownsEventResources) this.events.disposePlugin(id);
+      this.recordFailure({
+        id,
+        lastError: error,
+        checks: { load: "ok", registration: "failed" },
+      });
+      return { ok: false, error };
+    }
+  }
+
+  private validateRegistrationId(id: string): void {
     if (!isValidPluginId(id)) {
       throw new Error(`illegal plugin id: '${id}' (must match [A-Za-z0-9_-]+)`);
     }
-    if (this.plugins.has(id)) {
-      throw new Error(`duplicate plugin id: ${id}`);
-    }
-
-    const scoped = new ScopedRegistry();
-    const sessions = new SessionStore({
-      endpoint: Object.freeze({ kind: "plugin", pluginId: id }),
-      events: this.events,
-      resumeTtlMs: this.sessionResumeTtlMs,
-      onDispose: (clientId) => plugin.onDisconnect(clientId),
-    });
-    this.events?.createPluginScope(id);
-    bootstrap(plugin, scoped);
-
-    for (const route of scoped.routes) {
-      this.app.route({
-        method: route.method as HTTPMethods | HTTPMethods[],
-        url: `/${id}${route.url}`,
-        handler: route.handler as RouteHandlerMethod,
-      });
-    }
-
-    const entry: PluginEntry = { plugin, scoped, sessions, loadedAt: Date.now() };
-    this.plugins.set(id, entry);
-    this.failures.delete(id);
-    return entry;
+    if (this.plugins.has(id)) throw new Error(`duplicate plugin id: ${id}`);
   }
 }
 

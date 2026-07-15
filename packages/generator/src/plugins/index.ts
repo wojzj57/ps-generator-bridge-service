@@ -11,5 +11,12 @@ export {
   type PluginEntry,
   type PluginFailure,
   type PluginInfo,
+  type PluginRegistrationResult,
 } from "./pluginManager";
 export { ScopedRegistry } from "./scopedRegistry";
+export {
+  PluginLifecycleBoundary,
+  type PluginLifecycleBoundaryOptions,
+  type PluginLifecyclePhase,
+  type PluginLifecycleResult,
+} from "./pluginLifecycle";

@@ -124,6 +124,72 @@ module.exports = GoodPlugin;
     expect(infos.some((m) => m.includes("plugin loaded: good (good)"))).toBe(true);
   });
 
+  it("continues host startup when one loaded plugin fails registration", async () => {
+    const dir = await realpath(await mkdtemp(join(tmpdir(), "host-plugins-")));
+    const brokenDir = join(dir, "a-broken");
+    const goodDir = join(dir, "z-good");
+    await mkdir(brokenDir, { recursive: true });
+    await mkdir(goodDir, { recursive: true });
+    await writeFile(
+      join(brokenDir, "package.json"),
+      JSON.stringify({ name: "@fixture/broken", version: "0.0.0", main: "index.js" }),
+      "utf8"
+    );
+    await writeFile(
+      join(brokenDir, "index.js"),
+      `const { BasePlugin, api } = require(${JSON.stringify(SDK_PLUGIN)});
+const META = Symbol.for("Symbol.metadata");
+class BrokenPlugin extends BasePlugin {
+  static id = "broken";
+  first() { return { handler: "first" }; }
+  duplicate() { return { handler: "duplicate" }; }
+}
+const meta = {};
+BrokenPlugin[META] = meta;
+api("/partial")(BrokenPlugin.prototype.first, { name: "first", metadata: meta });
+api("/partial")(BrokenPlugin.prototype.duplicate, { name: "duplicate", metadata: meta });
+module.exports = BrokenPlugin;
+`,
+      "utf8"
+    );
+    await writeFile(
+      join(goodDir, "package.json"),
+      JSON.stringify({ name: "@fixture/good", version: "0.0.0", main: "index.js" }),
+      "utf8"
+    );
+    await writeFile(
+      join(goodDir, "index.js"),
+      `const { BasePlugin } = require(${JSON.stringify(SDK_PLUGIN)});
+class GoodPlugin extends BasePlugin { static id = "good"; }
+module.exports = GoodPlugin;
+`,
+      "utf8"
+    );
+
+    plugin = await PsBridgeHost.init(fakeGenerator(), { port: 0, pluginsDir: dir }, silentLogger, {
+      polyfillsDir: SOURCE_POLYFILLS,
+    });
+    const port = (plugin as unknown as { server: { port: number } }).server.port;
+
+    const plugins = await fetch(`http://127.0.0.1:${port}/plugins`);
+    await expect(plugins.json()).resolves.toEqual({ plugins: [{ id: "good" }] });
+
+    const health = await fetch(`http://127.0.0.1:${port}/plugins/broken/health`);
+    await expect(health.json()).resolves.toMatchObject({
+      id: "broken",
+      status: "failed",
+      lastError: { code: ErrorCode.PluginRegistrationFailed },
+      checks: { load: "ok", registration: "failed" },
+    });
+
+    const partial = await fetch(`http://127.0.0.1:${port}/broken/partial`);
+    expect(partial.status).toBe(503);
+    await expect(partial.json()).resolves.toMatchObject({
+      code: ErrorCode.PluginRegistrationFailed,
+      pluginId: "broken",
+    });
+  });
+
   it("records skipped plugin diagnostics for HTTP health checks", async () => {
     const dir = await realpath(await mkdtemp(join(tmpdir(), "host-plugins-")));
     await mkdir(join(dir, "bad"), { recursive: true });

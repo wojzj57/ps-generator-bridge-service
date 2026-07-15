@@ -76,6 +76,8 @@ function sourceForCode(code: string): ErrorSource {
       return "jsx";
     case ErrorCode.PluginNotFound:
     case ErrorCode.PluginLoadFailed:
+    case ErrorCode.PluginRegistrationFailed:
+    case ErrorCode.PluginLifecycleFailed:
       return "plugin";
     case ErrorCode.CosUploadFailed:
       return "cos";

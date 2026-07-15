@@ -403,7 +403,7 @@ module.exports = WalkUp;
     expect(res.loaded).toHaveLength(1);
 
     server = createServer({ port: 0, generator: fakeGenerator(), logger: recordingLogger() });
-    server.pluginManager.register(res.loaded[0]!.plugin);
+    await server.pluginManager.register(res.loaded[0]!.plugin);
     await server.listen();
 
     const ws = new WebSocket(`ws://127.0.0.1:${server.port}/ws/good`);

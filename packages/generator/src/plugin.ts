@@ -5,7 +5,6 @@ import {
   bootstrap,
   setGeneratorLogger,
   useLogger,
-  type BasePlugin,
   type Logger,
   type PluginHost,
 } from "@ps-generator-bridge/sdk/plugin";
@@ -91,7 +90,6 @@ export class PsBridgeHost implements PluginHost {
     image: ImageModule;
     selection: SelectionModule;
   };
-  private plugins: BasePlugin[] = [];
   private readonly _jsx: JsxRunner;
   private readonly _events: EventManager;
   private readonly _runtimeEvents: RuntimeEventManager;
@@ -171,8 +169,13 @@ export class PsBridgeHost implements PluginHost {
   ): Promise<PsBridgeHost> {
     setGeneratorLogger(logger);
     const host = new PsBridgeHost(generator, config, overrides, logger);
-    await host.onInit();
-    return host;
+    try {
+      await host.onInit();
+      return host;
+    } catch (error) {
+      await host.close();
+      throw error;
+    }
   }
 
   private async onInit(): Promise<void> {
@@ -211,18 +214,21 @@ export class PsBridgeHost implements PluginHost {
     });
     for (const s of skipped) {
       log.warn(`plugin skipped: ${s.path} — ${s.reason}`);
+      this._runtimeEvents.disposePlugin(s.id);
       server.pluginManager.recordFailure({
         id: s.id,
         lastError: bridgeError.pluginLoadFailed(s.id, s.reason).toProtocolError(),
       });
     }
-    this.plugins = loaded.map((l) => l.plugin);
     // Register every plugin (scoped table + per-plugin SessionStore + events +
     // /ws/{id} dispatch + prefixed @api) before module bootstrap, so plugin ids
     // are reserved first path segments — a module @api cannot then steal a
     // plugin's namespace (RFC 0004). All routes land before `listen` (fastify).
-    for (const plugin of this.plugins) {
-      server.pluginManager.register(plugin);
+    for (const item of loaded) {
+      const result = await server.pluginManager.register(item.plugin);
+      if (!result.ok) {
+        log.warn(`plugin registration failed: ${item.id}`, result.error);
+      }
     }
     server.registry.reservedSegments = new Set(server.pluginManager.ids);
     for (const module of Object.values(this.modules)) {
@@ -262,13 +268,6 @@ export class PsBridgeHost implements PluginHost {
   /** Stop the WebSocket service (used by tests; PS teardown is process exit). */
   async close(): Promise<void> {
     this._runtimeEvents.emitMain(MainEvent.Closing, { reason: "host-close" });
-    for (const plugin of [...this.plugins].reverse()) {
-      try {
-        await plugin.onDispose?.();
-      } catch (error) {
-        log.error(`plugin dispose failed: ${plugin.id}`, error);
-      }
-    }
     this.modules.selection.dispose();
     await this.server?.close();
     this.server = undefined;

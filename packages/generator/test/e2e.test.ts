@@ -46,7 +46,7 @@ describe("end-to-end: Connection <-> per-plugin server", () => {
     const generator = fakeGenerator();
     const events = new RuntimeEventManager(new EventManager(generator));
     server = createServer({ port: 0, generator, runtimeEvents: events, logger: silentLogger });
-    server.pluginManager.register(
+    await server.pluginManager.register(
       new EchoService("echo", {
         events: events.createPluginFacade("echo"),
       } as unknown as PluginHost)
