@@ -113,22 +113,11 @@ export function inspectRuntimePackage(packageDir: string): RuntimeCache | undefi
 function isStandaloneRuntime(packageDir: string, dependencies: Record<string, string>): boolean {
   return (
     Object.keys(dependencies).length === 0 &&
-    existsSync(join(packageDir, "vendor", "package.json")) &&
-    existsSync(join(packageDir, "vendor", "node_modules", "sharp", "package.json")) &&
-    existsSync(
-      join(
-        packageDir,
-        "vendor",
-        "node_modules",
-        "sharp",
-        "build",
-        "Release",
-        "sharp-win32-x64.node"
-      )
-    ) &&
-    existsSync(
-      join(packageDir, "vendor", "node_modules", "sharp", "build", "Release", "libvips-42.dll")
-    )
+    !existsSync(join(packageDir, "node_modules")) &&
+    !existsSync(join(packageDir, "vendor")) &&
+    existsSync(join(packageDir, "native", "sharp-win32-x64.node")) &&
+    existsSync(join(packageDir, "native", "libvips-42.dll")) &&
+    existsSync(join(packageDir, "native", "versions.json"))
   );
 }
 

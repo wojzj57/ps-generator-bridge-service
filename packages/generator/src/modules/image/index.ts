@@ -35,8 +35,8 @@ export type { LayerSpec };
  * `getDocumentPixmap` (to be wired up later); this module only deals with
  * explicit layer specs, which is what `Layer/getLayerPixmap.jsx` requires.
  *
- * Encoding (raw RGBA -> PNG) goes through the pinned `sharp` runtime staged in
- * the package-private vendor tree for Photoshop's Node.
+ * Encoding (raw RGBA -> PNG) goes through the bundled `sharp` JavaScript and
+ * the pinned native runtime staged in the package-private `native` directory.
  */
 /**
  * The Image module surface a Plugin reaches through `plugin.modules.image`

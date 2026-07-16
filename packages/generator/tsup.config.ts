@@ -1,17 +1,22 @@
-import { resolve } from "node:path";
+import { createRequire } from "node:module";
+import { dirname, resolve } from "node:path";
 import { defineConfig } from "tsup";
 
 // CJS bundles that generator-core can `require` (the CJS boundary lives in
 // main.js). The @ps-generator-bridge/sdk protocol contract is inlined *from
 // source* (alias below) so the server build never depends on a prebuilt sdk and
 // always sees the current contract. Pure-JS runtime dependencies are bundled;
-// sharp resolves through the package-private vendor tree prepared by prepack.
+// sharp's JavaScript is bundled, while its native addon and DLLs are staged in
+// the package-private native directory prepared by prepack.
 //
 // tsup runs with cwd = this package dir, so the sibling sdk source resolves
 // relative to it.
 const sdkSource = resolve(process.cwd(), "../sdk/src/index.ts");
 const sdkPluginSource = resolve(process.cwd(), "../sdk/src/plugin/index.ts");
-const sharpRuntimeSource = resolve(process.cwd(), "src/runtime/sharp.ts");
+const packageRequire = createRequire(import.meta.url);
+const sharpEntry = packageRequire.resolve("sharp");
+const sharpLibDir = dirname(sharpEntry);
+const sharpNativeSource = resolve(process.cwd(), "src/runtime/sharp-native.cjs");
 
 export default defineConfig({
   entry: {
@@ -44,9 +49,20 @@ export default defineConfig({
       ...options.alias,
       "@ps-generator-bridge/sdk/plugin": sdkPluginSource,
       "@ps-generator-bridge/sdk": sdkSource,
-      sharp: sharpRuntimeSource,
+      sharp: sharpEntry,
     };
   },
+  esbuildPlugins: [
+    {
+      name: "sharp-native-runtime",
+      setup(build) {
+        build.onResolve({ filter: /^\.\/sharp$/ }, (args) => {
+          if (resolve(args.resolveDir) !== sharpLibDir) return undefined;
+          return { path: sharpNativeSource };
+        });
+      },
+    },
+  ],
   // jsx ships as plain-text resources (ADR 0008) at the package root.
   // `JsxRunner` resolves them from `../jsx` when the bundled code runs from
   // `dist`, so installers must keep the top-level `jsx/` directory.

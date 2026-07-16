@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
-import { join, resolve } from "node:path";
+import { basename, extname, join, resolve } from "node:path";
 
 const runtimeDir = resolve(process.argv[2] ?? ".");
 const packageJson = JSON.parse(readFileSync(join(runtimeDir, "package.json"), "utf8"));
@@ -20,10 +20,29 @@ assert.deepEqual(
   {},
   "packed runtime must not declare dependencies"
 );
-assert.equal(existsSync(join(runtimeDir, "node_modules")), false, "runtime root has node_modules");
-for (const name of ["main.js", "dist", "jsx", "vendor"]) {
+for (const path of walk(runtimeDir)) {
+  assert.notEqual(basename(path), "node_modules", `packed runtime contains node_modules: ${path}`);
+}
+assert.equal(existsSync(join(runtimeDir, "vendor")), false, "packed runtime still has vendor");
+for (const name of ["main.js", "dist", "jsx", "native"]) {
   assert.equal(existsSync(join(runtimeDir, name)), true, `packed runtime is missing ${name}`);
 }
+
+const nativeDir = join(runtimeDir, "native");
+const nativeEntries = readdirSync(nativeDir, { withFileTypes: true });
+assert.equal(
+  nativeEntries.every((entry) => entry.isFile()),
+  true,
+  "packed native runtime must be a flat directory"
+);
+for (const name of ["sharp-win32-x64.node", "libvips-42.dll", "versions.json"]) {
+  assert.equal(existsSync(join(nativeDir, name)), true, `packed native runtime is missing ${name}`);
+}
+assert.equal(
+  nativeEntries.some((entry) => extname(entry.name) === ".dll"),
+  true,
+  "packed native runtime has no DLLs"
+);
 
 const runtimeRequire = createRequire(join(runtimeDir, "package.json"));
 const entry = runtimeRequire("./main.js");
@@ -62,17 +81,28 @@ const host = await entry.PsBridgeHost.init(
 );
 await host.close();
 
-const vendorRequire = createRequire(join(runtimeDir, "vendor", "package.json"));
-const sharp = vendorRequire("sharp");
-assert.equal(sharp.versions.sharp, "0.32.6", "packed sharp version is not pinned");
+const loadedNative = Object.keys(runtimeRequire.cache).find(
+  (path) => basename(path) === "sharp-win32-x64.node"
+);
+assert.equal(loadedNative, join(nativeDir, "sharp-win32-x64.node"), "sharp loaded outside native");
 
-const png = await sharp(Buffer.from([255, 0, 0, 255]), {
-  raw: { width: 1, height: 1, channels: 4 },
-})
-  .png()
-  .toBuffer();
+const png = await host.modules.image.encodePng({
+  width: 1,
+  height: 1,
+  channelCount: 4,
+  rowBytes: 4,
+  pixels: Buffer.from([255, 255, 0, 0]),
+  bounds: { left: 0, top: 0, right: 1, bottom: 1 },
+});
 assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
 
 console.log(
   `[generator-pack] verified ${runtimeDir} with Node ${process.versions.node} on ${process.platform}-${process.arch}`
 );
+
+function walk(root) {
+  const paths = [root];
+  if (!statSync(root).isDirectory()) return paths;
+  for (const entry of readdirSync(root)) paths.push(...walk(join(root, entry)));
+  return paths;
+}
