@@ -178,6 +178,16 @@ export class SessionStore {
     return true;
   }
 
+  /** Remove a connection that failed before its lifecycle handshake completed. */
+  discard(session: ConnectionSession, socket: any): boolean {
+    if (this.sessions.get(session.clientId) !== session || !session.detachSocket(socket)) {
+      return false;
+    }
+    this.sessions.delete(session.clientId);
+    session.clearResumeTimer();
+    return true;
+  }
+
   subscribe(clientId: string, type: string, bind: () => () => void): boolean {
     const session = this.sessions.get(clientId);
     if (!session?.connected || session.subscriptions.has(type)) return false;

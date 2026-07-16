@@ -6,12 +6,11 @@ import type {
 } from "@ps-generator-bridge/generator/contract";
 import type { MainEventMap, MainEventName, PhotoshopEventName } from "../protocol";
 import { PsPhotoshopProxy } from "../photoshop";
+import type { PluginInitContext, PluginRuntime } from "./initializer";
 
-// A *global* brand so "extends BasePlugin" can be detected across
-// separately-bundled SDK copies (an external plugin bundles its own
-// @ps-generator-bridge/sdk/plugin, so `instanceof BasePlugin` against the
-// server's copy would fail). Stamped on BasePlugin.prototype; any subclass
-// inherits it via the prototype chain. See `isBasePluginClass`.
+// Keep the established global brand available to authoring tools that inspect
+// classes across separately-bundled SDK copies. The generator loader no longer
+// uses it to accept plugin runtimes; initializer results are structural.
 const BASE_PLUGIN_BRAND = Symbol.for("ps-generator-bridge.BasePlugin");
 
 /**
@@ -36,17 +35,17 @@ const BASE_PLUGIN_BRAND = Symbol.for("ps-generator-bridge.BasePlugin");
  * `onConnect`/`onDisconnect` to react to its clients coming and going; the
  * defaults are no-ops.
  */
-export abstract class BasePlugin {
-  /** Stable URL identity of this plugin (read from the class's `static id`). */
-  readonly id: string;
+export abstract class BasePlugin implements PluginRuntime {
+  /** Stable URL identity resolved before this plugin's initializer runs. */
+  readonly pluginId: string;
   /** The abstract plugin contract (never the concrete server plugin). */
   protected readonly plugin: PluginHost;
 
   private _photoshop: PsPhotoshopProxy | undefined;
 
-  constructor(id: string, plugin: PluginHost) {
-    this.id = id;
-    this.plugin = plugin;
+  constructor(context: PluginInitContext) {
+    this.pluginId = context.pluginId;
+    this.plugin = context.host;
   }
 
   /** Feature modules, reached by short key (shortcut for `this.plugin.modules`). */
@@ -136,8 +135,8 @@ export abstract class BasePlugin {
   onDispose?(): void | Promise<void>;
 }
 
-// Stamp the brand on the prototype (inherited by every subclass) so the loader's
-// isBasePluginClass check works across separately-bundled SDK copies.
+// Stamp the brand on the prototype (inherited by every subclass) so authoring
+// tools can inspect separately-bundled SDK copies without `instanceof`.
 Object.defineProperty(BasePlugin.prototype, BASE_PLUGIN_BRAND, {
   value: true,
   enumerable: false,

@@ -19,6 +19,7 @@ import { EventManager, RuntimeEventManager } from "../utils/eventManager";
 import { bridgeError, toProtocolError } from "../errors";
 
 const log = useLogger("server");
+const PLUGIN_FAILURE_CLOSE_CODE = 1011;
 
 /** Port the plugin/dev-server fall back to when no port is configured. */
 export const DEFAULT_PORT = 7700;
@@ -133,23 +134,35 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
     });
 
     instance.get("/ws/:pluginId", { websocket: true }, (socket: WebSocket, req) => {
+      socket.on("error", (error) => log.error("socket error", error));
       const pluginId = (req.params as { pluginId: string }).pluginId;
       const entry = pluginManager.get(pluginId);
       if (!entry) {
-        socket.send(
-          serializeFrame({
-            type: "error",
-            data: { ...bridgeError.pluginNotFound(pluginId).toProtocolError(), pluginId },
-          })
-        );
-        socket.close();
+        const failure = pluginManager.failure(pluginId);
+        const error = failure?.lastError ?? {
+          ...bridgeError.pluginNotFound(pluginId).toProtocolError(),
+          pluginId,
+        };
+        socket.send(serializeFrame({ type: "error", data: error }));
+        failure ? socket.close(PLUGIN_FAILURE_CLOSE_CODE, "plugin-unavailable") : socket.close();
         return;
       }
       const { session, created } = entry.sessions.connect(resumeFromQuery(req.query), socket);
+      if (created) {
+        const connected = entry.lifecycle.connect(session.clientId);
+        if (!connected.ok) {
+          try {
+            socket.send(serializeFrame({ type: "error", data: connected.error }));
+          } finally {
+            entry.sessions.discard(session, socket);
+            socket.close(PLUGIN_FAILURE_CLOSE_CODE, "plugin-onConnect-failed");
+          }
+          return;
+        }
+      }
       log.info(`client connected: ${session.clientId} -> plugin ${pluginId}`);
       // First frame after connect is the handshake Event carrying the clientId.
       socket.send(serializeFrame({ type: "connected", data: { clientId: session.clientId } }));
-      if (created) entry.plugin.onConnect(session.clientId);
       const ctx: HandlerContext = { generator, jsx, session, clientId: session.clientId };
 
       socket.on("message", (data) => {
@@ -166,7 +179,6 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
           log.info(`client disconnected: ${session.clientId} -> plugin ${pluginId}`);
         }
       });
-      socket.on("error", (error) => log.error("socket error", error));
     });
   });
 
@@ -187,6 +199,7 @@ export function createServer(options: StartServerOptions): PsBridgeServer {
     close: async () => {
       rootSessions.clear();
       pluginManager.clearSessions();
+      await pluginManager.disposeAll();
       await app.close();
     },
   };
@@ -264,6 +277,9 @@ function statusForProtocolError(code: string): number {
     case ErrorCode.PhotoshopBusy:
       return 409;
     case ErrorCode.PhotoshopUnavailable:
+    case ErrorCode.PluginLoadFailed:
+    case ErrorCode.PluginRegistrationFailed:
+    case ErrorCode.PluginLifecycleFailed:
       return 503;
     default:
       return 500;

@@ -6,12 +6,19 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { PLUGINS_MARKER, pluginsSnapshotDir, type PathEnvironment } from "../src/appPaths";
-import { cleanupPluginSource, preparePluginSource, scanPluginCandidates } from "../src/pluginDirs";
+import {
+  cleanupPluginSource,
+  countPluginCandidates,
+  parsePluginPaths,
+  preparePluginSource,
+  scanPluginCandidates,
+} from "../src/pluginDirs";
 
 const roots: string[] = [];
 
@@ -81,6 +88,54 @@ describe("plugin source preparation", () => {
 
     await expect(preparePluginSource({ plugin }, paths)).rejects.toThrow("must not point inside");
     expect(existsSync(join(plugin, "package.json"))).toBe(true);
+  });
+
+  it("parses inherited explicit plugin paths using the platform delimiter", () => {
+    const first = join(tmpdir(), "plugin one");
+    const second = join(tmpdir(), "plugin-two");
+
+    expect(parsePluginPaths(` ${first}${delimiter}${delimiter}${second} `)).toEqual([
+      first,
+      second,
+    ]);
+  });
+
+  it("counts distinct explicit and collection candidates by real path", () => {
+    const { root } = newRoot();
+    const explicitPlugin = writePlugin(join(root, "explicit"));
+    const pluginsDir = join(root, "collection");
+    mkdirSync(pluginsDir, { recursive: true });
+    symlinkSync(
+      explicitPlugin,
+      join(pluginsDir, "same-plugin"),
+      process.platform === "win32" ? "junction" : "dir"
+    );
+    writePlugin(join(pluginsDir, "base-plugin"));
+
+    expect(countPluginCandidates(pluginsDir, [explicitPlugin, join(explicitPlugin, ".")])).toBe(2);
+  });
+
+  it("counts an invalid declared explicit path so smoke validation can fail", () => {
+    const { root } = newRoot();
+    const pluginsDir = join(root, "collection");
+    mkdirSync(pluginsDir, { recursive: true });
+    const missing = join(root, "missing");
+
+    expect(countPluginCandidates(pluginsDir, [missing, missing])).toBe(1);
+  });
+
+  it("does not deduplicate a rejected relative explicit path against the collection", () => {
+    const { root } = newRoot();
+    const pluginsDir = join(root, "collection");
+    writePlugin(join(pluginsDir, "base-plugin"));
+    const previous = process.cwd();
+    process.chdir(root);
+
+    try {
+      expect(countPluginCandidates(pluginsDir, [join("collection", "base-plugin")])).toBe(2);
+    } finally {
+      process.chdir(previous);
+    }
   });
 });
 

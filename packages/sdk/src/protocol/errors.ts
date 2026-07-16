@@ -33,6 +33,8 @@ export const ErrorCode = {
   JsxFailed: "JSX_FAILED",
   PluginNotFound: "PLUGIN_NOT_FOUND",
   PluginLoadFailed: "PLUGIN_LOAD_FAILED",
+  PluginRegistrationFailed: "PLUGIN_REGISTRATION_FAILED",
+  PluginLifecycleFailed: "PLUGIN_LIFECYCLE_FAILED",
   CosUploadFailed: "COS_UPLOAD_FAILED",
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

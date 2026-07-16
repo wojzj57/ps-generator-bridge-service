@@ -31,6 +31,24 @@ describe("RuntimeEventManager", () => {
     expect(seen).toEqual([]);
   });
 
+  it("disposes every facade owned by a failed plugin", () => {
+    const generator = fakeGenerator();
+    const runtime = new RuntimeEventManager(new EventManager(generator));
+    const first = runtime.createPluginFacade("paint");
+    const second = runtime.createPluginFacade("paint");
+    const seen: unknown[] = [];
+
+    first.on("imageChanged", (payload) => seen.push(["first", payload]));
+    second.on("imageChanged", (payload) => seen.push(["second", payload]));
+    expect(generator.listeners.has("imageChanged")).toBe(true);
+
+    runtime.disposePlugin("paint");
+    generator.emit("imageChanged", { documentId: 1 });
+
+    expect(generator.listeners.get("imageChanged")).toEqual([]);
+    expect(seen).toEqual([]);
+  });
+
   it("awaits remote event watchers before binding the subscription", async () => {
     const runtime = new RuntimeEventManager(new EventManager(fakeGenerator()));
     const order: string[] = [];

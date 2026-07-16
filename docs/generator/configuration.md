@@ -7,6 +7,7 @@ The generator accepts structured runtime options through `PluginConfig` and depl
 ```ts
 export interface PluginConfig {
   port?: number;
+  plugins?: string[];
   pluginsDir?: string;
   maxImportImageBytes?: number;
   maxImportImagePixels?: number;
@@ -17,7 +18,19 @@ export interface PluginConfig {
 }
 ```
 
-`port` controls the HTTP/WebSocket service port. `pluginsDir` points to a directory whose direct child folders are plugin packages.
+`port` controls the HTTP/WebSocket service port. `plugins` contains absolute
+plugin package directories loaded in array order. `pluginsDir` points to a
+collection directory whose direct child folders are plugin packages.
+
+Plugin sources load in this priority order:
+
+1. absolute paths from `PS_BRIDGE_PLUGINS`, in list order
+2. absolute paths from `PluginConfig.plugins`, in array order
+3. direct children of `pluginsDir`, sorted by folder name
+
+Real paths are deduplicated across sources. The first candidate that fully
+activates claims its plugin id; an initialization or registration failure leaves
+that id available for a later candidate.
 
 Layer image import validates inputs before handing them to Photoshop. `maxImportImageBytes` caps decoded/imported image bytes, `maxImportImagePixels` caps image dimensions by total pixels, `allowedImportImageFormats` limits accepted formats, and `allowLocalImagePaths` controls whether public `layer:importImage` requests may use local paths or `file://` URIs.
 
@@ -49,6 +62,7 @@ present in the process environment take precedence over `.env` values.
 | Variable                          | Purpose                                                                   |
 | --------------------------------- | ------------------------------------------------------------------------- |
 | `PS_BRIDGE_PORT`                  | Overrides the configured port when valid.                                 |
+| `PS_BRIDGE_PLUGINS`               | Prepends a platform-delimited list of absolute plugin package paths.      |
 | `PS_BRIDGE_PLUGINS_DIR`           | Overrides the default plugin directory when `pluginsDir` is not provided. |
 | `PS_BRIDGE_LOG_DIR`               | Overrides the generator runtime log directory before the bundle loads.    |
 | `PS_BRIDGE_SESSION_RESUME_TTL_MS` | Overrides the session resume TTL with a non-negative integer.             |
@@ -60,3 +74,6 @@ present in the process environment take precedence over `.env` values.
 | `PS_BRIDGE_COS_URL_EXPIRES`       | Optional signed URL lifetime in seconds, default `315360000`.             |
 
 COS upload support is enabled only when all four required COS fields are present and non-empty.
+
+`PS_BRIDGE_PLUGINS` uses the platform path delimiter: `;` on Windows and `:` on
+POSIX systems. Empty entries are ignored.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generatorCoreArguments, sdkCompatibilityError } from "../src/core";
+import { assertMinimumPlugins, generatorCoreArguments, sdkCompatibilityError } from "../src/core";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -33,6 +33,23 @@ describe("generatorCoreArguments", () => {
     expect(sdkCompatibilityError("2.0.0", new Error("unknown frame")).message).toContain(
       "upgrade @ps-generator-bridge/cli"
     );
+  });
+});
+
+describe("assertMinimumPlugins", () => {
+  it("allows plugins loaded from runtime configuration beyond the known minimum", () => {
+    expect(() =>
+      assertMinimumPlugins({
+        plugins: [{ id: "known" }, { id: "runtime-extra" }],
+        minimumExpectedCount: 1,
+      })
+    ).not.toThrow();
+  });
+
+  it("rejects a loaded count below the known minimum", () => {
+    expect(() =>
+      assertMinimumPlugins({ plugins: [{ id: "only-one" }], minimumExpectedCount: 2 })
+    ).toThrow("Expected at least 2 plugin(s), but host loaded 1");
   });
 });
 

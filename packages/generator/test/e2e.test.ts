@@ -1,7 +1,13 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { WebSocket } from "ws";
 import { ProtocolMethod, RawConnection } from "@ps-generator-bridge/sdk";
-import { BasePlugin, ws, bootstrap, type PluginHost } from "@ps-generator-bridge/sdk/plugin";
+import {
+  BasePlugin,
+  ws,
+  bootstrap,
+  type PluginHost,
+  type PluginInitContext,
+} from "@ps-generator-bridge/sdk/plugin";
 import { createServer, type PsBridgeServer } from "../src/server";
 import type { Logger } from "@ps-generator-bridge/sdk/plugin";
 import { EventManager, RuntimeEventManager } from "../src/utils/eventManager";
@@ -11,8 +17,6 @@ const silentLogger: Logger = { debug() {}, info() {}, warn() {}, error() {} };
 
 // A fixture plugin exercising the SDK <-> server round trip over /ws/{id}.
 class EchoService extends BasePlugin {
-  static readonly id = "echo";
-
   @ws("echo:ping")
   ping(params: { n?: number }): { pong: number } {
     return { pong: params?.n ?? 0 };
@@ -46,11 +50,14 @@ describe("end-to-end: Connection <-> per-plugin server", () => {
     const generator = fakeGenerator();
     const events = new RuntimeEventManager(new EventManager(generator));
     server = createServer({ port: 0, generator, runtimeEvents: events, logger: silentLogger });
-    server.pluginManager.register(
-      new EchoService("echo", {
-        events: events.createPluginFacade("echo"),
-      } as unknown as PluginHost)
-    );
+    const context = {
+      pluginId: "echo",
+      host: { events: events.createPluginFacade("echo") } as unknown as PluginHost,
+      ws() {},
+      api() {},
+    } as PluginInitContext;
+    const runtime = new EchoService(context);
+    await server.pluginManager.register({ pluginId: "echo", runtime });
     bootstrap(new GreetModule(), server.registry);
     await server.listen();
 
@@ -77,7 +84,7 @@ describe("end-to-end: Connection <-> per-plugin server", () => {
     // plugin events are delivered after an explicit protocol subscription
     await conn.invoke(ProtocolMethod.EventSubscribe, { type: "tick" });
     const broadcastSeen = new Promise((resolve) => conn!.on("tick", resolve));
-    (server.pluginManager.get("echo")!.plugin as EchoService).publish("tick", { n: 7 });
+    (server.pluginManager.get("echo")!.runtime as EchoService).publish("tick", { n: 7 });
     expect(await broadcastSeen).toEqual({ n: 7 });
   });
 });

@@ -53,7 +53,7 @@ Legacy `<workspace-root>/generator-core` checkouts are ignored and never moved o
 
 ### Runtime versions
 
-The CLI and generator runtime have independent versions. `setup`, `setup-photoshop`, `run`, and `dev` query the npm `latest` dist-tag on every invocation and update the shared runtime only when the resolved version changes. Installation is staged and validated before replacing the current cache.
+The CLI and generator runtime have independent versions. `setup`, `setup-photoshop`, `run`, and `dev` query the npm `latest` dist-tag on every invocation and update the shared runtime only when the resolved version changes. Installation is staged and validated before replacing the current cache. Valid runtimes are standalone Windows x64 packages with no unresolved runtime dependencies and a complete package-private sharp vendor payload; legacy dependency-based caches are rejected.
 
 If npm is unavailable, a valid cached runtime is used with a warning. A first install without npm fails. If an update fails, the previous valid runtime is preserved. Pass `--runtime-version <version-or-tag>` to pin or roll back; an explicit request is never replaced by a different cached version.
 
@@ -112,7 +112,10 @@ ps-generator-bridge dev --plugin-cwd --port 7700
 ps-generator-bridge dev --plugins-dir D:\plugins --runtime-version 0.6.0
 ```
 
-The harness verifies that the number of loaded plugins matches the candidate package directories. The removed `--expect-plugin` option is not supported.
+The harness verifies that the host loaded at least the number of distinct
+candidates known from the selected source and `PS_BRIDGE_PLUGINS`. Additional
+host-configured plugins are allowed. The removed `--expect-plugin` option is not
+supported.
 
 ## Clean
 

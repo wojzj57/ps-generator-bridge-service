@@ -1,6 +1,6 @@
 import { mkdtemp, mkdir, writeFile, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { delimiter, join, resolve } from "node:path";
 import { describe, it, expect, afterEach } from "vitest";
 import { ErrorCode, MainEvent } from "@ps-generator-bridge/sdk";
 import { PsBridgeHost } from "../src/plugin";
@@ -21,6 +21,23 @@ const SDK_PLUGIN = resolve(__dirname, "../../sdk/dist/plugin.cjs");
 const SOURCE_POLYFILLS = join(__dirname, "..", "jsx", "polyfills");
 
 let plugin: PsBridgeHost | undefined;
+
+async function writePluginPackage(path: string, id: string): Promise<void> {
+  await mkdir(path, { recursive: true });
+  await writeFile(
+    join(path, "package.json"),
+    JSON.stringify({ name: `@fixture/${id}`, version: "0.0.0", main: "index.js" }),
+    "utf8"
+  );
+  await writeFile(
+    join(path, "index.js"),
+    `const { BasePlugin, definePlugin } = require(${JSON.stringify(SDK_PLUGIN)});
+class FixturePlugin extends BasePlugin {}
+module.exports = definePlugin(${JSON.stringify(id)}, (context) => new FixturePlugin(context));
+`,
+    "utf8"
+  );
+}
 
 afterEach(async () => {
   await plugin?.close();
@@ -103,9 +120,9 @@ describe("PsBridgeHost", () => {
     );
     await writeFile(
       join(base, "index.js"),
-      `const { BasePlugin } = require(${JSON.stringify(SDK_PLUGIN)});
-class GoodPlugin extends BasePlugin { static id = "good"; }
-module.exports = GoodPlugin;
+      `const { BasePlugin, definePlugin } = require(${JSON.stringify(SDK_PLUGIN)});
+class GoodPlugin extends BasePlugin {}
+module.exports = definePlugin("good", (context) => new GoodPlugin(context));
 `,
       "utf8"
     );
@@ -122,6 +139,144 @@ module.exports = GoodPlugin;
     });
 
     expect(infos.some((m) => m.includes("plugin loaded: good (good)"))).toBe(true);
+  });
+
+  it("prepends env and config plugin paths before the collection", async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), "host-plugin-sources-")));
+    const envPlugin = join(root, "env-plugin");
+    const configPlugin = join(root, "config-plugin");
+    const collection = join(root, "collection");
+    await writePluginPackage(envPlugin, "env");
+    await writePluginPackage(configPlugin, "config");
+    await writePluginPackage(join(collection, "base-plugin"), "base");
+    const previous = process.env.PS_BRIDGE_PLUGINS;
+    process.env.PS_BRIDGE_PLUGINS = `${delimiter}${envPlugin}${delimiter}`;
+
+    try {
+      plugin = await PsBridgeHost.init(
+        fakeGenerator(),
+        { port: 0, plugins: [configPlugin], pluginsDir: collection },
+        silentLogger,
+        { polyfillsDir: SOURCE_POLYFILLS }
+      );
+      const port = (plugin as unknown as { server: { port: number } }).server.port;
+
+      const response = await fetch(`http://127.0.0.1:${port}/plugins`);
+      await expect(response.json()).resolves.toEqual({
+        plugins: [{ id: "env" }, { id: "config" }, { id: "base" }],
+      });
+    } finally {
+      if (previous === undefined) Reflect.deleteProperty(process.env, "PS_BRIDGE_PLUGINS");
+      else process.env.PS_BRIDGE_PLUGINS = previous;
+    }
+  });
+
+  it("preserves the winning plugin's event subscriptions when a duplicate id is skipped", async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), "host-plugin-duplicate-")));
+    const winner = join(root, "winner");
+    const collection = join(root, "collection");
+    const counterKey = "ps-bridge-test-duplicate-winner";
+    await mkdir(winner, { recursive: true });
+    await writeFile(
+      join(winner, "package.json"),
+      JSON.stringify({ name: "@fixture/winner", version: "0.0.0", main: "index.js" }),
+      "utf8"
+    );
+    await writeFile(
+      join(winner, "index.js"),
+      `const { BasePlugin, definePlugin } = require(${JSON.stringify(SDK_PLUGIN)});
+class WinnerPlugin extends BasePlugin {
+  constructor(context) {
+    super(context);
+    this.events.on("selection:changed", () => {
+      const key = Symbol.for(${JSON.stringify(counterKey)});
+      globalThis[key] = (globalThis[key] || 0) + 1;
+    });
+  }
+}
+module.exports = definePlugin("shared", (context) => new WinnerPlugin(context));
+`,
+      "utf8"
+    );
+    await writePluginPackage(join(collection, "duplicate"), "shared");
+    const key = Symbol.for(counterKey);
+    const counters = globalThis as unknown as Record<symbol, number>;
+    counters[key] = 0;
+
+    try {
+      plugin = await PsBridgeHost.init(
+        fakeGenerator(),
+        { port: 0, plugins: [winner], pluginsDir: collection },
+        silentLogger,
+        { polyfillsDir: SOURCE_POLYFILLS }
+      );
+
+      plugin.emitModuleEvent(MainEvent.SelectionChanged, null);
+      expect(counters[key]).toBe(1);
+    } finally {
+      Reflect.deleteProperty(counters, key);
+    }
+  });
+
+  it("continues host startup when one loaded plugin fails registration", async () => {
+    const dir = await realpath(await mkdtemp(join(tmpdir(), "host-plugins-")));
+    const brokenDir = join(dir, "a-broken");
+    const goodDir = join(dir, "z-good");
+    await mkdir(brokenDir, { recursive: true });
+    await mkdir(goodDir, { recursive: true });
+    await writeFile(
+      join(brokenDir, "package.json"),
+      JSON.stringify({ name: "@fixture/broken", version: "0.0.0", main: "index.js" }),
+      "utf8"
+    );
+    await writeFile(
+      join(brokenDir, "index.js"),
+      `const { BasePlugin, definePlugin, api } = require(${JSON.stringify(SDK_PLUGIN)});
+const META = Symbol.for("Symbol.metadata");
+class BrokenPlugin extends BasePlugin {
+  first() { return { handler: "first" }; }
+  duplicate() { return { handler: "duplicate" }; }
+}
+const meta = {};
+BrokenPlugin[META] = meta;
+api("/partial")(BrokenPlugin.prototype.first, { name: "first", metadata: meta });
+api("/partial")(BrokenPlugin.prototype.duplicate, { name: "duplicate", metadata: meta });
+module.exports = definePlugin("broken", (context) => new BrokenPlugin(context));
+`,
+      "utf8"
+    );
+    await writeFile(
+      join(goodDir, "package.json"),
+      JSON.stringify({ name: "@fixture/good", version: "0.0.0", main: "index.js" }),
+      "utf8"
+    );
+    await writeFile(
+      join(goodDir, "index.js"),
+      `const { BasePlugin, definePlugin } = require(${JSON.stringify(SDK_PLUGIN)});
+class GoodPlugin extends BasePlugin {}
+module.exports = definePlugin("good", (context) => new GoodPlugin(context));
+`,
+      "utf8"
+    );
+
+    plugin = await PsBridgeHost.init(fakeGenerator(), { port: 0, pluginsDir: dir }, silentLogger, {
+      polyfillsDir: SOURCE_POLYFILLS,
+    });
+    const port = (plugin as unknown as { server: { port: number } }).server.port;
+
+    const plugins = await fetch(`http://127.0.0.1:${port}/plugins`);
+    await expect(plugins.json()).resolves.toEqual({ plugins: [{ id: "good" }] });
+
+    const health = await fetch(`http://127.0.0.1:${port}/plugins/broken/health`);
+    await expect(health.json()).resolves.toMatchObject({
+      id: "broken",
+      status: "failed",
+      lastError: { code: ErrorCode.PluginRegistrationFailed },
+      checks: { load: "ok", registration: "failed" },
+    });
+
+    const partial = await fetch(`http://127.0.0.1:${port}/broken/partial`);
+    expect(partial.status).toBe(404);
   });
 
   it("records skipped plugin diagnostics for HTTP health checks", async () => {

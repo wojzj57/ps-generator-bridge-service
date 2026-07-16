@@ -30,9 +30,17 @@ Server-level codes include:
 - `JSX_FAILED`
 - `PLUGIN_NOT_FOUND`
 - `PLUGIN_LOAD_FAILED`
+- `PLUGIN_REGISTRATION_FAILED`
+- `PLUGIN_LIFECYCLE_FAILED`
 - `COS_UPLOAD_FAILED`
 
 Plugin-specific errors may use plugin-owned `code` values. The protocol keeps `code` as a string so plugin packages can define their own error catalog.
+
+Plugin loading errors include a diagnostic `details.phase` such as `manifest`,
+`import`, `identity`, `init`, `runtime-validation`, or `registration`, together
+with a public `reason`. Lifecycle failures identify `onConnect`, `onDisconnect`,
+or `onDispose`. Full third-party stacks stay in generator logs; health responses
+expose only protocol-safe diagnostics.
 
 ## Handling Errors
 

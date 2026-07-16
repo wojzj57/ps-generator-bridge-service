@@ -22,6 +22,10 @@ pnpm setup
 
 `pnpm setup` 会在用户级统一缓存中准备 Adobe `generator-core` 和 npm 上最新的 generator runtime。Windows 下位于 `%LOCALAPPDATA%\ps-generator-bridge`，仓库内的 core checkout 会被忽略。
 
+已发布 generator runtime 是独立的 Windows x64 包。JavaScript runtime 依赖会被
+bundle，sharp 及其原生 vendor 文件保留在包内私有目录。CLI 会在启动前拒绝旧式的
+依赖型缓存或原生文件不完整的缓存。
+
 ## Generator Runtime 安装
 
 普通用户不需要 clone 本仓库。可以直接运行已发布的 CLI：

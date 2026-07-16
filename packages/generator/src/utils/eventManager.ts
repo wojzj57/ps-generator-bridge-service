@@ -310,6 +310,7 @@ export class EventScope {
 export class RuntimeEventManager {
   readonly mainScope = new EventScope();
   private readonly pluginScopes = new Map<string, EventScope>();
+  private readonly pluginFacades = new Map<string, Set<PluginEventFacade>>();
   private readonly remoteWatchers = new Map<string, RemoteEventWatcher>();
   private readonly subscribables = new Map<string, SubscribableProducer>();
   private readonly subscribableStates = new Map<string, SubscribableState>();
@@ -343,7 +344,14 @@ export class RuntimeEventManager {
 
   createPluginFacade(pluginId: string): PluginEventFacade {
     this.createPluginScope(pluginId);
-    return new PluginEventFacade(this, pluginId);
+    const facade = new PluginEventFacade(this, pluginId);
+    let facades = this.pluginFacades.get(pluginId);
+    if (!facades) {
+      facades = new Set();
+      this.pluginFacades.set(pluginId, facades);
+    }
+    facades.add(facade);
+    return facade;
   }
 
   async subscribeRemote(options: RemoteEventSubscription): Promise<void> {
@@ -397,6 +405,8 @@ export class RuntimeEventManager {
   }
 
   disposePlugin(pluginId: string): void {
+    for (const facade of this.pluginFacades.get(pluginId) ?? []) facade.dispose();
+    this.pluginFacades.delete(pluginId);
     const scope = this.pluginScopes.get(pluginId);
     scope?.dispose();
     this.pluginScopes.delete(pluginId);
@@ -412,6 +422,10 @@ export class RuntimeEventManager {
     }
     this.subscribableStates.clear();
     this.mainScope.dispose();
+    for (const facades of this.pluginFacades.values()) {
+      for (const facade of facades) facade.dispose();
+    }
+    this.pluginFacades.clear();
     for (const scope of this.pluginScopes.values()) scope.dispose();
     this.pluginScopes.clear();
     this.generatorEvents.dispose();

@@ -104,11 +104,33 @@ export const bridgeError = {
       source: "plugin",
     });
   },
-  pluginLoadFailed(pluginId: string, reason: string): BridgeError {
+  pluginLoadFailed(pluginId: string, reason: string, phase = "load"): BridgeError {
     return new BridgeError({
       code: ErrorCode.PluginLoadFailed,
       message: `plugin load failed: ${pluginId}`,
-      details: { pluginId, reason },
+      details: { pluginId, phase, reason },
+      retryable: false,
+      source: "plugin",
+    });
+  },
+  pluginRegistrationFailed(pluginId: string, reason: string): BridgeError {
+    return new BridgeError({
+      code: ErrorCode.PluginRegistrationFailed,
+      message: `plugin registration failed: ${pluginId}`,
+      details: { pluginId, reason, phase: "registration" },
+      retryable: false,
+      source: "plugin",
+    });
+  },
+  pluginLifecycleFailed(
+    pluginId: string,
+    phase: "onConnect" | "onDisconnect" | "onDispose",
+    reason: string
+  ): BridgeError {
+    return new BridgeError({
+      code: ErrorCode.PluginLifecycleFailed,
+      message: `plugin lifecycle hook failed: ${pluginId}.${phase}`,
+      details: { pluginId, phase, reason },
       retryable: false,
       source: "plugin",
     });

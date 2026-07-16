@@ -5,11 +5,10 @@ import {
   bootstrap,
   setGeneratorLogger,
   useLogger,
-  type BasePlugin,
   type Logger,
   type PluginHost,
 } from "@ps-generator-bridge/sdk/plugin";
-import { loadPlugins } from "./plugins";
+import { loadPlugins, parsePluginPaths } from "./plugins";
 import { JsxRunner } from "./utils/jsxRunner";
 import { EventManager, RuntimeEventManager, type PluginEvents } from "./utils/eventManager";
 import { MainEvent, type MainEventMap, type MainEventName } from "@ps-generator-bridge/sdk";
@@ -44,6 +43,8 @@ export { DEFAULT_PORT };
 /** Host config handed in by generator-core (self._config[name]). */
 export interface PluginConfig {
   port?: number;
+  /** Absolute plugin package directories loaded in array order. */
+  plugins?: string[];
   /**
    * Directory whose direct child folders are loaded as plugin packages
    * (each a `package.json` with a `main` entry; see the plugin loader).
@@ -91,7 +92,6 @@ export class PsBridgeHost implements PluginHost {
     image: ImageModule;
     selection: SelectionModule;
   };
-  private plugins: BasePlugin[] = [];
   private readonly _jsx: JsxRunner;
   private readonly _events: EventManager;
   private readonly _runtimeEvents: RuntimeEventManager;
@@ -171,8 +171,13 @@ export class PsBridgeHost implements PluginHost {
   ): Promise<PsBridgeHost> {
     setGeneratorLogger(logger);
     const host = new PsBridgeHost(generator, config, overrides, logger);
-    await host.onInit();
-    return host;
+    try {
+      await host.onInit();
+      return host;
+    } catch (error) {
+      await host.close();
+      throw error;
+    }
   }
 
   private async onInit(): Promise<void> {
@@ -191,39 +196,61 @@ export class PsBridgeHost implements PluginHost {
       sessionResumeTtlMs: sessionResumeTtlFromEnv() ?? this.config.sessionResumeTtlMs,
     });
     this.server = server;
-    // Plugins are loaded entirely from `pluginsDir`: scan its direct child
-    // folders for `package.json` packages, validate + construct each with its
-    // `static id` and this host. A missing dir is the default state (no plugins
-    // installed). Modules exist from construction so a plugin can read
-    // `this.plugin.modules.<key>` (ADR 0009).
-    // Resolution order: explicit `config.pluginsDir`, then the
-    // PS_BRIDGE_PLUGINS_DIR env override, else the package-local
-    // `plugins/` tree (__dirname is `dist`, so `../plugins`).
+    // Explicit package paths are prepended in env -> config order, followed by
+    // the collection directory. A missing collection is the default state (no
+    // collection plugins installed). Modules exist from construction so a
+    // plugin can read `this.plugin.modules.<key>` (ADR 0009).
+    // Collection resolution remains explicit config, then env override, then
+    // the package-local `plugins/` tree (__dirname is `dist`, so `../plugins`).
+    const pluginDirs = [
+      ...parsePluginPaths(process.env.PS_BRIDGE_PLUGINS),
+      ...(this.config.plugins ?? []),
+    ];
     const pluginsDir =
       this.config.pluginsDir ??
       process.env.PS_BRIDGE_PLUGINS_DIR ??
       join(__dirname, "..", "plugins");
     const { loaded, skipped } = await loadPlugins({
+      pluginDirs,
       pluginsDir,
       hostFor: (pluginDir, pluginId) => this.hostFor(pluginDir, pluginId),
       knownIds: new Set(),
+      activate: async (candidate) => {
+        const result = await server.pluginManager.register({
+          pluginId: candidate.id,
+          runtime: candidate.runtime,
+          scoped: candidate.scoped,
+        });
+        if (result.ok) return { ok: true };
+        const reason = result.error.details?.reason;
+        return {
+          ok: false,
+          reason: typeof reason === "string" ? reason : result.error.message,
+          cleanupHandled: true,
+        };
+      },
       logger: log,
     });
+    const loadedIds = new Set(loaded.map((item) => item.id));
     for (const s of skipped) {
       log.warn(`plugin skipped: ${s.path} — ${s.reason}`);
+      // A later duplicate candidate is skipped under the winner's id. Keep the
+      // winner's init-time event subscriptions intact and let its activation
+      // determine health for that id.
+      if (loadedIds.has(s.id)) continue;
+      this._runtimeEvents.disposePlugin(s.id);
       server.pluginManager.recordFailure({
         id: s.id,
-        lastError: bridgeError.pluginLoadFailed(s.id, s.reason).toProtocolError(),
+        lastError:
+          s.code === "PLUGIN_REGISTRATION_FAILED"
+            ? bridgeError.pluginRegistrationFailed(s.id, s.reason).toProtocolError()
+            : bridgeError.pluginLoadFailed(s.id, s.reason, s.phase).toProtocolError(),
       });
     }
-    this.plugins = loaded.map((l) => l.plugin);
-    // Register every plugin (scoped table + per-plugin SessionStore + events +
-    // /ws/{id} dispatch + prefixed @api) before module bootstrap, so plugin ids
-    // are reserved first path segments — a module @api cannot then steal a
-    // plugin's namespace (RFC 0004). All routes land before `listen` (fastify).
-    for (const plugin of this.plugins) {
-      server.pluginManager.register(plugin);
-    }
+    // Plugin activation above has already registered each successful runtime,
+    // scoped table, session store, event scope, and prefixed API routes. Reserve
+    // those first path segments before module bootstrap so a module @api cannot
+    // steal a plugin namespace (RFC 0004). All routes land before `listen`.
     server.registry.reservedSegments = new Set(server.pluginManager.ids);
     for (const module of Object.values(this.modules)) {
       bootstrap(module, server.registry);
@@ -262,13 +289,6 @@ export class PsBridgeHost implements PluginHost {
   /** Stop the WebSocket service (used by tests; PS teardown is process exit). */
   async close(): Promise<void> {
     this._runtimeEvents.emitMain(MainEvent.Closing, { reason: "host-close" });
-    for (const plugin of [...this.plugins].reverse()) {
-      try {
-        await plugin.onDispose?.();
-      } catch (error) {
-        log.error(`plugin dispose failed: ${plugin.id}`, error);
-      }
-    }
     this.modules.selection.dispose();
     await this.server?.close();
     this.server = undefined;

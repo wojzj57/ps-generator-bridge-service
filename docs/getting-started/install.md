@@ -22,6 +22,11 @@ pnpm setup
 
 `pnpm setup` prepares Adobe `generator-core` and the latest published generator runtime in the shared per-user cache. On Windows it lives under `%LOCALAPPDATA%\ps-generator-bridge`; repository-local core checkouts are ignored.
 
+The published generator runtime is a standalone Windows x64 package. Its
+JavaScript runtime dependencies are bundled, while sharp and its native vendor
+files remain package-private. The CLI rejects legacy dependency-based or
+incomplete native caches before launch.
+
 ## Generator Runtime Install
 
 Users do not need to clone this repository to install the Photoshop Generator runtime. Run the published CLI directly:

@@ -30,9 +30,16 @@ interface ProtocolError {
 - `JSX_FAILED`
 - `PLUGIN_NOT_FOUND`
 - `PLUGIN_LOAD_FAILED`
+- `PLUGIN_REGISTRATION_FAILED`
+- `PLUGIN_LIFECYCLE_FAILED`
 - `COS_UPLOAD_FAILED`
 
 插件专属错误可以使用插件自己定义的 `code`。协议把 `code` 保持为字符串，所以插件包可以定义自己的错误目录。
+
+插件加载错误会在 `details.phase` 中给出 `manifest`、`import`、`identity`、
+`init`、`runtime-validation` 或 `registration` 等诊断阶段，并包含可公开的
+`reason`。生命周期错误会指出 `onConnect`、`onDisconnect` 或 `onDispose`。
+第三方完整 stack 只写入 generator 日志；健康响应只暴露协议安全的诊断信息。
 
 ## 处理错误
 

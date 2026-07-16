@@ -67,3 +67,50 @@ jobs:
 
       - name: Build docs
         run: pnpm docs:build
+
+  standalone-runtime:
+    name: Generator standalone runtime
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.0
+
+      - name: Setup build Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Pack generator runtime
+        shell: pwsh
+        run: pnpm --filter @ps-generator-bridge/generator pack --pack-destination $env:RUNNER_TEMP
+
+      - name: Extract packed runtime
+        shell: pwsh
+        run: |
+          $archive = Get-ChildItem -LiteralPath $env:RUNNER_TEMP -Filter "ps-generator-bridge-generator-*.tgz" | Select-Object -First 1
+          if (-not $archive) { throw "Generator runtime tarball was not created" }
+          $target = Join-Path $env:RUNNER_TEMP "generator-runtime-check"
+          New-Item -ItemType Directory -Path $target | Out-Null
+          & "$env:WINDIR\System32\tar.exe" -xzf $archive.FullName -C $target
+          "RUNTIME_DIR=$(Join-Path $target 'package')" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Setup Photoshop Node baseline
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.13.0
+
+      - name: Verify packed runtime in isolation
+        shell: pwsh
+        env:
+          NODE_PATH: ""
+          PS_BRIDGE_EXPECT_NODE_VERSION: 18.13.0
+        run: node packages/generator/scripts/verifyPackedRuntime.mjs $env:RUNTIME_DIR

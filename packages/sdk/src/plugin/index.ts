@@ -14,6 +14,13 @@
 
 // Runtime authoring kit (stays in the SDK).
 export { BasePlugin, isBasePluginClass } from "./base";
+export { definePlugin } from "./initializer";
+export type {
+  PluginApiRoute,
+  PluginInitContext,
+  PluginInitializer,
+  PluginRuntime,
+} from "./initializer";
 export { ws, api, subscribable, bootstrap } from "./decorators";
 export { setGeneratorLogger, useLogger } from "./logger";
 export type { Logger, LogLevel } from "./logger";

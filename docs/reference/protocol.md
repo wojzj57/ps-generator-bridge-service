@@ -132,6 +132,11 @@ interface PluginHealth {
 }
 ```
 
+Failed plugin health may report `load` or `registration` checks. A loaded plugin
+can remain available with a failed `runtime` check after a contained lifecycle
+hook error. `lastError` uses `PLUGIN_LOAD_FAILED`,
+`PLUGIN_REGISTRATION_FAILED`, or `PLUGIN_LIFECYCLE_FAILED` as appropriate.
+
 ## Main Events
 
 ```ts

@@ -1,18 +1,18 @@
 # API Routes
 
-Plugins can expose HTTP handlers with `@api`.
+Plugins can expose HTTP handlers with `@api` or the initializer context.
 
 ```ts
-import { BasePlugin, api } from "@ps-generator-bridge/sdk/plugin";
+import { BasePlugin, api, definePlugin } from "@ps-generator-bridge/sdk/plugin";
 
-export default class PaintPlugin extends BasePlugin {
-  static id = "paint";
-
+class PaintPlugin extends BasePlugin {
   @api("/status")
   status() {
     return { ok: true };
   }
 }
+
+export default definePlugin("paint", (context) => new PaintPlugin(context));
 ```
 
 The route is mounted under the plugin id:
@@ -31,6 +31,22 @@ create(params: unknown) {
   return { ok: true };
 }
 ```
+
+Plain-object plugins register the same routes during synchronous initialization:
+
+```ts
+import type { PluginInitContext } from "@ps-generator-bridge/sdk/plugin";
+
+export default function init(context: PluginInitContext) {
+  context.api("/status", () => ({ ok: true }));
+  context.api({ method: "POST", url: "/create" }, () => ({ ok: true }));
+  return {};
+}
+```
+
+Route paths must start with `/`. Supported methods are `GET`, `POST`, `PUT`,
+`PATCH`, `DELETE`, `HEAD`, and `OPTIONS`. Duplicate or malformed routes fail
+plugin activation before the plugin becomes available.
 
 ## Route Collisions
 

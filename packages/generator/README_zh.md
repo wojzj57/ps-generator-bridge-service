@@ -28,6 +28,9 @@ pnpm --filter @ps-generator-bridge/generator build
 pnpm --filter @ps-generator-bridge/generator test
 ```
 
+已发布 runtime 是独立的 Windows x64 包。JavaScript runtime 依赖会被 bundle，
+sharp 及其原生 vendor payload 保留在包内私有目录。
+
 ## 运行时职责
 
 `generator-core` 通过 `main.js` 加载该包，随后调用：
@@ -41,7 +44,7 @@ init(generator, config);
 1. 基于注入的 Photoshop Generator API 创建 `PsBridgeHost`。
 2. 注册 "PS Generator Bridge: Server" 菜单项。
 3. 启动 HTTP/WebSocket 服务，默认端口为 `7700`。
-4. 从 `pluginsDir` 或 `PS_BRIDGE_PLUGINS_DIR` 加载外部插件包。
+4. 先加载显式插件包，再加载已配置的插件集合。
 5. 在 Fastify 开始监听前注册内置模块和插件作用域 handler。
 
 ## 配置
@@ -49,6 +52,7 @@ init(generator, config);
 ```ts
 export interface PluginConfig {
   port?: number;
+  plugins?: string[];
   pluginsDir?: string;
   maxImportImageBytes?: number;
   maxImportImagePixels?: number;
@@ -61,19 +65,24 @@ export interface PluginConfig {
 
 环境变量覆盖项：
 
-| 变量                              | 作用                                       |
-| --------------------------------- | ------------------------------------------ |
-| `PS_BRIDGE_PORT`                  | 覆盖 `PluginConfig.port`。                 |
-| `PS_BRIDGE_PLUGINS_DIR`           | 当未提供 `pluginsDir` 时覆盖默认插件目录。 |
-| `PS_BRIDGE_LOG_DIR`               | 覆盖包内默认运行日志目录。                 |
-| `PS_BRIDGE_SESSION_RESUME_TTL_MS` | 覆盖会话恢复 TTL（毫秒）。                 |
-| `PS_BRIDGE_COS_*`                 | 所需凭据齐全时启用基于 COS 的图片上传。    |
-| `PS_BRIDGE_COS_KEY_PREFIX`        | 覆盖 COS 对象 key 前缀。                   |
-| `PS_BRIDGE_COS_URL_EXPIRES`       | 覆盖 COS 签名 URL 的有效期秒数。           |
+| 变量                              | 作用                                         |
+| --------------------------------- | -------------------------------------------- |
+| `PS_BRIDGE_PORT`                  | 覆盖 `PluginConfig.port`。                   |
+| `PS_BRIDGE_PLUGINS`               | 最先加载、以平台分隔符连接的插件包绝对路径。 |
+| `PS_BRIDGE_PLUGINS_DIR`           | 当未提供 `pluginsDir` 时覆盖默认插件目录。   |
+| `PS_BRIDGE_LOG_DIR`               | 覆盖包内默认运行日志目录。                   |
+| `PS_BRIDGE_SESSION_RESUME_TTL_MS` | 覆盖会话恢复 TTL（毫秒）。                   |
+| `PS_BRIDGE_COS_*`                 | 所需凭据齐全时启用基于 COS 的图片上传。      |
+| `PS_BRIDGE_COS_KEY_PREFIX`        | 覆盖 COS 对象 key 前缀。                     |
+| `PS_BRIDGE_COS_URL_EXPIRES`       | 覆盖 COS 签名 URL 的有效期秒数。             |
 
 `main.js` 会在加载 bundle 入口前读取包内 `.env`，因此 host 构造时可以使用这些覆盖项。
 
 结构化运行参数优先使用 `PluginConfig`。环境变量用于部署期覆盖和密钥。
+
+插件来源按以下顺序加载：`PS_BRIDGE_PLUGINS`、`PluginConfig.plugins`，然后是
+`pluginsDir`（或 `PS_BRIDGE_PLUGINS_DIR`）中按名称排序的直接子目录。显式路径必须
+是绝对路径，real path 重复项会被忽略。
 
 ## 服务端端点
 
@@ -81,6 +90,7 @@ export interface PluginConfig {
 | -------------------------- | ----------------------------------------------------------------- |
 | `GET /health`              | 存活探针。                                                        |
 | `GET /plugins`             | 列出已加载的外部插件 id。                                         |
+| `GET /plugins/:id/health`  | 报告已加载 runtime 健康状态或已隔离的加载/注册错误。              |
 | `GET/POST /{module}/...`   | 内置 action、document、layer、image、selection HTTP API。         |
 | `GET/POST /{pluginId}/...` | 外部插件通过 `@api` 注册的 HTTP API。                             |
 | `WS /ws`                   | 根 SDK 协议端点。                                                 |
@@ -105,7 +115,13 @@ generator 注册的内置协议方法包括：
 
 ## 插件宿主
 
-外部插件从插件目录的直接子目录加载。每个插件包需要包含 `package.json`、`main` 入口，以及一个继承 `BasePlugin` 的默认导出类。
+每个外部插件包需要 `package.json`、`main` 入口和默认导出的同步 initializer。
+initializer 接收冻结的 `PluginInitContext`，并返回普通 `PluginRuntime` 对象或
+`BasePlugin` 实例。返回 Promise 的 initializer 会被拒绝。
+
+插件 id 依次从 `package.json.pluginId`、`definePlugin(id, init)`、
+`package.json.name` 解析，并且必须匹配 `[A-Za-z0-9_-]+`。第一个完整激活的候选
+会占用 id；失败候选会把该 id 留给下一个来源继续尝试。
 
 传给每个插件的 host 只暴露窄接口：
 
@@ -115,6 +131,10 @@ generator 注册的内置协议方法包括：
 - `cos`：配置完整时提供的可选上传能力
 
 不要把 Fastify、generator-core、COS SDK 具体类或其他服务端内部细节暴露给插件作者。边界应通过 `src/contract.ts` 中的 type-only 契约跨越。
+
+初始化、注册和生命周期错误会被限制在所属插件内，并通过
+`/plugins/{id}/health` 暴露。`onConnect` 和 `onDisconnect` 必须同步，
+`onDispose` 可以异步。
 
 ## JSX 资源
 

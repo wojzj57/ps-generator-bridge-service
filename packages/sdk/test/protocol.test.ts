@@ -29,6 +29,8 @@ describe("protocol", () => {
     expect(ErrorCode.NoDocument).toBe("NO_DOCUMENT");
     expect(ErrorCode.PhotoshopBusy).toBe("PHOTOSHOP_BUSY");
     expect(ErrorCode.PluginNotFound).toBe("PLUGIN_NOT_FOUND");
+    expect(ErrorCode.PluginRegistrationFailed).toBe("PLUGIN_REGISTRATION_FAILED");
+    expect(ErrorCode.PluginLifecycleFailed).toBe("PLUGIN_LIFECYCLE_FAILED");
   });
 
   it("centralizes built-in Request method names", () => {

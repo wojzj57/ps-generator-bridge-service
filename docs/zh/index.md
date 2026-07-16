@@ -19,5 +19,5 @@ features:
   - title: Photoshop Generator 宿主
     details: generator 包运行在 Adobe generator-core 内，提供 HTTP 健康检查、插件发现和 WebSocket 协议端点。
   - title: 插件开发
-    details: 外部插件使用 BasePlugin、@ws、@api、作用域 JSX、内置模块和基于订阅的事件门面。
+    details: 外部插件使用同步 initializer、可选 BasePlugin helper、@ws、@api、作用域 JSX、内置模块和基于订阅的事件门面。
 ---

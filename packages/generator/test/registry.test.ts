@@ -89,6 +89,18 @@ describe("Registry.dispatch", () => {
     expect(res).toMatchObject({ id: "s2", ok: true, result: { ok: true } });
   });
 
+  it("rejects malformed scoped API routes before Fastify registration", () => {
+    const scoped = new ScopedRegistry();
+    const handler = () => undefined;
+
+    expect(() => scoped.registerApi({ method: "TRACE", url: "/trace", handler } as never)).toThrow(
+      /unsupported method/
+    );
+    expect(() => scoped.registerApi({ method: [], url: "/empty", handler })).toThrow(
+      /has no methods/
+    );
+  });
+
   it("surfaces a handler error as an INTERNAL response", async () => {
     const registry = newRegistry();
     registry.registerMethod("boom", () => {

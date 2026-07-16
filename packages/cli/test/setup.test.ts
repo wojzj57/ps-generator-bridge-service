@@ -2,8 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { copyRuntimeDependencies, inspectRuntimeTarget, prepareRuntimeTarget } from "../src/setup";
+import { inspectRuntimeTarget, prepareRuntimeTarget, setupGeneratorRuntime } from "../src/setup";
 import { confirmRuntimeReplacement } from "../src/setupPhotoshop";
+import { ensureGeneratorRuntime } from "../src/runtimeManager";
+
+vi.mock("../src/runtimeManager", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/runtimeManager")>();
+  return { ...actual, ensureGeneratorRuntime: vi.fn() };
+});
 
 const roots: string[] = [];
 
@@ -11,6 +17,7 @@ afterEach(() => {
   for (const root of roots.splice(0)) {
     rmSync(root, { recursive: true, force: true });
   }
+  vi.mocked(ensureGeneratorRuntime).mockReset();
 });
 
 function newTarget(): string {
@@ -33,6 +40,7 @@ describe("prepareRuntimeTarget", () => {
     write(join(target, "plugins", "custom", "index.js"));
     write(join(target, "dist", "old.js"));
     write(join(target, "jsx", "old.jsx"));
+    write(join(target, "vendor", "node_modules", "sharp", "index.js"));
     write(join(target, "node_modules", "old-package", "index.js"));
     write(join(target, "main.js"));
 
@@ -44,6 +52,7 @@ describe("prepareRuntimeTarget", () => {
     expect(existsSync(join(target, "plugins", "custom", "index.js"))).toBe(true);
     expect(existsSync(join(target, "dist"))).toBe(false);
     expect(existsSync(join(target, "jsx"))).toBe(false);
+    expect(existsSync(join(target, "vendor"))).toBe(false);
     expect(existsSync(join(target, "node_modules"))).toBe(false);
     expect(existsSync(join(target, "main.js"))).toBe(false);
     expect(existsSync(join(target, "package.json"))).toBe(true);
@@ -70,29 +79,45 @@ describe("prepareRuntimeTarget", () => {
   });
 });
 
-describe("copyRuntimeDependencies", () => {
-  it("materializes cached root and nested dependencies without copying the generator package", () => {
-    const root = mkdtempSync(join(tmpdir(), "ps-bridge-runtime-source-"));
-    roots.push(root);
-    const sourceDir = join(
-      root,
-      "generator-runtime",
-      "node_modules",
-      "@ps-generator-bridge",
-      "generator"
+describe("setupGeneratorRuntime", () => {
+  it("copies the standalone vendor without materializing a root dependency tree", () => {
+    const source = newTarget();
+    const target = newTarget();
+    write(join(source, "dist", "index.js"));
+    write(join(source, "jsx", "Common", "alert.jsx"));
+    write(join(source, "vendor", "package.json"), '{"private":true}');
+    write(join(source, "vendor", "node_modules", "sharp", "package.json"), "{}");
+    write(join(source, "main.js"));
+    for (const name of [".env.example", "CHANGELOG.md", "README.md", "README_zh.md"]) {
+      write(join(source, name));
+    }
+    write(
+      join(source, "package.json"),
+      JSON.stringify({
+        name: "@ps-generator-bridge/generator",
+        version: "1.2.3",
+        main: "main.js",
+        os: ["win32"],
+        cpu: ["x64"],
+        "generator-core-version": ">=1.0.0",
+      })
     );
-    const targetDir = join(root, "target");
-    write(join(root, "generator-runtime", "node_modules", "root-dependency", "index.js"));
-    write(join(sourceDir, "main.js"));
-    write(join(sourceDir, "node_modules", "nested-dependency", "index.js"));
+    vi.mocked(ensureGeneratorRuntime).mockReturnValue({
+      name: "@ps-generator-bridge/generator",
+      version: "1.2.3",
+      packageDir: source,
+    });
 
-    copyRuntimeDependencies(sourceDir, targetDir);
-
-    expect(existsSync(join(targetDir, "node_modules", "root-dependency", "index.js"))).toBe(true);
-    expect(existsSync(join(targetDir, "node_modules", "nested-dependency", "index.js"))).toBe(true);
-    expect(
-      existsSync(join(targetDir, "node_modules", "@ps-generator-bridge", "generator", "main.js"))
-    ).toBe(false);
+    expect(setupGeneratorRuntime({ dir: target })).toEqual({
+      targetDir: target,
+      version: "1.2.3",
+    });
+    expect(existsSync(join(target, "vendor", "node_modules", "sharp", "package.json"))).toBe(true);
+    expect(existsSync(join(target, "node_modules"))).toBe(false);
+    expect(JSON.parse(readFileSync(join(target, "package.json"), "utf8"))).toMatchObject({
+      os: ["win32"],
+      cpu: ["x64"],
+    });
   });
 });
 
