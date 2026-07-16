@@ -1,10 +1,15 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { valid } from "semver";
 import { generatorRuntimeDir, generatorRuntimePackageDir, type PathEnvironment } from "./appPaths";
-import { createNpmClient, type NpmClient } from "./npm";
+import {
+  createGitHubReleaseClient,
+  GENERATOR_PACKAGE,
+  type ResolvedRuntimeRelease,
+  type RuntimeReleaseClient,
+} from "./githubRelease";
 
-export const GENERATOR_PACKAGE = "@ps-generator-bridge/generator";
+export { GENERATOR_PACKAGE } from "./githubRelease";
 export const DEFAULT_RUNTIME_VERSION = "latest";
 
 export interface RuntimePackageJson {
@@ -31,24 +36,38 @@ export interface RuntimeCache extends RuntimePackageJson {
 
 export interface EnsureRuntimeOptions extends PathEnvironment {
   version?: string;
-  npm?: NpmClient;
+  releaseClient?: RuntimeReleaseClient;
+  runtimePlatform?: NodeJS.Platform;
   warn?: (message: string) => void;
 }
 
 export function ensureGeneratorRuntime(options: EnsureRuntimeOptions = {}): RuntimeCache {
-  const requested = options.version ?? DEFAULT_RUNTIME_VERSION;
-  if (!/^[A-Za-z0-9][A-Za-z0-9._+-]*$/.test(requested)) {
-    throw new Error(`Invalid generator runtime version or tag: ${requested}`);
+  const platform = options.runtimePlatform ?? process.platform;
+  if (platform !== "win32") {
+    throw new Error(`Generator runtime setup only supports Windows; received ${platform}.`);
   }
-  const npm = options.npm ?? createNpmClient();
+  const requested = options.version ?? DEFAULT_RUNTIME_VERSION;
+  if (
+    requested !== DEFAULT_RUNTIME_VERSION &&
+    (valid(requested) !== requested || requested.includes("+"))
+  ) {
+    throw new Error(
+      `Invalid generator runtime version: ${requested}; use latest or an exact semver`
+    );
+  }
   const warn = options.warn ?? console.warn;
+  const releaseClient =
+    options.releaseClient ?? createGitHubReleaseClient({ env: options.env, warn });
   const cached = inspectRuntimeCache(options);
 
   let desiredVersion: string;
+  let resolvedRelease: ResolvedRuntimeRelease | undefined;
   try {
-    desiredVersion = npm.viewVersion(`${GENERATOR_PACKAGE}@${requested}`);
-    if (!valid(desiredVersion)) {
-      throw new Error(`npm returned an invalid generator runtime version: ${desiredVersion}`);
+    if (requested === DEFAULT_RUNTIME_VERSION) {
+      resolvedRelease = releaseClient.resolve(requested);
+      desiredVersion = resolvedRelease.version;
+    } else {
+      desiredVersion = requested;
     }
   } catch (error) {
     if (cached && canUseOfflineCache(requested, cached.version)) {
@@ -58,7 +77,7 @@ export function ensureGeneratorRuntime(options: EnsureRuntimeOptions = {}): Runt
       return cached;
     }
     throw new Error(
-      `Unable to resolve ${GENERATOR_PACKAGE}@${requested} and no matching runtime cache is available: ${errorMessage(error)}`
+      `Unable to resolve the Generator GitHub Release for ${requested} and no matching runtime cache is available: ${errorMessage(error)}`
     );
   }
 
@@ -68,7 +87,8 @@ export function ensureGeneratorRuntime(options: EnsureRuntimeOptions = {}): Runt
   }
 
   try {
-    return installRuntimeVersion(desiredVersion, npm, options);
+    const release = resolvedRelease ?? releaseClient.resolve(desiredVersion);
+    return installRuntimeRelease(release.version, releaseClient, release, options, warn);
   } catch (error) {
     if (cached && requested === DEFAULT_RUNTIME_VERSION) {
       warn(
@@ -90,13 +110,19 @@ export function inspectRuntimePackage(packageDir: string): RuntimeCache | undefi
   try {
     const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8")) as RuntimePackageJson;
     const main = pkg.main ?? "main.js";
+    const mainPath = typeof main === "string" ? resolve(packageDir, main) : "";
+    const relativeMain = mainPath ? relative(packageDir, mainPath) : "..";
     // The generator package owns its payload layout. Keep cache discovery independent
     // of version-specific directories such as vendor/ or native/.
     if (
       pkg.name !== GENERATOR_PACKAGE ||
       typeof pkg.version !== "string" ||
-      pkg.version.length === 0 ||
-      !existsSync(join(packageDir, main))
+      valid(pkg.version) !== pkg.version ||
+      pkg.version.includes("+") ||
+      relativeMain === ".." ||
+      relativeMain.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) ||
+      isAbsolute(relativeMain) ||
+      !lstatSync(mainPath).isFile()
     ) {
       return undefined;
     }
@@ -106,10 +132,12 @@ export function inspectRuntimePackage(packageDir: string): RuntimeCache | undefi
   }
 }
 
-function installRuntimeVersion(
+function installRuntimeRelease(
   version: string,
-  npm: NpmClient,
-  options: PathEnvironment
+  releaseClient: RuntimeReleaseClient,
+  release: { version: string; assetUrl: string },
+  options: PathEnvironment,
+  warn: (message: string) => void
 ): RuntimeCache {
   const target = generatorRuntimeDir(options);
   const parent = dirname(target);
@@ -117,39 +145,18 @@ function installRuntimeVersion(
   const backup = join(parent, `.generator-runtime-backup-${process.pid}-${Date.now()}`);
   mkdirSync(parent, { recursive: true });
   rmSync(stage, { recursive: true, force: true });
-  mkdirSync(stage, { recursive: true });
-  writeFileSync(
-    join(stage, "package.json"),
-    `${JSON.stringify(
-      {
-        private: true,
-        dependencies: { [GENERATOR_PACKAGE]: version },
-      },
-      null,
-      2
-    )}\n`
-  );
+  const stagePackageDir = join(stage, "node_modules", "@ps-generator-bridge", "generator");
+  mkdirSync(stagePackageDir, { recursive: true });
 
-  console.log(`[generator-runtime] installing ${GENERATOR_PACKAGE}@${version}`);
+  console.log(
+    `[generator-runtime] downloading ${GENERATOR_PACKAGE}@${version} from GitHub Releases`
+  );
   let movedCurrent = false;
   try {
-    npm.install(
-      [
-        `${GENERATOR_PACKAGE}@${version}`,
-        "--save-exact",
-        "--omit=dev",
-        "--package-lock=false",
-        "--no-audit",
-        "--no-fund",
-      ],
-      stage
-    );
-    const installed = inspectRuntimePackage(
-      join(stage, "node_modules", "@ps-generator-bridge", "generator")
-    );
-    // npm owns version selection; the CLI only checks that the installed package is loadable.
-    if (!installed) {
-      throw new Error(`Installed package is not a loadable ${GENERATOR_PACKAGE} runtime`);
+    releaseClient.install(release, stagePackageDir);
+    const installed = inspectRuntimePackage(stagePackageDir);
+    if (!installed || installed.version !== version) {
+      throw new Error(`Downloaded package is not ${GENERATOR_PACKAGE}@${version}`);
     }
 
     rmSync(backup, { recursive: true, force: true });
@@ -158,14 +165,32 @@ function installRuntimeVersion(
       movedCurrent = true;
     }
     renameSync(stage, target);
-    rmSync(backup, { recursive: true, force: true });
+    movedCurrent = false;
+    try {
+      rmSync(backup, { recursive: true, force: true });
+    } catch (error) {
+      warn(
+        `[generator-runtime] runtime updated, but the old backup could not be removed: ${errorMessage(error)}`
+      );
+    }
     return { ...installed, packageDir: generatorRuntimePackageDir(options) };
   } catch (error) {
-    if (movedCurrent && !existsSync(target) && existsSync(backup)) renameSync(backup, target);
-    throw new Error(`Failed to install generator runtime ${version}: ${errorMessage(error)}`);
+    if (movedCurrent && !existsSync(target) && existsSync(backup)) {
+      renameSync(backup, target);
+      movedCurrent = false;
+    }
+    throw new Error(
+      `Failed to install generator runtime ${version} from GitHub Releases: ${errorMessage(error)}`
+    );
   } finally {
     rmSync(stage, { recursive: true, force: true });
-    if (existsSync(target)) rmSync(backup, { recursive: true, force: true });
+    if (!movedCurrent && existsSync(backup)) {
+      try {
+        rmSync(backup, { recursive: true, force: true });
+      } catch {
+        // A stale .generator-* backup is safe and will be retried by the next locked update.
+      }
+    }
   }
 }
 
