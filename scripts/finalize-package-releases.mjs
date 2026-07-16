@@ -104,7 +104,7 @@ export function generatorAssetName(version) {
   if (!VERSION_PATTERN.test(version)) {
     throw new Error(`Invalid Generator asset version: ${String(version)}`);
   }
-  return `ps-generator-bridge-${version}.zip`;
+  return "ps-generator-bridge.zip";
 }
 
 export function buildGeneratorReleaseCreateArgs({ assetPath, notesFile, repository, tag }) {
@@ -124,7 +124,15 @@ export function buildGeneratorReleaseCreateArgs({ assetPath, notesFile, reposito
 }
 
 export function buildGeneratorReleaseUploadArgs({ assetPath, repository, tag }) {
-  return ["release", "upload", tag, assetPath, "--repo", repository, "--clobber"];
+  return ["release", "upload", tag, assetPath, "--repo", repository];
+}
+
+export function assertGeneratorReleaseAssetMissing(assetNames, assetName) {
+  if (assetNames.includes(assetName)) {
+    throw new Error(
+      `GitHub Release already contains immutable Generator asset ${assetName}; publish a new Generator version instead.`
+    );
+  }
 }
 
 export function main(env = process.env) {
@@ -242,16 +250,25 @@ export function createGeneratorArchive(version, tempDir) {
 
 function createGeneratorRelease({ assetPath, notesFile, repository, version }) {
   const tag = `${GENERATOR_PACKAGE}@${version}`;
-  const existing = spawnSync("gh", ["release", "view", tag, "--repo", repository], {
-    stdio: "ignore",
-  });
+  const existing = spawnSync(
+    "gh",
+    ["release", "view", tag, "--repo", repository, "--json", "assets", "--jq", ".assets[].name"],
+    { encoding: "utf8" }
+  );
   if (existing.error) throw existing.error;
   if (existing.status === 0) {
-    console.log(`GitHub Release ${tag} already exists; replacing its Generator ZIP asset.`);
+    const assetNames = existing.stdout.split(/\r?\n/u).filter(Boolean);
+    assertGeneratorReleaseAssetMissing(assetNames, generatorAssetName(version));
+    console.log(`GitHub Release ${tag} exists without its Generator ZIP; uploading it.`);
     execFileSync("gh", buildGeneratorReleaseUploadArgs({ assetPath, repository, tag }), {
       stdio: "inherit",
     });
     return;
+  }
+
+  const viewError = `${existing.stdout || ""}\n${existing.stderr || ""}`;
+  if (!/(?:release not found|HTTP 404)/iu.test(viewError)) {
+    throw new Error(`Unable to inspect GitHub Release ${tag}: ${viewError.trim()}`);
   }
 
   execFileSync("gh", buildGeneratorReleaseCreateArgs({ assetPath, notesFile, repository, tag }), {

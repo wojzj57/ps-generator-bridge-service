@@ -42,7 +42,7 @@ describe("shared application paths", () => {
     ).toBe("/cache/ps-generator-bridge");
   });
 
-  it("places the npm-installed runtime package under generator-runtime", () => {
+  it("keeps the runtime package in the legacy npm-shaped cache directory", () => {
     expect(
       generatorRuntimePackageDir({
         platform: "linux",

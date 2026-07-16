@@ -22,12 +22,12 @@ export interface ParsedArgs {
 }
 
 export const USAGE = `Usage:
-  ps-generator-bridge setup [--dir <dir>] [--runtime-version <version-or-tag>]
-  ps-generator-bridge setup-photoshop [--version <year>] [--yes] [--password <value>] [--runtime-version <version-or-tag>]
+  ps-generator-bridge setup [--dir <dir>] [--runtime-version <latest-or-exact-version>]
+  ps-generator-bridge setup-photoshop [--version <year>] [--yes] [--password <value>] [--runtime-version <latest-or-exact-version>]
   ps-generator-bridge setup-generator-settings (--pref <path> | -pref <path>) [--password <value>]
   ps-generator-bridge setup-core [--update]
-  ps-generator-bridge run (--plugin <dir> | --plugin-cwd | --plugins-dir <dir>) [--runtime-version <version-or-tag>] [--port <number>] [--timeout <ms>] [--update-core] [--password <value>]
-  ps-generator-bridge dev (--plugin <dir> | --plugin-cwd | --plugins-dir <dir>) [--runtime-version <version-or-tag>] [--port <number>] [--timeout <ms>] [--update-core] [--password <value>]
+  ps-generator-bridge run (--plugin <dir> | --plugin-cwd | --plugins-dir <dir>) [--runtime-version <latest-or-exact-version>] [--port <number>] [--timeout <ms>] [--update-core] [--password <value>]
+  ps-generator-bridge dev (--plugin <dir> | --plugin-cwd | --plugins-dir <dir>) [--runtime-version <latest-or-exact-version>] [--port <number>] [--timeout <ms>] [--update-core] [--password <value>]
   ps-generator-bridge clean`;
 
 export function parseArgs(args: string[]): ParsedArgs {

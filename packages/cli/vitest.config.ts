@@ -7,14 +7,13 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
-      // Composition roots and process/filesystem/npm/Photoshop adapters belong
+      // Composition roots and process/filesystem/Photoshop adapters belong
       // to the real-machine smoke boundary, not the cross-platform unit suite.
       exclude: [
         "src/cli.ts",
         "src/appPaths.ts",
         "src/core.ts",
         "src/generatorCore.ts",
-        "src/npm.ts",
         "src/operationLock.ts",
         "src/photoshop.ts",
         "src/pluginDirs.ts",

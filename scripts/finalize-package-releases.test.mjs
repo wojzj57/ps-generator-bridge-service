@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  assertGeneratorReleaseAssetMissing,
   buildGeneratorReleaseCreateArgs,
   buildGeneratorReleaseUploadArgs,
   buildReleasePlan,
@@ -114,14 +115,14 @@ test("extracts only the requested Generator changelog entry", () => {
   assert.throws(() => extractChangelogEntry(changelog, "2.0.0"), /has no ## 2\.0\.0 entry/u);
 });
 
-test("names the Generator ZIP asset from its released version", () => {
-  assert.equal(generatorAssetName("1.2.0"), "ps-generator-bridge-1.2.0.zip");
+test("uses one stable Generator ZIP asset name across releases", () => {
+  assert.equal(generatorAssetName("1.2.0"), "ps-generator-bridge.zip");
   assert.throws(() => generatorAssetName("latest"), /Invalid Generator asset version/u);
 });
 
 test("attaches the Generator ZIP when creating or recovering a GitHub Release", () => {
   const release = {
-    assetPath: "C:\\temp\\ps-generator-bridge-1.2.0.zip",
+    assetPath: "C:\\temp\\ps-generator-bridge.zip",
     notesFile: "C:\\temp\\notes.md",
     repository: "owner/repository",
     tag: "@ps-generator-bridge/generator@1.2.0",
@@ -147,6 +148,19 @@ test("attaches the Generator ZIP when creating or recovering a GitHub Release", 
     release.assetPath,
     "--repo",
     release.repository,
-    "--clobber",
   ]);
+});
+
+test("treats an existing Generator ZIP as immutable", () => {
+  assert.doesNotThrow(() =>
+    assertGeneratorReleaseAssetMissing(["checksums.txt"], "ps-generator-bridge.zip")
+  );
+  assert.throws(
+    () =>
+      assertGeneratorReleaseAssetMissing(
+        ["checksums.txt", "ps-generator-bridge.zip"],
+        "ps-generator-bridge.zip"
+      ),
+    /immutable Generator asset/u
+  );
 });
