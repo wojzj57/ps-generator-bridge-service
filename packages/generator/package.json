@@ -47,7 +47,7 @@
     "main.js",
     "dist",
     "jsx",
-    "vendor",
+    "native",
     ".env.example",
     "CHANGELOG.md",
     "README.md",
@@ -63,7 +63,7 @@
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "dev": "tsx test/devServer.ts",
-    "clean": "rimraf dist vendor logs coverage *.tsbuildinfo"
+    "clean": "rimraf dist native vendor logs coverage *.tsbuildinfo"
   },
   "devDependencies": {
     "@ps-generator-bridge/sdk": "workspace:*",

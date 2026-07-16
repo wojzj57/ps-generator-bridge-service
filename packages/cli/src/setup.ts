@@ -18,14 +18,14 @@ const DEFAULT_INSTALL_DIR = "generator-bridge";
 const RUNTIME_FILES = [
   "dist",
   "jsx",
-  "vendor",
+  "native",
   "main.js",
   ".env.example",
   "CHANGELOG.md",
   "README.md",
   "README_zh.md",
 ] as const;
-const MANAGED_ENTRIES = [...RUNTIME_FILES, "node_modules"] as const;
+const MANAGED_ENTRIES = [...RUNTIME_FILES, "vendor", "node_modules"] as const;
 
 export interface SetupOptions {
   dir?: string;

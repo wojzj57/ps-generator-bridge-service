@@ -8,38 +8,34 @@ import {
   readdirSync,
   rmSync,
   statSync,
-  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { builtinModules, createRequire } from "node:module";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const SHARP_VERSION = "0.32.6";
 const SIZE_WARNING_BYTES = 35 * 1024 * 1024;
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const vendorDir = join(packageDir, "vendor");
-const vendorNodeModules = join(vendorDir, "node_modules");
+const nativeDir = join(packageDir, "native");
+const legacyVendorDir = join(packageDir, "vendor");
 const packageRequire = createRequire(join(packageDir, "package.json"));
 
 interface PackageManifest {
   name: string;
   version: string;
-  dependencies?: Record<string, string>;
 }
 
 interface ResolvedPackage {
   manifest: PackageManifest;
   packageDir: string;
-  packageJson: string;
 }
 
 export function prepareRuntimePack(): void {
   assertWindowsX64();
   cleanRuntimePack();
-  mkdirSync(vendorNodeModules, { recursive: true });
-  writeFileSync(join(vendorDir, "package.json"), '{"private":true}\n');
+  mkdirSync(nativeDir, { recursive: true });
 
   const sharpPackage = resolvePackage("sharp", packageRequire);
   if (sharpPackage.manifest.version !== SHARP_VERSION) {
@@ -48,8 +44,7 @@ export function prepareRuntimePack(): void {
     );
   }
 
-  copySharpRuntime(sharpPackage.packageDir, join(vendorNodeModules, "sharp"));
-  copyRuntimeDependencyClosure(sharpPackage, ["color", "detect-libc", "semver"]);
+  copySharpNativeRuntime(sharpPackage.packageDir);
   assertSharpNativeFiles();
   auditBundleRequires(join(packageDir, "dist"));
   verifyIsolatedRuntime();
@@ -63,7 +58,8 @@ export function prepareRuntimePack(): void {
 }
 
 export function cleanRuntimePack(): void {
-  rmSync(vendorDir, { recursive: true, force: true });
+  rmSync(nativeDir, { recursive: true, force: true });
+  rmSync(legacyVendorDir, { recursive: true, force: true });
 }
 
 export function auditBundleRequires(distDir: string): void {
@@ -110,7 +106,7 @@ function resolvePackage(name: string, from: NodeJS.Require): ResolvedPackage {
     if (existsSync(packageJson)) {
       const manifest = JSON.parse(readFileSync(packageJson, "utf8")) as PackageManifest;
       if (manifest.name === name) {
-        return { manifest, packageDir: current, packageJson };
+        return { manifest, packageDir: current };
       }
     }
     const parent = dirname(current);
@@ -119,59 +115,15 @@ function resolvePackage(name: string, from: NodeJS.Require): ResolvedPackage {
   }
 }
 
-function copyRuntimeDependencyClosure(root: ResolvedPackage, directDependencies: string[]): void {
-  const queue = directDependencies.map((name) => ({
-    name,
-    from: createRequire(root.packageJson),
-  }));
-  const copied = new Map<string, string>();
-
-  while (queue.length > 0) {
-    const next = queue.shift() as { name: string; from: NodeJS.Require };
-    const dependency = resolvePackage(next.name, next.from);
-    const copiedVersion = copied.get(dependency.manifest.name);
-    if (copiedVersion) {
-      if (copiedVersion !== dependency.manifest.version) {
-        throw new Error(
-          `Vendor dependency conflict for ${dependency.manifest.name}: ${copiedVersion} and ${dependency.manifest.version}`
-        );
-      }
-      continue;
-    }
-
-    copyPackage(dependency.packageDir, packageTarget(dependency.manifest.name));
-    copied.set(dependency.manifest.name, dependency.manifest.version);
-    const dependencyRequire = createRequire(dependency.packageJson);
-    for (const name of Object.keys(dependency.manifest.dependencies ?? {})) {
-      queue.push({ name, from: dependencyRequire });
-    }
+function copySharpNativeRuntime(source: string): void {
+  const releaseDir = join(source, "build", "Release");
+  const nativeFiles = readdirSync(releaseDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && [".dll", ".node"].includes(extname(entry.name)))
+    .map((entry) => entry.name);
+  if (nativeFiles.length === 0) {
+    throw new Error(`Sharp native runtime is empty: ${releaseDir}`);
   }
-}
-
-function packageTarget(name: string): string {
-  return join(vendorNodeModules, ...name.split("/"));
-}
-
-function copyPackage(source: string, target: string): void {
-  mkdirSync(dirname(target), { recursive: true });
-  cpSync(source, target, {
-    recursive: true,
-    dereference: true,
-    filter(path) {
-      const part = relative(source, path).split(sep)[0];
-      return part !== "node_modules";
-    },
-  });
-}
-
-function copySharpRuntime(source: string, target: string): void {
-  mkdirSync(target, { recursive: true });
-  const files = ["LICENSE", "README.md", "package.json"];
-  const directories = ["lib", join("build", "Release")];
-  for (const file of files) cpSync(join(source, file), join(target, file), { recursive: true });
-  for (const directory of directories) {
-    cpSync(join(source, directory), join(target, directory), { recursive: true });
-  }
+  for (const file of nativeFiles) cpSync(join(releaseDir, file), join(nativeDir, file));
 
   const manifest = JSON.parse(readFileSync(join(source, "package.json"), "utf8")) as {
     config?: { libvips?: string };
@@ -179,19 +131,17 @@ function copySharpRuntime(source: string, target: string): void {
   const libvips = manifest.config?.libvips;
   if (!libvips) throw new Error("sharp package does not declare config.libvips");
   const sourcePlatform = join(source, "vendor", libvips, "win32-x64");
-  const targetPlatform = join(target, "vendor", libvips, "win32-x64");
-  mkdirSync(targetPlatform, { recursive: true });
   for (const file of ["platform.json", "versions.json", "THIRD-PARTY-NOTICES.md"]) {
-    cpSync(join(sourcePlatform, file), join(targetPlatform, file));
+    cpSync(join(sourcePlatform, file), join(nativeDir, file));
   }
+  cpSync(join(source, "LICENSE"), join(nativeDir, "SHARP-LICENSE"));
 }
 
 function assertSharpNativeFiles(): void {
-  const sharpDir = join(vendorNodeModules, "sharp");
   const required = [
-    join(sharpDir, "build", "Release", "sharp-win32-x64.node"),
-    join(sharpDir, "build", "Release", "libvips-42.dll"),
-    join(sharpDir, "vendor", "8.14.5", "win32-x64", "versions.json"),
+    join(nativeDir, "sharp-win32-x64.node"),
+    join(nativeDir, "libvips-42.dll"),
+    join(nativeDir, "versions.json"),
   ];
   for (const path of required) {
     if (!existsSync(path)) throw new Error(`Missing sharp runtime file: ${path}`);
@@ -201,7 +151,7 @@ function assertSharpNativeFiles(): void {
 function verifyIsolatedRuntime(): void {
   const root = mkdtempSync(join(tmpdir(), "ps-bridge-packed-runtime-"));
   try {
-    for (const name of ["dist", "jsx", "vendor", "main.js", "package.json"]) {
+    for (const name of ["dist", "jsx", "native", "main.js", "package.json"]) {
       cpSync(join(packageDir, name), join(root, name), { recursive: true });
     }
     execFileSync(process.execPath, [join(packageDir, "scripts", "verifyPackedRuntime.mjs"), root], {
@@ -215,7 +165,7 @@ function verifyIsolatedRuntime(): void {
 }
 
 function runtimeSizeBytes(): number {
-  return ["dist", "jsx", "vendor", "main.js", "package.json"]
+  return ["dist", "jsx", "native", "main.js", "package.json"]
     .flatMap((name) => walkFiles(join(packageDir, name)))
     .reduce((total, path) => total + statSync(path).size, 0);
 }

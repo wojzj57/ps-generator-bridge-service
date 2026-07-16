@@ -149,7 +149,7 @@ describe("generator runtime cache", () => {
     expect(inspectRuntimeCache(paths)).toBeUndefined();
   });
 
-  it("rejects a runtime with an incomplete package-private sharp vendor", () => {
+  it("rejects a runtime with an incomplete package-private native directory", () => {
     const paths = newPaths();
     ensureGeneratorRuntime({
       ...paths,
@@ -157,18 +157,23 @@ describe("generator runtime cache", () => {
     });
     const cached = inspectRuntimeCache(paths);
     expect(cached).toBeDefined();
-    rmSync(
-      join(
-        cached?.packageDir as string,
-        "vendor",
-        "node_modules",
-        "sharp",
-        "build",
-        "Release",
-        "sharp-win32-x64.node"
-      ),
-      { force: true }
-    );
+    rmSync(join(cached?.packageDir as string, "native", "sharp-win32-x64.node"), { force: true });
+
+    expect(inspectRuntimeCache(paths)).toBeUndefined();
+  });
+
+  it("rejects the legacy nested vendor layout", () => {
+    const paths = newPaths();
+    ensureGeneratorRuntime({
+      ...paths,
+      npm: fakeNpm("1.0.0", (cwd, version) => writeRuntime(cwd, version)),
+    });
+    const cached = inspectRuntimeCache(paths);
+    expect(cached).toBeDefined();
+    rmSync(join(cached?.packageDir as string, "native"), { recursive: true, force: true });
+    mkdirSync(join(cached?.packageDir as string, "vendor", "node_modules", "sharp"), {
+      recursive: true,
+    });
 
     expect(inspectRuntimeCache(paths)).toBeUndefined();
   });
@@ -201,24 +206,11 @@ function writeRuntime(runtimeRoot: string, version: string): void {
   const packageDir = join(runtimeRoot, "node_modules", "@ps-generator-bridge", "generator");
   mkdirSync(join(packageDir, "dist"), { recursive: true });
   mkdirSync(join(packageDir, "jsx"), { recursive: true });
-  mkdirSync(join(packageDir, "vendor", "node_modules", "sharp"), { recursive: true });
-  mkdirSync(join(packageDir, "vendor", "node_modules", "sharp", "build", "Release"), {
-    recursive: true,
-  });
+  mkdirSync(join(packageDir, "native"), { recursive: true });
   writeFileSync(join(packageDir, "main.js"), "module.exports = {};\n");
-  writeFileSync(join(packageDir, "vendor", "package.json"), '{"private":true}\n');
-  writeFileSync(
-    join(packageDir, "vendor", "node_modules", "sharp", "package.json"),
-    '{"name":"sharp","version":"0.32.6"}\n'
-  );
-  writeFileSync(
-    join(packageDir, "vendor", "node_modules", "sharp", "build", "Release", "sharp-win32-x64.node"),
-    "native"
-  );
-  writeFileSync(
-    join(packageDir, "vendor", "node_modules", "sharp", "build", "Release", "libvips-42.dll"),
-    "native"
-  );
+  writeFileSync(join(packageDir, "native", "sharp-win32-x64.node"), "native");
+  writeFileSync(join(packageDir, "native", "libvips-42.dll"), "native");
+  writeFileSync(join(packageDir, "native", "versions.json"), "{}");
   writeFileSync(
     join(packageDir, "package.json"),
     JSON.stringify({

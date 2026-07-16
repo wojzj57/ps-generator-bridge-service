@@ -8,21 +8,7 @@
  */
 "use strict";
 
-var fs = require("fs");
 var path = require("path");
-
-// Adobe Generator restricts package resolution to its configured plugin
-// folders. When this plugin is installed through a symlink, Node executes the
-// entry from the symlink's real target, which falls outside that whitelist and
-// makes package-private runtime dependencies (notably sharp) unresolvable.
-// Allow only this plugin's real directory before loading any bundled code.
-var whitelistedModuleFolders = globalThis.whitelistedModuleFolders;
-if (Array.isArray(whitelistedModuleFolders)) {
-  var pluginRoot = fs.realpathSync(__dirname);
-  if (!whitelistedModuleFolders.includes(pluginRoot)) {
-    whitelistedModuleFolders.push(pluginRoot);
-  }
-}
 
 var environment = require("./dist/environment.js");
 

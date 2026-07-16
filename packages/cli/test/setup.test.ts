@@ -40,6 +40,7 @@ describe("prepareRuntimeTarget", () => {
     write(join(target, "plugins", "custom", "index.js"));
     write(join(target, "dist", "old.js"));
     write(join(target, "jsx", "old.jsx"));
+    write(join(target, "native", "old.dll"));
     write(join(target, "vendor", "node_modules", "sharp", "index.js"));
     write(join(target, "node_modules", "old-package", "index.js"));
     write(join(target, "main.js"));
@@ -52,6 +53,7 @@ describe("prepareRuntimeTarget", () => {
     expect(existsSync(join(target, "plugins", "custom", "index.js"))).toBe(true);
     expect(existsSync(join(target, "dist"))).toBe(false);
     expect(existsSync(join(target, "jsx"))).toBe(false);
+    expect(existsSync(join(target, "native"))).toBe(false);
     expect(existsSync(join(target, "vendor"))).toBe(false);
     expect(existsSync(join(target, "node_modules"))).toBe(false);
     expect(existsSync(join(target, "main.js"))).toBe(false);
@@ -80,13 +82,14 @@ describe("prepareRuntimeTarget", () => {
 });
 
 describe("setupGeneratorRuntime", () => {
-  it("copies the standalone vendor without materializing a root dependency tree", () => {
+  it("copies the standalone native runtime without materializing a dependency tree", () => {
     const source = newTarget();
     const target = newTarget();
     write(join(source, "dist", "index.js"));
     write(join(source, "jsx", "Common", "alert.jsx"));
-    write(join(source, "vendor", "package.json"), '{"private":true}');
-    write(join(source, "vendor", "node_modules", "sharp", "package.json"), "{}");
+    write(join(source, "native", "sharp-win32-x64.node"));
+    write(join(source, "native", "libvips-42.dll"));
+    write(join(source, "native", "versions.json"), "{}");
     write(join(source, "main.js"));
     for (const name of [".env.example", "CHANGELOG.md", "README.md", "README_zh.md"]) {
       write(join(source, name));
@@ -112,7 +115,9 @@ describe("setupGeneratorRuntime", () => {
       targetDir: target,
       version: "1.2.3",
     });
-    expect(existsSync(join(target, "vendor", "node_modules", "sharp", "package.json"))).toBe(true);
+    expect(existsSync(join(target, "native", "sharp-win32-x64.node"))).toBe(true);
+    expect(existsSync(join(target, "native", "libvips-42.dll"))).toBe(true);
+    expect(existsSync(join(target, "vendor"))).toBe(false);
     expect(existsSync(join(target, "node_modules"))).toBe(false);
     expect(JSON.parse(readFileSync(join(target, "package.json"), "utf8"))).toMatchObject({
       os: ["win32"],
