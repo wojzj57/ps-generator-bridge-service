@@ -104,11 +104,11 @@ export const bridgeError = {
       source: "plugin",
     });
   },
-  pluginLoadFailed(pluginId: string, reason: string): BridgeError {
+  pluginLoadFailed(pluginId: string, reason: string, phase = "load"): BridgeError {
     return new BridgeError({
       code: ErrorCode.PluginLoadFailed,
       message: `plugin load failed: ${pluginId}`,
-      details: { pluginId, reason },
+      details: { pluginId, phase, reason },
       retryable: false,
       source: "plugin",
     });

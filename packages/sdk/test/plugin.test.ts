@@ -6,8 +6,10 @@ import {
   api,
   subscribable,
   bootstrap,
+  definePlugin,
   type AssemblyTarget,
   type PluginHost,
+  type PluginInitContext,
   type MethodHandler,
   type WsHandlerContext,
   type ApiRouteSpec,
@@ -43,9 +45,10 @@ const fakeHost = {
   modules: { layer: {}, document: {}, action: {}, image: {}, selection: {} },
 } as unknown as PluginHost;
 
-class TestPlugin extends BasePlugin {
-  static readonly id = "test";
+const context = (pluginId: string): PluginInitContext =>
+  ({ pluginId, host: fakeHost, ws() {}, api() {} }) as PluginInitContext;
 
+class TestPlugin extends BasePlugin {
   @ws("test:echo")
   echo(params: unknown): unknown {
     return params;
@@ -63,27 +66,30 @@ class TestPlugin extends BasePlugin {
 }
 
 describe("BasePlugin", () => {
-  it("stores the id passed to the constructor", () => {
-    const s = new TestPlugin("test", fakeHost);
-    expect(s.id).toBe("test");
+  it("stores the plugin id passed through the initializer context", () => {
+    const s = new TestPlugin(context("test"));
+    expect(s.pluginId).toBe("test");
+  });
+
+  it("definePlugin attaches an immutable code-level plugin id", () => {
+    const init = definePlugin("paint", () => ({}));
+    expect(init.pluginId).toBe("paint");
+    expect(() => Object.assign(init, { pluginId: "other" })).toThrow();
   });
 
   it("does not expose the removed direct push APIs", () => {
-    const s = new TestPlugin("test", fakeHost);
+    const s = new TestPlugin(context("test"));
     expect("broadcast" in s).toBe(false);
     expect("send" in s).toBe(false);
   });
 
   it("onConnect/onDisconnect default to no-ops and are overridable", () => {
-    class Bare extends BasePlugin {
-      static readonly id = "bare";
-    }
-    const bare = new Bare("bare", fakeHost);
+    class Bare extends BasePlugin {}
+    const bare = new Bare(context("bare"));
     expect(() => bare.onConnect("c")).not.toThrow();
     expect(() => bare.onDisconnect("c")).not.toThrow();
 
     class WithHooks extends BasePlugin {
-      static readonly id = "with-hooks";
       seen: string[] = [];
       override onConnect(clientId: string): void {
         this.seen.push(`+${clientId}`);
@@ -92,7 +98,7 @@ describe("BasePlugin", () => {
         this.seen.push(`-${clientId}`);
       }
     }
-    const s = new WithHooks("with-hooks", fakeHost);
+    const s = new WithHooks(context("with-hooks"));
     s.onConnect("a");
     s.onDisconnect("a");
     expect(s.seen).toEqual(["+a", "-a"]);
@@ -100,7 +106,6 @@ describe("BasePlugin", () => {
 
   it("lets subclasses listen to main events with this.on", () => {
     class Listener extends BasePlugin {
-      static readonly id = "listener";
       listen(): void {
         this.on(MainEvent.SelectionChanged, (area) => {
           area?.width;
@@ -108,7 +113,7 @@ describe("BasePlugin", () => {
       }
     }
 
-    const listener = new Listener("listener", fakeHost);
+    const listener = new Listener(context("listener"));
     listener.listen();
 
     expect(eventOn).toHaveBeenCalledWith(MainEvent.SelectionChanged, expect.any(Function));
@@ -139,7 +144,7 @@ describe("decorators + bootstrap", () => {
 
   it("collects @ws/@api metadata and registers bound handlers with the target", () => {
     const { target, methods, apis, subscribables } = mockTarget();
-    const s = new TestPlugin("test", fakeHost);
+    const s = new TestPlugin(context("test"));
     bootstrap(s, target);
 
     expect(methods.has("test:echo")).toBe(true);
@@ -152,27 +157,25 @@ describe("decorators + bootstrap", () => {
 
   it("supports @api({ method, url }) for selecting the verb", () => {
     class PostPlugin extends BasePlugin {
-      static readonly id = "post";
       @api({ method: "POST", url: "/create" })
       create(): unknown {
         return {};
       }
     }
     const { target, apis } = mockTarget();
-    bootstrap(new PostPlugin("post", fakeHost), target);
+    bootstrap(new PostPlugin(context("post")), target);
     expect(apis[0]).toMatchObject({ method: "POST", url: "/create" });
   });
 
   it("does not leak handlers between unrelated classes", () => {
     class Other extends BasePlugin {
-      static readonly id = "other";
       @ws("other:run")
       run(): string {
         return "ok";
       }
     }
     const { target, methods } = mockTarget();
-    bootstrap(new Other("other", fakeHost), target);
+    bootstrap(new Other(context("other")), target);
     expect(methods.has("test:echo")).toBe(false);
     expect(methods.has("other:run")).toBe(true);
     expect(methods.get("other:run")!({}, handlerContext)).toBe("ok");
@@ -180,7 +183,6 @@ describe("decorators + bootstrap", () => {
 
   it("includes inherited handlers via the metadata prototype chain", () => {
     class Parent extends BasePlugin {
-      static readonly id: string = "parent";
       @ws("parent:p")
       p(): number {
         return 1;
@@ -193,7 +195,7 @@ describe("decorators + bootstrap", () => {
       }
     }
     const { target, methods } = mockTarget();
-    bootstrap(new Child("child", fakeHost), target);
+    bootstrap(new Child(context("child")), target);
     expect(methods.has("parent:p")).toBe(true); // inherited
     expect(methods.has("child:c")).toBe(true); // own
   });

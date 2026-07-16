@@ -215,31 +215,42 @@ export class PsBridgeHost implements PluginHost {
       pluginsDir,
       hostFor: (pluginDir, pluginId) => this.hostFor(pluginDir, pluginId),
       knownIds: new Set(),
+      activate: async (candidate) => {
+        const result = await server.pluginManager.register({
+          pluginId: candidate.id,
+          runtime: candidate.runtime,
+          scoped: candidate.scoped,
+        });
+        if (result.ok) return { ok: true };
+        const reason = result.error.details?.reason;
+        return {
+          ok: false,
+          reason: typeof reason === "string" ? reason : result.error.message,
+          cleanupHandled: true,
+        };
+      },
       logger: log,
     });
     const loadedIds = new Set(loaded.map((item) => item.id));
     for (const s of skipped) {
       log.warn(`plugin skipped: ${s.path} — ${s.reason}`);
       // A later duplicate candidate is skipped under the winner's id. Keep the
-      // winner's constructor-time event subscriptions intact and let its
-      // registration determine health for that id.
+      // winner's init-time event subscriptions intact and let its activation
+      // determine health for that id.
       if (loadedIds.has(s.id)) continue;
       this._runtimeEvents.disposePlugin(s.id);
       server.pluginManager.recordFailure({
         id: s.id,
-        lastError: bridgeError.pluginLoadFailed(s.id, s.reason).toProtocolError(),
+        lastError:
+          s.code === "PLUGIN_REGISTRATION_FAILED"
+            ? bridgeError.pluginRegistrationFailed(s.id, s.reason).toProtocolError()
+            : bridgeError.pluginLoadFailed(s.id, s.reason, s.phase).toProtocolError(),
       });
     }
-    // Register every plugin (scoped table + per-plugin SessionStore + events +
-    // /ws/{id} dispatch + prefixed @api) before module bootstrap, so plugin ids
-    // are reserved first path segments — a module @api cannot then steal a
-    // plugin's namespace (RFC 0004). All routes land before `listen` (fastify).
-    for (const item of loaded) {
-      const result = await server.pluginManager.register(item.plugin);
-      if (!result.ok) {
-        log.warn(`plugin registration failed: ${item.id}`, result.error);
-      }
-    }
+    // Plugin activation above has already registered each successful runtime,
+    // scoped table, session store, event scope, and prefixed API routes. Reserve
+    // those first path segments before module bootstrap so a module @api cannot
+    // steal a plugin namespace (RFC 0004). All routes land before `listen`.
     server.registry.reservedSegments = new Set(server.pluginManager.ids);
     for (const module of Object.values(this.modules)) {
       bootstrap(module, server.registry);

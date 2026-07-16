@@ -106,9 +106,10 @@ export function subscribable(type: string) {
  * the per-plugin scoped assembler (RFC 0004); for a module, the global Registry.
  */
 export function bootstrap(instance: object, target: AssemblyTarget): void {
-  const ctor = instance.constructor as unknown as Record<symbol, unknown>;
+  const ctor = (instance as { constructor?: unknown }).constructor;
+  if (typeof ctor !== "function") return;
   const collected: HandlerMeta[] = [];
-  let metadata = ctor[METADATA] as MetadataLike | undefined;
+  let metadata = (ctor as unknown as Record<symbol, unknown>)[METADATA] as MetadataLike | undefined;
   while (metadata) {
     if (Object.prototype.hasOwnProperty.call(metadata, HANDLERS)) {
       collected.push(...(metadata[HANDLERS] as HandlerMeta[]));

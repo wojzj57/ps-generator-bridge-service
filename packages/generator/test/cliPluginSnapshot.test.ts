@@ -83,9 +83,9 @@ async function writePlugin(pluginDir: string): Promise<void> {
   );
   await writeFile(
     join(pluginDir, "index.js"),
-    `const { BasePlugin } = require(${JSON.stringify(SDK_PLUGIN)});
-class GoodPlugin extends BasePlugin { static id = "good"; }
-module.exports = GoodPlugin;
+    `const { BasePlugin, definePlugin } = require(${JSON.stringify(SDK_PLUGIN)});
+class GoodPlugin extends BasePlugin {}
+module.exports = definePlugin("good", (context) => new GoodPlugin(context));
 `
   );
 }

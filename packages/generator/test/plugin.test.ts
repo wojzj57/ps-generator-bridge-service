@@ -31,9 +31,9 @@ async function writePluginPackage(path: string, id: string): Promise<void> {
   );
   await writeFile(
     join(path, "index.js"),
-    `const { BasePlugin } = require(${JSON.stringify(SDK_PLUGIN)});
-class FixturePlugin extends BasePlugin { static id = ${JSON.stringify(id)}; }
-module.exports = FixturePlugin;
+    `const { BasePlugin, definePlugin } = require(${JSON.stringify(SDK_PLUGIN)});
+class FixturePlugin extends BasePlugin {}
+module.exports = definePlugin(${JSON.stringify(id)}, (context) => new FixturePlugin(context));
 `,
     "utf8"
   );
@@ -120,9 +120,9 @@ describe("PsBridgeHost", () => {
     );
     await writeFile(
       join(base, "index.js"),
-      `const { BasePlugin } = require(${JSON.stringify(SDK_PLUGIN)});
-class GoodPlugin extends BasePlugin { static id = "good"; }
-module.exports = GoodPlugin;
+      `const { BasePlugin, definePlugin } = require(${JSON.stringify(SDK_PLUGIN)});
+class GoodPlugin extends BasePlugin {}
+module.exports = definePlugin("good", (context) => new GoodPlugin(context));
 `,
       "utf8"
     );
@@ -184,18 +184,17 @@ module.exports = GoodPlugin;
     );
     await writeFile(
       join(winner, "index.js"),
-      `const { BasePlugin } = require(${JSON.stringify(SDK_PLUGIN)});
+      `const { BasePlugin, definePlugin } = require(${JSON.stringify(SDK_PLUGIN)});
 class WinnerPlugin extends BasePlugin {
-  static id = "shared";
-  constructor(id, host) {
-    super(id, host);
+  constructor(context) {
+    super(context);
     this.events.on("selection:changed", () => {
       const key = Symbol.for(${JSON.stringify(counterKey)});
       globalThis[key] = (globalThis[key] || 0) + 1;
     });
   }
 }
-module.exports = WinnerPlugin;
+module.exports = definePlugin("shared", (context) => new WinnerPlugin(context));
 `,
       "utf8"
     );
@@ -232,10 +231,9 @@ module.exports = WinnerPlugin;
     );
     await writeFile(
       join(brokenDir, "index.js"),
-      `const { BasePlugin, api } = require(${JSON.stringify(SDK_PLUGIN)});
+      `const { BasePlugin, definePlugin, api } = require(${JSON.stringify(SDK_PLUGIN)});
 const META = Symbol.for("Symbol.metadata");
 class BrokenPlugin extends BasePlugin {
-  static id = "broken";
   first() { return { handler: "first" }; }
   duplicate() { return { handler: "duplicate" }; }
 }
@@ -243,7 +241,7 @@ const meta = {};
 BrokenPlugin[META] = meta;
 api("/partial")(BrokenPlugin.prototype.first, { name: "first", metadata: meta });
 api("/partial")(BrokenPlugin.prototype.duplicate, { name: "duplicate", metadata: meta });
-module.exports = BrokenPlugin;
+module.exports = definePlugin("broken", (context) => new BrokenPlugin(context));
 `,
       "utf8"
     );
@@ -254,9 +252,9 @@ module.exports = BrokenPlugin;
     );
     await writeFile(
       join(goodDir, "index.js"),
-      `const { BasePlugin } = require(${JSON.stringify(SDK_PLUGIN)});
-class GoodPlugin extends BasePlugin { static id = "good"; }
-module.exports = GoodPlugin;
+      `const { BasePlugin, definePlugin } = require(${JSON.stringify(SDK_PLUGIN)});
+class GoodPlugin extends BasePlugin {}
+module.exports = definePlugin("good", (context) => new GoodPlugin(context));
 `,
       "utf8"
     );
@@ -278,11 +276,7 @@ module.exports = GoodPlugin;
     });
 
     const partial = await fetch(`http://127.0.0.1:${port}/broken/partial`);
-    expect(partial.status).toBe(503);
-    await expect(partial.json()).resolves.toMatchObject({
-      code: ErrorCode.PluginRegistrationFailed,
-      pluginId: "broken",
-    });
+    expect(partial.status).toBe(404);
   });
 
   it("records skipped plugin diagnostics for HTTP health checks", async () => {

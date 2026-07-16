@@ -3,10 +3,21 @@ import type {
   AssemblyTarget,
   MethodHandler,
   ApiRouteSpec,
+  HttpMethod,
   SubscribableProducer,
 } from "@ps-generator-bridge/sdk/plugin";
 import { unknownMethodResponse, type HandlerContext } from "../server/dispatch";
 import { MethodTable } from "../server/methodTable";
+
+const HTTP_METHODS = new Set<HttpMethod>([
+  "GET",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+  "HEAD",
+  "OPTIONS",
+]);
 
 /**
  * Per-plugin scoped method table (RFC 0004). Implements the SDK AssemblyTarget
@@ -22,13 +33,43 @@ import { MethodTable } from "../server/methodTable";
  */
 export class ScopedRegistry implements AssemblyTarget {
   private readonly methods = new MethodTable();
+  private readonly methodNames = new Set<string>();
   private readonly apiRoutes: ApiRouteSpec[] = [];
+  private readonly apiRouteKeys = new Set<string>();
 
   registerMethod(name: string, handler: MethodHandler): void {
+    if (name.length === 0) throw new Error("plugin WS method name must not be empty");
+    if (typeof handler !== "function") {
+      throw new Error(`plugin WS handler '${name}' must be a function`);
+    }
+    if (this.methodNames.has(name)) {
+      throw new Error(`plugin WS method already registered: ${name}`);
+    }
+    this.methodNames.add(name);
     this.methods.register(name, handler);
   }
 
   registerApi(route: ApiRouteSpec): void {
+    if (!route.url.startsWith("/")) {
+      throw new Error(`plugin API route must start with '/': ${route.url}`);
+    }
+    if (typeof route.handler !== "function") {
+      throw new Error(`plugin API handler '${route.url}' must be a function`);
+    }
+    const methods = Array.isArray(route.method) ? route.method : [route.method];
+    if (methods.length === 0) throw new Error(`plugin API route has no methods: ${route.url}`);
+    for (const method of methods) {
+      if (!HTTP_METHODS.has(method)) {
+        throw new Error(
+          `plugin API route has unsupported method '${String(method)}': ${route.url}`
+        );
+      }
+      const key = `${method} ${route.url}`;
+      if (this.apiRouteKeys.has(key)) {
+        throw new Error(`plugin API route already registered: ${key}`);
+      }
+    }
+    for (const method of methods) this.apiRouteKeys.add(`${method} ${route.url}`);
     this.apiRoutes.push(route);
   }
 

@@ -3,44 +3,60 @@ import { basename, delimiter, isAbsolute, join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { ErrorCode } from "@ps-generator-bridge/sdk";
 import {
-  isBasePluginClass,
-  type BasePlugin,
+  type ApiHandler,
+  type Logger,
+  type MethodHandler,
+  type PluginApiRoute,
   type PluginHost,
+  type PluginInitContext,
+  type PluginInitializer,
+  type PluginRuntime,
 } from "@ps-generator-bridge/sdk/plugin";
 import { isValidPluginId } from "./pluginManager";
-import type { Logger } from "@ps-generator-bridge/sdk/plugin";
+import { ScopedRegistry } from "./scopedRegistry";
+
+export type PluginLoadPhase =
+  | "manifest"
+  | "import"
+  | "identity"
+  | "init"
+  | "runtime-validation"
+  | "registration";
+
+export type PluginActivationResult =
+  | Readonly<{ ok: true }>
+  | Readonly<{ ok: false; reason: string; cleanupHandled?: boolean }>;
 
 export interface LoadOptions {
   /** Explicit plugin package directories loaded before the collection directory. */
   pluginDirs?: readonly string[];
   /** Directory whose direct child folders are scanned as plugin packages. */
   pluginsDir: string;
-  /**
-   * Builds the host contract for a plugin, given that plugin's package dir
-   * (RFC 0005). The loader calls it once per plugin and passes the result to the
-   * plugin's constructor, so each plugin can receive a `jsx` scoped to its own
-   * `<pluginDir>/jsx`. The loader stays ignorant of jsx scoping — `PsBridgeHost`
-   * owns the per-plugin wrapper.
-   */
+  /** Build the plugin-scoped host after the final plugin id has been resolved. */
   hostFor: (pluginDir: string, pluginId: string) => PluginHost;
-  /** Plugin ids already taken — enforced unique across the whole load. */
+  /** Plugin ids already reserved outside this scan. */
   knownIds: Set<string>;
+  /**
+   * Optional activation boundary. Production registers the staged runtime with
+   * PluginManager here; an id is claimed only after this returns ok.
+   */
+  activate?: (plugin: LoadedPlugin) => Promise<PluginActivationResult>;
   logger: Logger;
 }
 
 export interface LoadedPlugin {
   id: string;
-  plugin: BasePlugin;
-  /** Absolute path of the package entry (resolved from package.json `main`). */
+  runtime: PluginRuntime;
+  scoped: ScopedRegistry;
+  /** Absolute package entry resolved from package.json `main`. */
   path: string;
 }
 
 export interface SkippedPlugin {
-  /** Folder name under pluginsDir, for readable logs. */
   path: string;
-  /** Stable diagnostic id. Uses static plugin id when available, else folder name. */
   id: string;
   code: string;
+  phase: PluginLoadPhase;
   reason: string;
 }
 
@@ -59,54 +75,35 @@ export function parsePluginPaths(raw: string | undefined): string[] {
 }
 
 /**
- * Plugin loader. Loads explicit `pluginDirs` in declaration order, then scans
- * the *direct* child folders and directory links of `pluginsDir` (flat, one
- * level — `node_modules` and dotfolders are ignored). Every candidate is
- * treated as an npm package: the loader reads its `package.json`, resolves the
- * `main` entry, and loads it via dynamic `import()` with CJS interop
- * (`mod.default ?? mod`). The default export must be a `BasePlugin` subclass
- * with a legal, unique `static id`; it is constructed with `(id, host)`.
- *
- * A plugin's own dependencies resolve from its own `node_modules` via Node's
- * native module resolution (the entry's requires walk up from the entry file),
- * so a plugin ships with its dependencies installed beside it — the loader adds
- * no resolution machinery of its own.
- *
- * Explicit paths must be absolute directories and are deduplicated with all
- * collection candidates by real path. Invalid or broken packages are skipped
- * with a `log.warn` naming the folder and reason — one bad package never stops
- * the others or the host. A folder with no `package.json`, or a `package.json`
- * with no `main`, is skipped. A missing `pluginsDir` is the default state (no
- * collection plugins installed) and is a debug log. `isBasePluginClass` (a
- * global brand) makes validation work even when the package bundles its own SDK
- * copy.
+ * Load plugin packages in deterministic priority order. A package default
+ * export is a synchronous initializer, never a class. Explicit package paths
+ * win before the sorted collection directory, and the first candidate that
+ * completes initialization/activation claims its id.
  */
 export async function loadPlugins(options: LoadOptions): Promise<LoadResult> {
-  const { pluginDirs = [], pluginsDir, hostFor, knownIds, logger: log } = options;
+  const { pluginDirs = [], pluginsDir, hostFor, knownIds, activate, logger: log } = options;
   const loaded: LoadedPlugin[] = [];
   const skipped: SkippedPlugin[] = [];
-  // id -> the folder that already claimed it, so a later duplicate can name the
-  // winner in its skip reason. Ids passed in via `knownIds` predate this scan
-  // (e.g. reserved built-ins), so their owner is labelled generically.
   const taken = new Map<string, string>();
   for (const id of knownIds) taken.set(id, "<reserved>");
 
   const seenDirs = new Set<string>();
   const loadCandidate = async (dir: string, label: string): Promise<void> => {
-    const outcome = await loadOne(dir, hostFor, taken);
+    const outcome = await loadOne(dir, hostFor, taken, activate, log);
     if (outcome.kind === "loaded") {
-      loaded.push({ id: outcome.id, plugin: outcome.plugin, path: outcome.path });
-      taken.set(outcome.id, label);
-      log.info(`plugin loaded: ${label} (${outcome.id})`);
+      loaded.push(outcome.plugin);
+      taken.set(outcome.plugin.id, label);
+      log.info(`plugin loaded: ${label} (${outcome.plugin.id})`);
       return;
     }
     skipped.push({
       path: label,
       id: outcome.id ?? diagnosticId(dir),
-      code: ErrorCode.PluginLoadFailed,
+      code: outcome.code ?? ErrorCode.PluginLoadFailed,
+      phase: outcome.phase,
       reason: outcome.reason,
     });
-    log.warn(`plugin skipped: ${label} — ${outcome.reason}`);
+    log.warn(`plugin skipped: ${label} [${outcome.phase}] - ${outcome.reason}`);
   };
 
   for (const rawDir of pluginDirs) {
@@ -118,9 +115,10 @@ export async function loadPlugins(options: LoadOptions): Promise<LoadResult> {
         path: dir,
         id: diagnosticId(dir),
         code: ErrorCode.PluginLoadFailed,
+        phase: "manifest",
         reason: prepared.reason,
       });
-      log.warn(`plugin skipped: ${dir} — ${prepared.reason}`);
+      log.warn(`plugin skipped: ${dir} [manifest] - ${prepared.reason}`);
       continue;
     }
     if (seenDirs.has(prepared.key)) {
@@ -134,8 +132,8 @@ export async function loadPlugins(options: LoadOptions): Promise<LoadResult> {
   let dirs: string[];
   try {
     dirs = scanPluginDirs(pluginsDir);
-  } catch (err) {
-    log.debug(`pluginsDir not loaded: ${pluginsDir} (${(err as Error).message})`);
+  } catch (error) {
+    log.debug(`pluginsDir not loaded: ${pluginsDir} (${errorMessage(error)})`);
     return { loaded, skipped };
   }
 
@@ -152,30 +150,305 @@ export async function loadPlugins(options: LoadOptions): Promise<LoadResult> {
   return { loaded, skipped };
 }
 
+type Outcome =
+  | { kind: "loaded"; plugin: LoadedPlugin }
+  | {
+      kind: "skipped";
+      id?: string;
+      code?: string;
+      phase: PluginLoadPhase;
+      reason: string;
+    };
+
+interface PluginPackageJson {
+  main?: unknown;
+  name?: unknown;
+  pluginId?: unknown;
+}
+
+async function loadOne(
+  dir: string,
+  hostFor: (pluginDir: string, pluginId: string) => PluginHost,
+  taken: Map<string, string>,
+  activate: LoadOptions["activate"],
+  log: Logger
+): Promise<Outcome> {
+  let pkg: PluginPackageJson;
+  try {
+    pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as PluginPackageJson;
+  } catch (error) {
+    return skip("manifest", `package.json missing or invalid: ${errorMessage(error)}`);
+  }
+
+  if (typeof pkg.main !== "string" || pkg.main.length === 0) {
+    return skip("manifest", 'package.json has no "main"');
+  }
+  const root = resolve(dir);
+  const entry = resolve(root, pkg.main);
+  if (entry !== root && !entry.startsWith(root + sep)) {
+    return skip("manifest", `"main" escapes the plugin directory: ${pkg.main}`);
+  }
+
+  let exported: unknown;
+  try {
+    const mod = (await import(pathToFileURL(entry).href)) as Record<string, unknown>;
+    exported = unwrapDefault(mod);
+  } catch (error) {
+    log.error(`plugin entry import failed: ${entry}`, errorStack(error));
+    return skip("import", `load failed: ${errorMessage(error)}`);
+  }
+
+  if (isClassFunction(exported)) {
+    return skip("import", "default export must be an initializer function, not a class");
+  }
+  if (typeof exported !== "function") {
+    return skip("import", "default export is not a plugin initializer function");
+  }
+  const initializer = exported as PluginInitializer;
+
+  const identity = resolvePluginId(pkg, initializer);
+  if (!identity.ok) return skip("identity", identity.reason);
+  const id = identity.id;
+  if (!isValidPluginId(id)) {
+    return skip("identity", `illegal id '${id}' (must match [A-Za-z0-9_-]+)`, id);
+  }
+  const owner = taken.get(id);
+  if (owner !== undefined) {
+    return skip("identity", `duplicate id '${id}' (already claimed by '${owner}')`, id);
+  }
+
+  let host: PluginHost;
+  try {
+    host = hostFor(dir, id);
+  } catch (error) {
+    log.error(`plugin ${id} host creation failed`, errorStack(error));
+    return skip("init", `host creation failed: ${errorMessage(error)}`, id);
+  }
+
+  const scoped = new ScopedRegistry();
+  const registration = createInitContext(id, host, scoped);
+  let value: unknown;
+  try {
+    value = initializer(registration.context);
+  } catch (error) {
+    registration.close();
+    safeDisposeHostEvents(host, id, log);
+    log.error(`plugin ${id} init failed`, errorStack(error));
+    return skip("init", errorMessage(error), id);
+  }
+  registration.close();
+
+  if (isPromiseLike(value)) {
+    void Promise.resolve(value).then(
+      (lateRuntime) => safeDisposeUnknown(lateRuntime, id, log),
+      (error) => log.error(`plugin ${id} async initializer rejected`, errorStack(error))
+    );
+    safeDisposeHostEvents(host, id, log);
+    return skip("init", "plugin initializer must be synchronous", id);
+  }
+
+  const validation = validateRuntime(value, id);
+  if (!validation.ok) {
+    await safeDisposeUnknown(value, id, log);
+    safeDisposeHostEvents(host, id, log);
+    return skip("runtime-validation", validation.reason, id);
+  }
+
+  const plugin: LoadedPlugin = { id, runtime: validation.runtime, scoped, path: entry };
+  if (activate) {
+    let activated: PluginActivationResult;
+    try {
+      activated = await activate(plugin);
+    } catch (error) {
+      log.error(`plugin ${id} registration failed`, errorStack(error));
+      await safeDisposeUnknown(plugin.runtime, id, log);
+      safeDisposeHostEvents(host, id, log);
+      return skip("registration", errorMessage(error), id, ErrorCode.PluginRegistrationFailed);
+    }
+    if (!activated.ok) {
+      if (!activated.cleanupHandled) {
+        await safeDisposeUnknown(plugin.runtime, id, log);
+        safeDisposeHostEvents(host, id, log);
+      }
+      return skip("registration", activated.reason, id, ErrorCode.PluginRegistrationFailed);
+    }
+  }
+  return { kind: "loaded", plugin };
+}
+
+function unwrapDefault(mod: Record<string, unknown>): unknown {
+  let exported: unknown = mod.default ?? mod;
+  if (exported !== null && typeof exported === "object") {
+    const inner = (exported as Record<string, unknown>).default;
+    if (inner !== undefined) exported = inner;
+  }
+  return exported;
+}
+
+type IdentityResult = { ok: true; id: string } | { ok: false; reason: string };
+
+function resolvePluginId(pkg: PluginPackageJson, initializer: PluginInitializer): IdentityResult {
+  const manifest = optionalId(pkg, "pluginId", "package.json pluginId");
+  if (!manifest.ok) return manifest;
+
+  let rawInitializerId: unknown;
+  try {
+    rawInitializerId = initializer.pluginId;
+  } catch (error) {
+    return { ok: false, reason: `initializer pluginId could not be read: ${errorMessage(error)}` };
+  }
+  const code = normalizeOptionalId(rawInitializerId, "initializer pluginId");
+  if (!code.ok) return code;
+
+  if (manifest.id !== undefined && code.id !== undefined && manifest.id !== code.id) {
+    return {
+      ok: false,
+      reason: `pluginId mismatch: package.json declares '${manifest.id}', initializer declares '${code.id}'`,
+    };
+  }
+  const explicit = manifest.id ?? code.id;
+  if (explicit !== undefined) return { ok: true, id: explicit };
+  if (typeof pkg.name !== "string" || pkg.name.length === 0) {
+    return { ok: false, reason: "missing pluginId and package.json name" };
+  }
+  return { ok: true, id: pkg.name };
+}
+
+function optionalId(
+  object: PluginPackageJson,
+  key: "pluginId",
+  label: string
+): { ok: true; id?: string } | { ok: false; reason: string } {
+  return normalizeOptionalId(object[key], label);
+}
+
+function normalizeOptionalId(
+  value: unknown,
+  label: string
+): { ok: true; id?: string } | { ok: false; reason: string } {
+  if (value === undefined) return { ok: true };
+  if (typeof value !== "string" || value.length === 0) {
+    return { ok: false, reason: `${label} must be a non-empty string` };
+  }
+  return { ok: true, id: value };
+}
+
+function createInitContext(
+  pluginId: string,
+  host: PluginHost,
+  scoped: ScopedRegistry
+): { context: PluginInitContext; close(): void } {
+  let open = true;
+  const assertOpen = (): void => {
+    if (!open) throw new Error(`plugin '${pluginId}' registration context is closed`);
+  };
+  const context: PluginInitContext = Object.freeze({
+    pluginId,
+    host,
+    ws(name: string, handler: MethodHandler): void {
+      assertOpen();
+      scoped.registerMethod(name, handler);
+    },
+    api(route: PluginApiRoute, handler: ApiHandler): void {
+      assertOpen();
+      const normalized =
+        typeof route === "string"
+          ? { method: "GET" as const, url: route, handler }
+          : { method: route.method ?? ("GET" as const), url: route.url, handler };
+      scoped.registerApi(normalized);
+    },
+  });
+  return { context, close: () => void (open = false) };
+}
+
+type RuntimeValidation = { ok: true; runtime: PluginRuntime } | { ok: false; reason: string };
+
+function validateRuntime(value: unknown, pluginId: string): RuntimeValidation {
+  if (typeof value !== "object" || value === null) {
+    return { ok: false, reason: "plugin initializer must return a PluginRuntime object" };
+  }
+  try {
+    const runtime = value as PluginRuntime;
+    if (runtime.pluginId !== undefined) {
+      if (typeof runtime.pluginId !== "string") {
+        return { ok: false, reason: "runtime pluginId must be a string" };
+      }
+      if (runtime.pluginId !== pluginId) {
+        return {
+          ok: false,
+          reason: `runtime pluginId '${runtime.pluginId}' does not match resolved pluginId '${pluginId}'`,
+        };
+      }
+    }
+    for (const hook of ["onConnect", "onDisconnect", "onDispose"] as const) {
+      if (runtime[hook] !== undefined && typeof runtime[hook] !== "function") {
+        return { ok: false, reason: `${hook} must be a function` };
+      }
+    }
+    return { ok: true, runtime };
+  } catch (error) {
+    return { ok: false, reason: `runtime validation failed: ${errorMessage(error)}` };
+  }
+}
+
+async function safeDisposeUnknown(value: unknown, pluginId: string, log: Logger): Promise<void> {
+  if (typeof value !== "object" || value === null) return;
+  try {
+    const dispose = (value as { onDispose?: unknown }).onDispose;
+    if (typeof dispose === "function") await dispose.call(value);
+  } catch (error) {
+    log.error(`plugin ${pluginId} cleanup failed`, errorStack(error));
+  }
+}
+
+function safeDisposeHostEvents(host: PluginHost, pluginId: string, log: Logger): void {
+  try {
+    host.events.dispose();
+  } catch (error) {
+    log.error(`plugin ${pluginId} event cleanup failed`, errorStack(error));
+  }
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  try {
+    return (
+      ((typeof value === "object" && value !== null) || typeof value === "function") &&
+      typeof (value as { then?: unknown }).then === "function"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isClassFunction(value: unknown): boolean {
+  if (typeof value !== "function") return false;
+  try {
+    return /^\s*class\b/.test(Function.prototype.toString.call(value));
+  } catch {
+    return false;
+  }
+}
+
+function skip(phase: PluginLoadPhase, reason: string, id?: string, code?: string): Outcome {
+  return { kind: "skipped", phase, reason, id, code };
+}
+
 type PreparedPluginDir = { kind: "valid"; key: string } | { kind: "invalid"; reason: string };
 
 function prepareExplicitPluginDir(dir: string): PreparedPluginDir {
-  if (!isAbsolute(dir)) {
-    return { kind: "invalid", reason: "plugin path must be absolute" };
-  }
+  if (!isAbsolute(dir)) return { kind: "invalid", reason: "plugin path must be absolute" };
   let canonical: string;
   try {
     canonical = realpathSync(dir);
   } catch (error) {
-    return {
-      kind: "invalid",
-      reason: `plugin path is unavailable: ${(error as Error).message}`,
-    };
+    return { kind: "invalid", reason: `plugin path is unavailable: ${errorMessage(error)}` };
   }
   try {
     if (!statSync(canonical).isDirectory()) {
       return { kind: "invalid", reason: "plugin path is not a directory" };
     }
   } catch (error) {
-    return {
-      kind: "invalid",
-      reason: `plugin path is unavailable: ${(error as Error).message}`,
-    };
+    return { kind: "invalid", reason: `plugin path is unavailable: ${errorMessage(error)}` };
   }
   return { kind: "valid", key: normalizeCanonicalPath(canonical) };
 }
@@ -196,94 +469,6 @@ function diagnosticId(dir: string): string {
   return basename(dir) || dir;
 }
 
-type Outcome =
-  | { kind: "loaded"; id: string; plugin: BasePlugin; path: string }
-  | { kind: "skipped"; id?: string; reason: string };
-
-async function loadOne(
-  dir: string,
-  hostFor: (pluginDir: string, pluginId: string) => PluginHost,
-  taken: Map<string, string>
-): Promise<Outcome> {
-  // Read + parse package.json.
-  let pkg: { main?: unknown };
-  try {
-    pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { main?: unknown };
-  } catch (err) {
-    return {
-      kind: "skipped",
-      reason: `package.json missing or invalid: ${(err as Error).message}`,
-    };
-  }
-
-  // The entry is the package's `main`; a package with no `main` is skipped.
-  if (typeof pkg.main !== "string" || pkg.main.length === 0) {
-    return { kind: "skipped", reason: 'package.json has no "main"' };
-  }
-
-  // Resolve the entry within the plugin folder; reject a `main` that escapes it.
-  const root = resolve(dir);
-  const entry = resolve(root, pkg.main);
-  if (entry !== root && !entry.startsWith(root + sep)) {
-    return { kind: "skipped", reason: `"main" escapes the plugin directory: ${pkg.main}` };
-  }
-
-  let mod: Record<string, unknown>;
-  try {
-    // Node's ESM loader requires a file:// URL for absolute paths; a bare
-    // Windows path like `d:\...` is read as a protocol and rejected.
-    mod = (await import(pathToFileURL(entry).href)) as Record<string, unknown>;
-  } catch (err) {
-    return { kind: "skipped", reason: `load failed: ${(err as Error).message}` };
-  }
-
-  // CJS interop for dynamic import(): node exposes a CJS module's `module.exports`
-  // as the namespace `default`. A bundler's `export default` (tsup) yields
-  // `module.exports.default = S` which the import() lexer may not flatten, so the
-  // namespace `default` is the whole exports object carrying an inner `default`.
-  // Unwrap one such inner default; a bare `module.exports = S` (a function/class)
-  // is taken as-is.
-  let S: unknown = mod.default ?? mod;
-  if (S !== null && typeof S === "object") {
-    const inner = (S as Record<string, unknown>).default;
-    if (inner !== undefined) S = inner;
-  }
-
-  if (!isBasePluginClass(S)) {
-    return { kind: "skipped", reason: "default export is not a BasePlugin subclass" };
-  }
-  const id = (S as { id?: unknown }).id;
-  if (typeof id !== "string" || id.length === 0) {
-    return { kind: "skipped", reason: "missing static id" };
-  }
-  if (!isValidPluginId(id)) {
-    return { kind: "skipped", reason: `illegal id '${id}' (must match [A-Za-z0-9_-]+)` };
-  }
-  const owner = taken.get(id);
-  if (owner !== undefined) {
-    return {
-      kind: "skipped",
-      id,
-      reason: `duplicate id '${id}' (already claimed by '${owner}')`,
-    };
-  }
-  try {
-    const host = hostFor(dir, id);
-    const plugin = new (S as new (id: string, host: PluginHost) => BasePlugin)(id, host);
-    return { kind: "loaded", id, plugin, path: entry };
-  } catch (err) {
-    return { kind: "skipped", id, reason: `construct failed: ${(err as Error).message}` };
-  }
-}
-
-/**
- * List the direct child folder or directory-link names of `pluginsDir`, sorted
- * for deterministic load order. Links are included so the CLI's managed
- * one-plugin junction snapshot is loadable. A broken link or a link to a file is
- * passed to `loadOne`, which reports its missing package.json as a normal plugin
- * load failure. `node_modules` and dotfolders are skipped. Throws if
- * `pluginsDir` itself is missing (caller treats that as "no plugins installed").
- */
 function scanPluginDirs(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true })
     .filter(
@@ -294,4 +479,12 @@ function scanPluginDirs(dir: string): string[] {
     )
     .map((entry) => entry.name)
     .sort();
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function errorStack(error: unknown): unknown {
+  return error instanceof Error ? (error.stack ?? error.message) : error;
 }

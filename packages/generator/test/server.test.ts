@@ -8,6 +8,7 @@ import {
   api,
   bootstrap,
   type PluginHost,
+  type PluginInitContext,
   type WsHandlerContext,
 } from "@ps-generator-bridge/sdk/plugin";
 import { EventManager, RuntimeEventManager } from "../src/utils/eventManager";
@@ -25,8 +26,6 @@ const silentLogger: Logger = {
 // A fixture plugin for the per-plugin WS/HTTP tests (RFC 0004). Its handlers
 // do not reach the plugin, so a bare cast PluginHost suffices for construction.
 class EchoService extends BasePlugin {
-  static readonly id = "echo";
-
   @ws("echo:ping")
   ping(params: { n?: number }): { pong: number } {
     return { pong: params?.n ?? 0 };
@@ -101,16 +100,15 @@ class BrokenRegistrationService extends BasePlugin {
 
 class DisposeService extends EchoService {
   constructor(
-    id: string,
-    host: PluginHost,
+    context: PluginInitContext,
     private readonly disposed: string[],
     private readonly shouldThrow = false
   ) {
-    super(id, host);
+    super(context);
   }
 
   override onDispose(): void {
-    this.disposed.push(this.id);
+    this.disposed.push(this.pluginId);
     if (this.shouldThrow) throw new Error("dispose exploded");
   }
 }
@@ -168,17 +166,23 @@ async function startWithTtl(
 ): Promise<PsBridgeServer> {
   const { server: s, events } = createPluginServer(sessionResumeTtlMs);
   for (const svc of plugins) {
-    await s.pluginManager.register(typeof svc === "function" ? svc(events) : svc);
+    const runtime = typeof svc === "function" ? svc(events) : svc;
+    await s.pluginManager.register({ pluginId: runtime.pluginId, runtime });
   }
   await s.listen();
   server = s;
   return s;
 }
 
+const pluginContext = (pluginId: string, host: PluginHost): PluginInitContext =>
+  ({ pluginId, host, ws() {}, api() {} }) as PluginInitContext;
+
 const echo = (events?: RuntimeEventManager, id = "echo") =>
-  new EchoService(id, {
-    events: events?.createPluginFacade(id),
-  } as unknown as PluginHost);
+  new EchoService(
+    pluginContext(id, {
+      events: events?.createPluginFacade(id),
+    } as unknown as PluginHost)
+  );
 
 async function startRoot(): Promise<{
   server: PsBridgeServer;
@@ -196,7 +200,8 @@ async function startRoot(): Promise<{
     runtimeEvents: events,
     logger: silentLogger,
   });
-  await s.pluginManager.register(echo(events));
+  const runtime = echo(events);
+  await s.pluginManager.register({ pluginId: runtime.pluginId, runtime });
   bootstrap(new GreetModule(), s.registry);
   await s.listen();
   server = s;
@@ -356,11 +361,13 @@ describe("per-plugin server (RFC 0004)", () => {
     const created = createPluginServer();
     const s = created.server;
     server = s;
-    const broken = new BrokenRegistrationService("broken", {
-      events: created.events.createPluginFacade("broken"),
-    } as unknown as PluginHost);
+    const broken = new BrokenRegistrationService(
+      pluginContext("broken", {
+        events: created.events.createPluginFacade("broken"),
+      } as unknown as PluginHost)
+    );
 
-    const failed = await s.pluginManager.register(broken);
+    const failed = await s.pluginManager.register({ pluginId: broken.pluginId, runtime: broken });
     expect(failed.ok).toBe(false);
     if (failed.ok) throw new Error("expected broken plugin registration to fail");
     expect(failed.error).toMatchObject({
@@ -372,7 +379,11 @@ describe("per-plugin server (RFC 0004)", () => {
     });
     expect(broken.disposeCalls).toBe(1);
 
-    const good = await s.pluginManager.register(echo(created.events));
+    const goodRuntime = echo(created.events);
+    const good = await s.pluginManager.register({
+      pluginId: goodRuntime.pluginId,
+      runtime: goodRuntime,
+    });
     expect(good.ok).toBe(true);
     await s.listen();
 
@@ -389,8 +400,9 @@ describe("per-plugin server (RFC 0004)", () => {
     });
 
     const partial = await fetch(`http://127.0.0.1:${s.port}/broken/partial`);
-    expect(partial.status).toBe(503);
-    await expect(partial.json()).resolves.toEqual(failed.error);
+    // Duplicate routes are rejected in the staging registry before anything is
+    // committed to Fastify, so no partial route remains reachable.
+    expect(partial.status).toBe(404);
 
     const unavailable = await firstFrame(s.port, "broken");
     expect(unavailable.frame).toEqual({ type: "error", data: failed.error });
@@ -501,7 +513,7 @@ describe("per-plugin server (RFC 0004)", () => {
     });
     const gotA = nextEvent(a.ws, "ping");
     const gotB = nextEvent(b.ws, "ping");
-    (s.pluginManager.get("echo")!.plugin as EchoService).publish("ping", { n: 1 });
+    (s.pluginManager.get("echo")!.runtime as EchoService).publish("ping", { n: 1 });
     expect((await gotA).data).toEqual({ n: 1 });
     expect((await gotB).data).toEqual({ n: 1 });
   });
@@ -520,7 +532,9 @@ describe("per-plugin server (RFC 0004)", () => {
       if (JSON.parse(String(data)).type === "hey") bGotIt = true;
     });
     const gotA = nextEvent(a.ws, "hey");
-    (s.pluginManager.get("echo")!.plugin as EchoService).publish("hey", { only: "subscribed" });
+    (s.pluginManager.get("echo")!.runtime as EchoService).publish("hey", {
+      only: "subscribed",
+    });
     expect((await gotA).data).toEqual({ only: "subscribed" });
     await new Promise((r) => setTimeout(r, 20));
     expect(bGotIt).toBe(false);
@@ -548,7 +562,7 @@ describe("per-plugin server (RFC 0004)", () => {
       if (JSON.parse(String(data)).type === "ping") otherGotIt = true;
     });
     const gotEcho = nextEvent(echoClient.ws, "ping");
-    (s.pluginManager.get("echo")!.plugin as EchoService).publish("ping", { n: 2 });
+    (s.pluginManager.get("echo")!.runtime as EchoService).publish("ping", { n: 2 });
     expect((await gotEcho).data).toEqual({ n: 2 });
     await new Promise((r) => setTimeout(r, 20));
     expect(otherGotIt).toBe(false);
@@ -557,9 +571,11 @@ describe("per-plugin server (RFC 0004)", () => {
   it("resumes the session atomically, closes the stale socket, and requires subscription replay", async () => {
     let plugin!: LifecycleEchoService;
     const s = await start((events) => {
-      plugin = new LifecycleEchoService("echo", {
-        events: events.createPluginFacade("echo"),
-      } as unknown as PluginHost);
+      plugin = new LifecycleEchoService(
+        pluginContext("echo", {
+          events: events.createPluginFacade("echo"),
+        } as unknown as PluginHost)
+      );
       return plugin;
     });
     const first = await connect(s.port, "echo");
@@ -587,9 +603,11 @@ describe("per-plugin server (RFC 0004)", () => {
   it("keeps unexpected disconnects resumable but disposes explicitly closed sessions", async () => {
     let plugin!: LifecycleEchoService;
     const s = await start((events) => {
-      plugin = new LifecycleEchoService("echo", {
-        events: events.createPluginFacade("echo"),
-      } as unknown as PluginHost);
+      plugin = new LifecycleEchoService(
+        pluginContext("echo", {
+          events: events.createPluginFacade("echo"),
+        } as unknown as PluginHost)
+      );
       return plugin;
     });
     const first = await connect(s.port, "echo");
@@ -616,9 +634,11 @@ describe("per-plugin server (RFC 0004)", () => {
   it("rejects only the connection whose plugin onConnect fails", async () => {
     let plugin!: FaultyLifecycleService;
     const s = await start((events) => {
-      plugin = new FaultyLifecycleService("echo", {
-        events: events.createPluginFacade("echo"),
-      } as unknown as PluginHost);
+      plugin = new FaultyLifecycleService(
+        pluginContext("echo", {
+          events: events.createPluginFacade("echo"),
+        } as unknown as PluginHost)
+      );
       return plugin;
     });
     const existing = await connect(s.port, "echo");
@@ -660,9 +680,11 @@ describe("per-plugin server (RFC 0004)", () => {
   it("contains onDisconnect failures from active-close and resume-TTL paths", async () => {
     let plugin!: FaultyLifecycleService;
     const s = await startWithTtl(10, (events) => {
-      plugin = new FaultyLifecycleService("echo", {
-        events: events.createPluginFacade("echo"),
-      } as unknown as PluginHost);
+      plugin = new FaultyLifecycleService(
+        pluginContext("echo", {
+          events: events.createPluginFacade("echo"),
+        } as unknown as PluginHost)
+      );
       plugin.failDisconnect = true;
       return plugin;
     });
@@ -696,9 +718,11 @@ describe("per-plugin server (RFC 0004)", () => {
   it("expires an unexpectedly disconnected session after the configured TTL", async () => {
     let plugin!: LifecycleEchoService;
     const s = await startWithTtl(10, (events) => {
-      plugin = new LifecycleEchoService("echo", {
-        events: events.createPluginFacade("echo"),
-      } as unknown as PluginHost);
+      plugin = new LifecycleEchoService(
+        pluginContext("echo", {
+          events: events.createPluginFacade("echo"),
+        } as unknown as PluginHost)
+      );
       return plugin;
     });
     const first = await connect(s.port, "echo");
@@ -729,8 +753,10 @@ describe("per-plugin server (RFC 0004)", () => {
     const host = (id: string) =>
       ({ events: created.events.createPluginFacade(id) }) as unknown as PluginHost;
 
-    await s.pluginManager.register(new DisposeService("recorder", host("recorder"), disposed));
-    await s.pluginManager.register(new DisposeService("thrower", host("thrower"), disposed, true));
+    const recorder = new DisposeService(pluginContext("recorder", host("recorder")), disposed);
+    const thrower = new DisposeService(pluginContext("thrower", host("thrower")), disposed, true);
+    await s.pluginManager.register({ pluginId: recorder.pluginId, runtime: recorder });
+    await s.pluginManager.register({ pluginId: thrower.pluginId, runtime: thrower });
 
     await s.close();
     server = undefined;

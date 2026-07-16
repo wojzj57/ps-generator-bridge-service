@@ -1,6 +1,6 @@
 import type { FastifyInstance, HTTPMethods } from "fastify";
 import type { PluginHealth, ProtocolError } from "@ps-generator-bridge/sdk";
-import type { ApiHandler, BasePlugin } from "@ps-generator-bridge/sdk/plugin";
+import type { ApiHandler, PluginRuntime } from "@ps-generator-bridge/sdk/plugin";
 import { bootstrap } from "@ps-generator-bridge/sdk/plugin";
 import { bridgeError } from "../errors";
 import { SessionStore } from "../server/connectionSession";
@@ -17,14 +17,21 @@ interface RouteActivation {
   failure?: ProtocolError;
 }
 
-/** One loaded plugin's runtime state: the instance, scoped table, and sessions. */
+/** One activated plugin's structural runtime, scoped table, and sessions. */
 export interface PluginEntry {
-  plugin: BasePlugin;
+  pluginId: string;
+  runtime: PluginRuntime;
   scoped: ScopedRegistry;
   sessions: SessionStore;
   lifecycle: PluginLifecycleBoundary;
-  runtime: PluginRuntimeState;
+  state: PluginRuntimeState;
   loadedAt: number;
+}
+
+export interface PluginRegistration {
+  pluginId: string;
+  runtime: PluginRuntime;
+  scoped?: ScopedRegistry;
 }
 
 /** One entry in the `GET /plugins` discovery list (RFC 0004). */
@@ -62,7 +69,7 @@ export class PluginManager {
   }
 
   list(): PluginInfo[] {
-    return [...this.plugins.values()].map((entry) => ({ id: entry.plugin.id }));
+    return [...this.plugins.values()].map((entry) => ({ id: entry.pluginId }));
   }
 
   get(id: string): PluginEntry | undefined {
@@ -81,8 +88,8 @@ export class PluginManager {
         status: "loaded",
         clients: entry.sessions.count,
         loadedAt: entry.loadedAt,
-        lastError: entry.runtime.lastError,
-        checks: { runtime: entry.runtime.lastError ? "failed" : "ok" },
+        lastError: entry.state.lastError,
+        checks: { runtime: entry.state.lastError ? "failed" : "ok" },
       };
     }
 
@@ -98,7 +105,7 @@ export class PluginManager {
   }
 
   recordFailure(failure: PluginFailure): void {
-    if (this.plugins.has(failure.id)) return;
+    if (this.plugins.has(failure.id) || this.failures.has(failure.id)) return;
     this.failures.set(failure.id, failure);
   }
 
@@ -116,21 +123,21 @@ export class PluginManager {
    * Prepare and commit one plugin. Plugin-originated failures are returned and
    * recorded instead of escaping into host startup.
    */
-  async register(plugin: BasePlugin): Promise<PluginRegistrationResult> {
-    const id = plugin.id;
+  async register(registration: PluginRegistration): Promise<PluginRegistrationResult> {
+    const { pluginId: id, runtime } = registration;
     const ownsEventResources = !this.plugins.has(id);
-    const runtime: PluginRuntimeState = {};
-    const lifecycle = new PluginLifecycleBoundary(plugin, {
+    const state: PluginRuntimeState = {};
+    const lifecycle = new PluginLifecycleBoundary(id, runtime, {
       onFailure: (error) => {
-        runtime.lastError = error;
+        state.lastError = error;
       },
     });
     const activation: RouteActivation = { active: false };
 
     try {
       this.validateRegistrationId(id);
-      const scoped = new ScopedRegistry();
-      bootstrap(plugin, scoped);
+      const scoped = registration.scoped ?? new ScopedRegistry();
+      bootstrap(runtime, scoped);
 
       for (const route of scoped.routes) {
         const handler = route.handler;
@@ -154,11 +161,12 @@ export class PluginManager {
       });
       this.events.createPluginScope(id);
       const entry: PluginEntry = {
-        plugin,
+        pluginId: id,
+        runtime,
         scoped,
         sessions,
         lifecycle,
-        runtime,
+        state,
         loadedAt: Date.now(),
       };
       this.plugins.set(id, entry);
