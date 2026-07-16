@@ -1,18 +1,18 @@
 # API 路由
 
-插件可以用 `@api` 暴露 HTTP handler。
+插件可以用 `@api` 或 initializer 上下文暴露 HTTP handler。
 
 ```ts
-import { BasePlugin, api } from "@ps-generator-bridge/sdk/plugin";
+import { BasePlugin, api, definePlugin } from "@ps-generator-bridge/sdk/plugin";
 
-export default class PaintPlugin extends BasePlugin {
-  static id = "paint";
-
+class PaintPlugin extends BasePlugin {
   @api("/status")
   status() {
     return { ok: true };
   }
 }
+
+export default definePlugin("paint", (context) => new PaintPlugin(context));
 ```
 
 路由会挂载到插件 id 下面：
@@ -31,6 +31,21 @@ create(params: unknown) {
   return { ok: true };
 }
 ```
+
+普通对象插件在同步初始化期间注册相同路由：
+
+```ts
+import type { PluginInitContext } from "@ps-generator-bridge/sdk/plugin";
+
+export default function init(context: PluginInitContext) {
+  context.api("/status", () => ({ ok: true }));
+  context.api({ method: "POST", url: "/create" }, () => ({ ok: true }));
+  return {};
+}
+```
+
+路由路径必须以 `/` 开头。支持的方法包括 `GET`、`POST`、`PUT`、`PATCH`、
+`DELETE`、`HEAD` 和 `OPTIONS`。重复或格式错误的路由会在插件可用前让激活失败。
 
 ## 路由冲突
 

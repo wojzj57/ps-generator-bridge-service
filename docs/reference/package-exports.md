@@ -29,10 +29,22 @@ Important exports:
 Plugin authoring subpath:
 
 ```ts
-import { BasePlugin, ws, api, bootstrap } from "@ps-generator-bridge/sdk/plugin";
+import {
+  BasePlugin,
+  definePlugin,
+  ws,
+  api,
+  bootstrap,
+  type PluginInitContext,
+  type PluginInitializer,
+  type PluginRuntime,
+} from "@ps-generator-bridge/sdk/plugin";
 ```
 
-The plugin subpath exports runtime authoring primitives and type-only host/module/event contracts, including `WsSession`, `WsEndpoint`, and `WsHandlerContext`.
+The plugin subpath exports the synchronous initializer contract, structural
+runtime types, decorator authoring primitives, and type-only host/module/event
+contracts. This includes `PluginInitContext`, `PluginInitializer`,
+`PluginRuntime`, `WsSession`, `WsEndpoint`, and `WsHandlerContext`.
 
 ## `@ps-generator-bridge/generator`
 

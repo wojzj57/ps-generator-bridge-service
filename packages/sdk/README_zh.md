@@ -82,12 +82,12 @@ const connection = new Connection({
 - `Connection.status()` 查询 `/health`；`Connection.plugins()` 查询 `/plugins`；`Connection.pluginHealth(id)` 查询 `/plugins/{id}/health`。
 - `connection.on()`、`connection.once()`、`connection.off()` 通过协议订阅和取消订阅服务端事件。
 - 插件私有 API 通过插件 endpoint 连接上的 `connection.invoke(...)` 调用。
-- `connection.jsx` 执行协议暴露的远程 JSX 方法。插件作者仍应使用 `BasePlugin` 上下文提供的插件作用域 helper。
+- `connection.jsx` 执行协议暴露的远程 JSX 方法。插件作者通过 `PluginInitContext` 直接使用插件作用域 helper，或经由 `BasePlugin` 使用。
 - `RawConnection` 提供更底层的强类型 `invoke()` 和事件订阅。
 - `PsBridgeClient` 为兼容旧调用方保留，已废弃，推荐迁移到 `Connection`。
 - `createWebSocketTransport` 和 `Transport` 是测试与自定义运行时使用的传输层 seam。
 - `ConnectionInterruptedError` 表示请求已发出，但在收到响应前 transport 中断；SDK 不会自动重放此类请求。
-- `@ps-generator-bridge/sdk/plugin` 导出插件开发原语（`BasePlugin`、`ws`、`api`、`bootstrap`）以及 type-only 的宿主契约。
+- `@ps-generator-bridge/sdk/plugin` 导出同步 initializer 契约（`definePlugin`、`PluginInitContext`、`PluginInitializer`、`PluginRuntime`）、decorator 开发原语（`BasePlugin`、`ws`、`api`、`bootstrap`）以及 type-only 宿主契约。
 
 旧门面的 breaking changes：
 
@@ -133,17 +133,20 @@ const connection = new Connection({
 外部插件包应使用 plugin subpath：
 
 ```ts
-import { BasePlugin, ws, api } from "@ps-generator-bridge/sdk/plugin";
+import { BasePlugin, definePlugin, ws } from "@ps-generator-bridge/sdk/plugin";
 
-export default class MyPlugin extends BasePlugin {
-  static id = "myPlugin";
-
+class MyPlugin extends BasePlugin {
   @ws("myPlugin:ping")
   ping() {
     return { ok: true };
   }
 }
+
+export default definePlugin("myPlugin", (context) => new MyPlugin(context));
 ```
+
+默认导出必须是同步 initializer。它可以返回 `BasePlugin` 实例或普通
+`PluginRuntime` 对象；普通插件通过 `context.ws()` 和 `context.api()` 注册 handler。
 
 SDK plugin subpath 必须保持轻量和平台无关。不要把 Fastify、`ws`、Photoshop Generator 内部类型、COS SDK 类型或其他 Node-only 实现细节引入包根入口。
 

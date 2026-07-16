@@ -104,12 +104,12 @@ const connection = new Connection({
 - `openPhotoshopOnLightBox()` checks `/health` and opens the LightBox Photoshop entry page only when the bridge server is not healthy.
 - `connection.on()`, `connection.once()`, and `connection.off()` subscribe and unsubscribe server events through the protocol.
 - Plugin-private APIs stay on the plugin endpoint connection through `connection.invoke(...)`.
-- `connection.jsx` executes remote protocol-exposed JSX methods. Plugin authors should continue to use plugin-scoped helpers from their `BasePlugin` context.
+- `connection.jsx` executes remote protocol-exposed JSX methods. Plugin authors use plugin-scoped helpers from `PluginInitContext`, directly or through `BasePlugin`.
 - `RawConnection` exposes lower-level typed `invoke()` and event subscription.
 - `PsBridgeClient` is retained for compatibility and is deprecated in favor of `Connection`.
 - `createWebSocketTransport` and `Transport` are the injected transport seam used by tests and custom runtimes.
 - `ConnectionInterruptedError` identifies requests that were sent but lost their transport before a response; these requests are never replayed automatically.
-- `@ps-generator-bridge/sdk/plugin` exports plugin authoring primitives (`BasePlugin`, `ws`, `api`, `bootstrap`) and type-only host contracts.
+- `@ps-generator-bridge/sdk/plugin` exports the synchronous initializer contract (`definePlugin`, `PluginInitContext`, `PluginInitializer`, `PluginRuntime`), decorator authoring primitives (`BasePlugin`, `ws`, `api`, `bootstrap`), and type-only host contracts.
 
 Breaking changes from the old facade:
 
@@ -155,11 +155,9 @@ When adding a server capability:
 Use the plugin subpath for external plugin packages:
 
 ```ts
-import { BasePlugin, ws, api } from "@ps-generator-bridge/sdk/plugin";
+import { BasePlugin, definePlugin, ws } from "@ps-generator-bridge/sdk/plugin";
 
-export default class MyPlugin extends BasePlugin {
-  static id = "myPlugin";
-
+class MyPlugin extends BasePlugin {
   @ws("myPlugin:ping")
   ping() {
     return { ok: true };
@@ -169,10 +167,15 @@ export default class MyPlugin extends BasePlugin {
     this.events.emit("myPlugin:changed", data);
   }
 }
+
+export default definePlugin("myPlugin", (context) => new MyPlugin(context));
 ```
 
-Plugins publish client-visible events with `this.events.emit(...)`. Direct
-`broadcast` / `send` APIs are not part of the plugin authoring surface.
+The default export must be a synchronous initializer. It may return a
+`BasePlugin` instance or a plain `PluginRuntime` object; plain plugins register
+handlers with `context.ws()` and `context.api()`. Plugins publish client-visible
+events through the host event facade. Direct `broadcast` / `send` APIs are not
+part of the plugin authoring surface.
 
 The SDK plugin subpath must stay lightweight and platform-neutral. Do not import Fastify, `ws`, Photoshop Generator internals, COS SDK types, or other Node-only implementation details into the package root.
 

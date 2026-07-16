@@ -53,7 +53,7 @@ ps-generator-bridge/
 
 ### Runtime 版本
 
-CLI 与 generator runtime 独立版本。`setup`、`setup-photoshop`、`run`、`dev` 每次执行都会查询 npm 的 `latest` dist-tag；只有解析出的版本发生变化时才更新共享 runtime。新版本先在临时目录安装和校验，成功后才替换当前缓存。
+CLI 与 generator runtime 独立版本。`setup`、`setup-photoshop`、`run`、`dev` 每次执行都会查询 npm 的 `latest` dist-tag；只有解析出的版本发生变化时才更新共享 runtime。新版本先在临时目录安装和校验，成功后才替换当前缓存。有效 runtime 必须是独立的 Windows x64 包，不能包含未解析的 runtime 依赖，并且必须带有完整的包内私有 sharp vendor payload；旧式依赖型缓存会被拒绝。
 
 npm 不可用时，命令会警告并使用完整的已有缓存；首次安装且无缓存时失败。更新失败会保留上一版。可用 `--runtime-version <version-or-tag>` 固定或回退版本；显式指定的版本不会被其他缓存版本替代。
 
@@ -112,7 +112,8 @@ ps-generator-bridge dev --plugin-cwd --port 7700
 ps-generator-bridge dev --plugins-dir D:\plugins --runtime-version 0.6.0
 ```
 
-Harness 仍会校验候选插件数量与实际加载数量一致。旧的 `--expect-plugin` 参数已移除。
+Harness 会校验宿主至少加载了所选来源和 `PS_BRIDGE_PLUGINS` 中已知的不同候选数量；
+允许宿主额外加载其他已配置插件。旧的 `--expect-plugin` 参数已移除。
 
 ## Clean
 

@@ -9,6 +9,7 @@ Generator launches; existing process environment variables are not overwritten.
 | Variable                          | Required | Purpose                                              | Default                  |
 | --------------------------------- | -------- | ---------------------------------------------------- | ------------------------ |
 | `PS_BRIDGE_PORT`                  | No       | Overrides the generator service port when valid.     | `7700`                   |
+| `PS_BRIDGE_PLUGINS`               | No       | Ordered absolute plugin package paths.               | none                     |
 | `PS_BRIDGE_PLUGINS_DIR`           | No       | Directory whose direct children are plugin packages. | package-local `plugins/` |
 | `PS_BRIDGE_LOG_DIR`               | No       | Directory for generator runtime logs.                | package-local `logs/`    |
 | `PS_BRIDGE_SESSION_RESUME_TTL_MS` | No       | Unexpected-disconnect resume TTL in milliseconds.    | `1800000`                |
@@ -18,6 +19,11 @@ Generator launches; existing process environment variables are not overwritten.
 | `PS_BRIDGE_COS_REGION`            | COS only | Tencent Cloud COS region.                            | none                     |
 | `PS_BRIDGE_COS_KEY_PREFIX`        | No       | Object key prefix for COS uploads.                   | `ps-bridge/exports`      |
 | `PS_BRIDGE_COS_URL_EXPIRES`       | No       | Signed URL lifetime in seconds.                      | `315360000`              |
+
+`PS_BRIDGE_PLUGINS` is a platform-delimited list (`;` on Windows, `:` on
+POSIX). These explicit packages load before `PluginConfig.plugins` and the
+collection selected by `pluginsDir` / `PS_BRIDGE_PLUGINS_DIR`. Paths must be
+absolute; empty and duplicate real paths are ignored.
 
 ## COS Enablement
 

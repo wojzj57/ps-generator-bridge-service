@@ -19,5 +19,5 @@ features:
   - title: Photoshop Generator Host
     details: The generator package runs inside Adobe generator-core and exposes HTTP health, plugin discovery, and WebSocket protocol endpoints.
   - title: Plugin Authoring
-    details: External plugins use BasePlugin, @ws, @api, scoped JSX, built-in modules, and a subscription-based event facade.
+    details: External plugins use synchronous initializers, optional BasePlugin helpers, @ws, @api, scoped JSX, built-in modules, and a subscription-based event facade.
 ---

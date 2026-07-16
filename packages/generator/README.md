@@ -28,6 +28,10 @@ pnpm --filter @ps-generator-bridge/generator build
 pnpm --filter @ps-generator-bridge/generator test
 ```
 
+The published runtime is a standalone Windows x64 package. JavaScript runtime
+dependencies are bundled; sharp and its native vendor payload remain private to
+the package.
+
 ## Runtime Role
 
 `generator-core` requires this package through `main.js`, which loads the built CommonJS entry and calls:
@@ -41,7 +45,7 @@ Initialization:
 1. Creates a `PsBridgeHost` around the injected Photoshop Generator API.
 2. Registers the "PS Generator Bridge: Server" menu item.
 3. Starts the HTTP/WebSocket service, defaulting to port `7700`.
-4. Loads external plugin packages from `pluginsDir` or `PS_BRIDGE_PLUGINS_DIR`.
+4. Loads explicit plugin packages, then the configured plugin collection.
 5. Registers built-in modules and plugin-scoped handlers before Fastify starts listening.
 
 ## Configuration
@@ -49,6 +53,7 @@ Initialization:
 ```ts
 export interface PluginConfig {
   port?: number;
+  plugins?: string[];
   pluginsDir?: string;
   maxImportImageBytes?: number;
   maxImportImagePixels?: number;
@@ -64,6 +69,7 @@ Environment overrides:
 | Variable                          | Purpose                                                                                |
 | --------------------------------- | -------------------------------------------------------------------------------------- |
 | `PS_BRIDGE_PORT`                  | Overrides `PluginConfig.port`.                                                         |
+| `PS_BRIDGE_PLUGINS`               | Platform-delimited absolute plugin package paths loaded first.                         |
 | `PS_BRIDGE_PLUGINS_DIR`           | Overrides the default plugin directory when `pluginsDir` is not provided.              |
 | `PS_BRIDGE_LOG_DIR`               | Overrides the package-local runtime log directory.                                     |
 | `PS_BRIDGE_SESSION_RESUME_TTL_MS` | Overrides the session resume TTL in milliseconds.                                      |
@@ -76,12 +82,18 @@ plugin entry, so these overrides are available during host construction.
 
 Prefer `PluginConfig` for structured run parameters. Use environment variables for deployment-time overrides and secrets.
 
+Plugin sources load in this order: `PS_BRIDGE_PLUGINS`,
+`PluginConfig.plugins`, then the sorted direct children of `pluginsDir` (or
+`PS_BRIDGE_PLUGINS_DIR`). Explicit paths must be absolute. Duplicate real paths
+are ignored.
+
 ## Server Endpoints
 
 | Endpoint                   | Purpose                                                                         |
 | -------------------------- | ------------------------------------------------------------------------------- |
 | `GET /health`              | Liveness probe.                                                                 |
 | `GET /plugins`             | Lists loaded external plugin ids.                                               |
+| `GET /plugins/:id/health`  | Reports loaded runtime health or contained load/registration failures.          |
 | `GET/POST /{module}/...`   | Built-in action, document, layer, image, and selection HTTP APIs.               |
 | `GET/POST /{pluginId}/...` | HTTP APIs registered by an external plugin with `@api`.                         |
 | `WS /ws`                   | Root SDK protocol endpoint.                                                     |
@@ -106,7 +118,15 @@ Protocol method names and payload types live in `@ps-generator-bridge/sdk`; keep
 
 ## Plugin Host
 
-External plugins are loaded from direct child folders of the plugin directory. Each plugin package needs a `package.json` with a `main` entry and a default export class derived from `BasePlugin`.
+Each external plugin package needs a `package.json` with a `main` entry and a
+default-exported synchronous initializer. The initializer receives a frozen
+`PluginInitContext` and returns either a plain `PluginRuntime` object or a
+`BasePlugin` instance. Promise-returning initializers are rejected.
+
+Plugin ids resolve from `package.json.pluginId`, then `definePlugin(id, init)`,
+then `package.json.name`. They must match `[A-Za-z0-9_-]+`. The first candidate
+that fully activates claims an id; failed candidates leave it available to the
+next source.
 
 The host passed to each plugin exposes narrow capabilities:
 
@@ -117,6 +137,10 @@ The host passed to each plugin exposes narrow capabilities:
 - optional `cos` upload support when configured
 
 Do not expose Fastify, generator-core, COS SDK concrete classes, or other server internals to plugin authors. Cross the boundary with the type-only contracts in `src/contract.ts`.
+
+Initialization, registration, and lifecycle failures are isolated to the
+owning plugin and surfaced through `/plugins/{id}/health`. `onConnect` and
+`onDisconnect` are synchronous; `onDispose` may be asynchronous.
 
 ## JSX Resources
 

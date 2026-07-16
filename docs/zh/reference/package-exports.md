@@ -29,10 +29,22 @@ import {
 插件开发子路径：
 
 ```ts
-import { BasePlugin, ws, api, bootstrap } from "@ps-generator-bridge/sdk/plugin";
+import {
+  BasePlugin,
+  definePlugin,
+  ws,
+  api,
+  bootstrap,
+  type PluginInitContext,
+  type PluginInitializer,
+  type PluginRuntime,
+} from "@ps-generator-bridge/sdk/plugin";
 ```
 
-插件子路径导出运行时 authoring 原语，以及 type-only 的 host、module、event 契约，包括 `WsSession`、`WsEndpoint` 和 `WsHandlerContext`。
+插件子路径导出同步 initializer 契约、结构化 runtime 类型、decorator authoring
+原语，以及 type-only 的 host、module、event 契约。其中包括
+`PluginInitContext`、`PluginInitializer`、`PluginRuntime`、`WsSession`、
+`WsEndpoint` 和 `WsHandlerContext`。
 
 ## `@ps-generator-bridge/generator`
 

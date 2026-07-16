@@ -131,6 +131,11 @@ interface PluginHealth {
 }
 ```
 
+插件加载失败时，健康信息可能包含 `load` 或 `registration` check。已加载插件的
+生命周期 hook 错误会被隔离，插件仍然可用，但 `runtime` check 会变成 `failed`。
+`lastError` 会按情况使用 `PLUGIN_LOAD_FAILED`、`PLUGIN_REGISTRATION_FAILED` 或
+`PLUGIN_LIFECYCLE_FAILED`。
+
 ## 主事件
 
 ```ts
