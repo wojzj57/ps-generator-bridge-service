@@ -89,18 +89,14 @@ export function inspectRuntimePackage(packageDir: string): RuntimeCache | undefi
   if (!existsSync(packageJsonPath)) return undefined;
   try {
     const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8")) as RuntimePackageJson;
+    const main = pkg.main ?? "main.js";
+    // The generator package owns its payload layout. Keep cache discovery independent
+    // of version-specific directories such as vendor/ or native/.
     if (
       pkg.name !== GENERATOR_PACKAGE ||
       typeof pkg.version !== "string" ||
       pkg.version.length === 0 ||
-      typeof pkg["generator-core-version"] !== "string" ||
-      pkg["generator-core-version"].length === 0 ||
-      !existsSync(join(packageDir, pkg.main ?? "main.js")) ||
-      !existsSync(join(packageDir, "dist")) ||
-      !existsSync(join(packageDir, "jsx")) ||
-      !pkg.os?.includes("win32") ||
-      !pkg.cpu?.includes("x64") ||
-      !isStandaloneRuntime(packageDir, pkg.dependencies ?? {})
+      !existsSync(join(packageDir, main))
     ) {
       return undefined;
     }
@@ -108,17 +104,6 @@ export function inspectRuntimePackage(packageDir: string): RuntimeCache | undefi
   } catch {
     return undefined;
   }
-}
-
-function isStandaloneRuntime(packageDir: string, dependencies: Record<string, string>): boolean {
-  return (
-    Object.keys(dependencies).length === 0 &&
-    !existsSync(join(packageDir, "node_modules")) &&
-    !existsSync(join(packageDir, "vendor")) &&
-    existsSync(join(packageDir, "native", "sharp-win32-x64.node")) &&
-    existsSync(join(packageDir, "native", "libvips-42.dll")) &&
-    existsSync(join(packageDir, "native", "versions.json"))
-  );
 }
 
 function installRuntimeVersion(
@@ -162,8 +147,9 @@ function installRuntimeVersion(
     const installed = inspectRuntimePackage(
       join(stage, "node_modules", "@ps-generator-bridge", "generator")
     );
-    if (!installed || installed.version !== version) {
-      throw new Error(`Installed generator runtime did not validate as version ${version}`);
+    // npm owns version selection; the CLI only checks that the installed package is loadable.
+    if (!installed) {
+      throw new Error(`Installed package is not a loadable ${GENERATOR_PACKAGE} runtime`);
     }
 
     rmSync(backup, { recursive: true, force: true });
@@ -173,7 +159,7 @@ function installRuntimeVersion(
     }
     renameSync(stage, target);
     rmSync(backup, { recursive: true, force: true });
-    return inspectRuntimeCache(options) as RuntimeCache;
+    return { ...installed, packageDir: generatorRuntimePackageDir(options) };
   } catch (error) {
     if (movedCurrent && !existsSync(target) && existsSync(backup)) renameSync(backup, target);
     throw new Error(`Failed to install generator runtime ${version}: ${errorMessage(error)}`);

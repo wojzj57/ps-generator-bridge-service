@@ -109,7 +109,7 @@ describe("generator runtime cache", () => {
     );
   });
 
-  it("rejects a legacy cache that still declares runtime dependencies", () => {
+  it("does not validate a runtime's dependency or payload layout", () => {
     const paths = newPaths();
     ensureGeneratorRuntime({
       ...paths,
@@ -129,11 +129,15 @@ describe("generator runtime cache", () => {
         dependencies: { fastify: "4.29.1" },
       })
     );
+    rmSync(join(cached?.packageDir as string, "native"), { recursive: true, force: true });
+    mkdirSync(join(cached?.packageDir as string, "vendor", "node_modules", "sharp"), {
+      recursive: true,
+    });
 
-    expect(inspectRuntimeCache(paths)).toBeUndefined();
+    expect(inspectRuntimeCache(paths)?.version).toBe("1.0.0");
   });
 
-  it("rejects a runtime that does not target Windows x64", () => {
+  it("does not validate runtime platform metadata", () => {
     const paths = newPaths();
     ensureGeneratorRuntime({
       ...paths,
@@ -146,10 +150,21 @@ describe("generator runtime cache", () => {
       JSON.stringify({ ...cached, cpu: ["arm64"], packageDir: undefined })
     );
 
-    expect(inspectRuntimeCache(paths)).toBeUndefined();
+    expect(inspectRuntimeCache(paths)?.cpu).toEqual(["arm64"]);
   });
 
-  it("rejects a runtime with an incomplete package-private native directory", () => {
+  it("does not compare the installed package version with the resolved version", () => {
+    const paths = newPaths();
+    const runtime = ensureGeneratorRuntime({
+      ...paths,
+      npm: fakeNpm("2.0.0", (cwd) => writeRuntime(cwd, "1.0.0")),
+    });
+
+    expect(runtime.version).toBe("1.0.0");
+    expect(inspectRuntimeCache(paths)?.version).toBe("1.0.0");
+  });
+
+  it("still rejects a package that cannot be loaded", () => {
     const paths = newPaths();
     ensureGeneratorRuntime({
       ...paths,
@@ -157,23 +172,7 @@ describe("generator runtime cache", () => {
     });
     const cached = inspectRuntimeCache(paths);
     expect(cached).toBeDefined();
-    rmSync(join(cached?.packageDir as string, "native", "sharp-win32-x64.node"), { force: true });
-
-    expect(inspectRuntimeCache(paths)).toBeUndefined();
-  });
-
-  it("rejects the legacy nested vendor layout", () => {
-    const paths = newPaths();
-    ensureGeneratorRuntime({
-      ...paths,
-      npm: fakeNpm("1.0.0", (cwd, version) => writeRuntime(cwd, version)),
-    });
-    const cached = inspectRuntimeCache(paths);
-    expect(cached).toBeDefined();
-    rmSync(join(cached?.packageDir as string, "native"), { recursive: true, force: true });
-    mkdirSync(join(cached?.packageDir as string, "vendor", "node_modules", "sharp"), {
-      recursive: true,
-    });
+    rmSync(join(cached?.packageDir as string, "main.js"), { force: true });
 
     expect(inspectRuntimeCache(paths)).toBeUndefined();
   });
