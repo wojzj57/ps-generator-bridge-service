@@ -15,6 +15,8 @@ declare global {
       PS_BRIDGE_PLUGINS_DIR: string;
       PS_BRIDGE_LOG_DIR: string;
       PS_BRIDGE_SESSION_RESUME_TTL_MS: string;
+      // Deployment marker: when present, COS credentials are Base64-encoded.
+      REZ_LIGHTBOX_PS_SERVICE_BASE?: string;
       //
       // CosService (RFC 0008/0009): secrets + non-secret COS settings are all
       // env-driven for cohesion. All four credential fields must be present for

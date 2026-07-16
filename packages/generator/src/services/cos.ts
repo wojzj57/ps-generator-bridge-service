@@ -36,21 +36,19 @@ const DEFAULT_KEY_PREFIX = "ps-bridge/exports";
 // with the credential (RFC 0008).
 const DEFAULT_URL_EXPIRES_SECONDS = 315360000;
 const MAX_NAME_LENGTH = 64;
-const BASE64_SECRET_PREFIX = "base64:";
 
-/** Decode an explicitly Base64-prefixed secret while preserving plain values. */
-function parseSecretEnv(raw: string | undefined): string | undefined {
+/** Decode a Base64 secret when the deployment environment requires it. */
+function parseSecretEnv(raw: string | undefined, decodeBase64: boolean): string | undefined {
   const value = raw?.trim();
   if (!value) return undefined;
-  if (!value.startsWith(BASE64_SECRET_PREFIX)) return value;
+  if (!decodeBase64) return value;
 
-  const encoded = value.slice(BASE64_SECRET_PREFIX.length).trim();
-  if (!encoded || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded) || encoded.length % 4 === 1) {
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value) || value.length % 4 === 1) {
     return undefined;
   }
 
-  const decodedBytes = Buffer.from(encoded, "base64");
-  const canonicalInput = encoded.replace(/=+$/, "");
+  const decodedBytes = Buffer.from(value, "base64");
+  const canonicalInput = value.replace(/=+$/, "");
   const canonicalDecoded = decodedBytes.toString("base64").replace(/=+$/, "");
   if (canonicalDecoded !== canonicalInput) return undefined;
 
@@ -184,8 +182,9 @@ export class CosService implements CosServiceApi {
 
 /**
  * Read the COS config from the environment, or return undefined when COS is not
- * configured. Secret credentials prefixed with `base64:` are decoded before use;
- * unprefixed values remain compatible. All four
+ * configured. Secret credentials are decoded from Base64 when
+ * `REZ_LIGHTBOX_PS_SERVICE_BASE` is present; otherwise they are preserved as-is.
+ * All four
  * `PS_BRIDGE_COS_SECRET_ID/SECRET_KEY/BUCKET/REGION` fields must be present and
  * non-empty — a missing field means "not enabled", decided once at startup rather
  * than failing loudly on the first upload. The two tuning knobs (`KEY_PREFIX`,
@@ -196,8 +195,9 @@ export class CosService implements CosServiceApi {
  * config (injectable in tests) and never touches `process.env` itself.
  */
 export function parseCosEnv(): CosConfig | undefined {
-  const secretId = parseSecretEnv(process.env.PS_BRIDGE_COS_SECRET_ID);
-  const secretKey = parseSecretEnv(process.env.PS_BRIDGE_COS_SECRET_KEY);
+  const decodeSecrets = process.env.REZ_LIGHTBOX_PS_SERVICE_BASE !== undefined;
+  const secretId = parseSecretEnv(process.env.PS_BRIDGE_COS_SECRET_ID, decodeSecrets);
+  const secretKey = parseSecretEnv(process.env.PS_BRIDGE_COS_SECRET_KEY, decodeSecrets);
   const bucket = process.env.PS_BRIDGE_COS_BUCKET?.trim();
   const region = process.env.PS_BRIDGE_COS_REGION?.trim();
   if (!secretId || !secretKey || !bucket || !region) return undefined;
