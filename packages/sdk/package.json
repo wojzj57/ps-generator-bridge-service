@@ -1,6 +1,6 @@
 {
   "name": "@ps-generator-bridge/sdk",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Isomorphic (browser + Node >=18) client SDK for the PS Generator Bridge server",
   "license": "MIT",
   "author": "wojzj57",
