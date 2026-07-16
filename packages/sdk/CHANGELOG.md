@@ -1,5 +1,25 @@
 # @ps-generator-bridge/sdk
 
+## 1.0.0
+
+### Major Changes
+
+- Breaking Changes
+
+  - External plugin packages must replace a default-exported `BasePlugin` class with a synchronous initializer; wrap existing classes with `definePlugin(id, (context) => new Plugin(context))`, register handlers during initialization, and keep `onConnect` and `onDisconnect` synchronous.
+
+  Features
+
+  1. Export `definePlugin`, `PluginInitContext`, `PluginInitializer`, and `PluginRuntime` from `@ps-generator-bridge/sdk/plugin`, with initializer-time WebSocket and HTTP handler registration for class-based or plain-object plugins.
+
+  Fixes
+
+  1. Add `PLUGIN_REGISTRATION_FAILED` and `PLUGIN_LIFECYCLE_FAILED` protocol errors so clients can distinguish isolated plugin registration and lifecycle failures in health diagnostics.
+
+  Documentation
+
+  1. Document the synchronous initializer contract, lifecycle constraints, and plugin health error handling in the public English and Chinese guides.
+
 ## 0.6.1
 
 ### Patch Changes
