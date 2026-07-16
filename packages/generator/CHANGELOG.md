@@ -1,5 +1,13 @@
 # @ps-generator-bridge/generator
 
+## 1.2.0
+
+### Minor Changes
+
+- Fixes
+
+  1. Decode complete `PS_BRIDGE_COS_SECRET_ID` and `PS_BRIDGE_COS_SECRET_KEY` values only when `REZ_LIGHTBOX_PS_SERVICE_BASE` is present, while preserving configured credentials in other environments without relying on a `base64:` prefix.
+
 ## 1.1.1
 
 ### Patch Changes

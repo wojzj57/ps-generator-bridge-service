@@ -1,5 +1,18 @@
 # @ps-generator-bridge/cli
 
+## 0.5.0
+
+### Minor Changes
+
+- Features
+
+  1. Install Generator runtimes from immutable GitHub Release assets with version-tag resolution, download retries, cache validation, and offline fallback.
+
+### Patch Changes
+
+- Updated dependencies
+  - @ps-generator-bridge/sdk@1.2.0
+
 ## 0.4.1
 
 ### Patch Changes
