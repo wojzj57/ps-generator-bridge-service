@@ -1,5 +1,13 @@
 # @ps-generator-bridge/cli
 
+## 0.4.1
+
+### Patch Changes
+
+- Fixes
+
+  1. Accept npm-installed Generator runtimes by package identity and loadable entry point instead of rejecting `generator@1.1.1` based on resolved version metadata or its internal `vendor`/`native` payload layout.
+
 ## 0.4.0
 
 ### Minor Changes
