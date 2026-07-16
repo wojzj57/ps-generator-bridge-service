@@ -13,15 +13,18 @@ async function executeMainEntry(
   onLoadEnvironment: (
     packageDir: string,
     processEnv: Record<string, string | undefined>
-  ) => void = () => undefined
+  ) => void = () => undefined,
+  whitelistedModuleFolders?: string[]
 ): Promise<{
   bundleEnv: Record<string, string | undefined>;
+  bundleWhitelist: string[] | undefined;
   environmentCalls: string[];
   exports: unknown;
 }> {
   const code = fs.readFileSync(MAIN_JS, "utf8");
   const module = { exports: undefined as unknown };
   let bundleEnv: Record<string, string | undefined> = {};
+  let bundleWhitelist: string[] | undefined;
   const environmentCalls: string[] = [];
   const processLike = { env: { ...env } };
 
@@ -30,7 +33,9 @@ async function executeMainEntry(
     module,
     exports: module.exports,
     process: processLike,
+    whitelistedModuleFolders,
     require(request: string) {
+      if (request === "fs") return fs;
       if (request === "./dist/environment.js") {
         return {
           loadEnvironment(dir: string) {
@@ -42,6 +47,7 @@ async function executeMainEntry(
       if (request === "path") return path;
       if (request === "./dist/index.js") {
         bundleEnv = { ...processLike.env };
+        bundleWhitelist = whitelistedModuleFolders ? [...whitelistedModuleFolders] : undefined;
         return { init: "bundle" };
       }
       throw new Error(`Unexpected require: ${request}`);
@@ -52,12 +58,23 @@ async function executeMainEntry(
 
   return {
     bundleEnv,
+    bundleWhitelist,
     environmentCalls,
     exports: module.exports,
   };
 }
 
 describe("generator main entry", () => {
+  it("whitelists the real plugin directory before requiring the bundle", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "ps-bridge-main-"));
+    const existingRoot = path.join(dir, "generator-builtin");
+    const whitelist = [existingRoot];
+
+    const result = await executeMainEntry(dir, {}, () => undefined, whitelist);
+
+    expect(result.bundleWhitelist).toEqual([existingRoot, fs.realpathSync(dir)]);
+  });
+
   it("loads package-local .env before requiring the bundle", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "ps-bridge-main-"));
 

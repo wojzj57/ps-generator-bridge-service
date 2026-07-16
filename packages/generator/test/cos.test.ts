@@ -85,6 +85,22 @@ describe("parseCosEnv", () => {
     expect(parseCosEnv()).toEqual(CONFIG);
   });
 
+  it("decodes explicitly Base64-prefixed secret credentials", () => {
+    setAllEnv();
+    process.env.PS_BRIDGE_COS_SECRET_ID = "base64:aWQ=";
+    process.env.PS_BRIDGE_COS_SECRET_KEY = "base64:a2V5";
+    expect(parseCosEnv()).toEqual(CONFIG);
+  });
+
+  it.each(["base64:", "base64:not-base64!", "base64:====", "base64:IA=="])(
+    "treats an invalid or empty decoded Base64 secret as missing: %s",
+    (secretId) => {
+      setAllEnv();
+      process.env.PS_BRIDGE_COS_SECRET_ID = secretId;
+      expect(parseCosEnv()).toBeUndefined();
+    }
+  );
+
   it("applies KEY_PREFIX / URL_EXPIRES overrides", () => {
     setAllEnv();
     process.env.PS_BRIDGE_COS_KEY_PREFIX = "custom/prefix";
