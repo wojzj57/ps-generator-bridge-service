@@ -84,4 +84,5 @@ jobs:
         with:
           publish: pnpm release
         env:
+          HOME: ${{ runner.temp }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
