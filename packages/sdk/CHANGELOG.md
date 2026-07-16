@@ -1,5 +1,17 @@
 # @ps-generator-bridge/sdk
 
+## 1.1.0
+
+### Minor Changes
+
+- Features
+
+  1. Allow `PS_BRIDGE_COS_SECRET_ID` and `PS_BRIDGE_COS_SECRET_KEY` to use an explicit `base64:` prefix, decoding valid credentials before COS client creation while preserving unprefixed values.
+
+  Fixes
+
+  1. Resolve package-private runtime dependencies such as `sharp` when the Generator package is installed through a symlink by adding the real plugin directory to Adobe Generator's module whitelist before bundle loading.
+
 ## 1.0.0
 
 ### Major Changes
