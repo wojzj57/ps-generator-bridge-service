@@ -80,9 +80,20 @@ jobs:
         run: pnpm pack:check && pnpm pack:check:generator
 
       - name: Publish packages
+        id: changesets
         uses: changesets/action@v1
         with:
           publish: pnpm release
+          createGithubReleases: false
         env:
           HOME: ${{ runner.temp }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push package tags and create Generator GitHub Release with runtime ZIP
+        if: steps.changesets.outcome == 'success'
+        env:
+          BASE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.base_sha || github.event.before }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.release_sha || github.sha }}
+          PUBLISHED_PACKAGES: ${{ steps.changesets.outputs.publishedPackages || '[]' }}
+        run: node scripts/finalize-package-releases.mjs

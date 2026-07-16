@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
+runNodeTests("scripts/finalize-package-releases.test.mjs");
 run(["--filter", "@ps-generator-bridge/sdk", "test"]);
 run(["--filter", "@ps-generator-bridge/generator", "test"]);
 
@@ -16,6 +17,12 @@ function run(args) {
   const command = npmExecPath ? process.execPath : "pnpm";
   const commandArgs = npmExecPath ? [npmExecPath, ...args] : args;
   const result = spawnSync(command, commandArgs, { stdio: "inherit" });
+  if (result.error) throw result.error;
+  if (result.status !== 0) process.exit(result.status ?? 1);
+}
+
+function runNodeTests(path) {
+  const result = spawnSync(process.execPath, ["--test", path], { stdio: "inherit" });
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
 }

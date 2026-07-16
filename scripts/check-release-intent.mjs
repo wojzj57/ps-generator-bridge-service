@@ -54,6 +54,21 @@ if (!/^\s*base_sha:/mu.test(releaseWorkflow) || !/^\s*release_sha:/mu.test(relea
 if (!/^\s*id-token:\s*write\s*$/mu.test(releaseWorkflow)) {
   errors.push("The release workflow must grant id-token: write for npm trusted publishing.");
 }
+if (!/^\s*createGithubReleases:\s*false\s*$/mu.test(releaseWorkflow)) {
+  errors.push(
+    "The release workflow must disable Changesets GitHub Releases so CLI and SDK publish only to npm."
+  );
+}
+if (
+  !/^\s*PUBLISHED_PACKAGES:\s*\$\{\{\s*steps\.changesets\.outputs\.publishedPackages\s*\|\|\s*'\[\]'\s*\}\}\s*$/mu.test(
+    releaseWorkflow
+  )
+) {
+  errors.push("The release workflow must pass published packages to the release finalizer.");
+}
+if (!/^\s*run:\s*node scripts\/finalize-package-releases\.mjs\s*$/mu.test(releaseWorkflow)) {
+  errors.push("The release workflow must run the package release finalizer after npm publishing.");
+}
 
 if (pendingChangesets.length > 0) {
   errors.push(
