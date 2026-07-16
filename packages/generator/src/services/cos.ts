@@ -36,6 +36,26 @@ const DEFAULT_KEY_PREFIX = "ps-bridge/exports";
 // with the credential (RFC 0008).
 const DEFAULT_URL_EXPIRES_SECONDS = 315360000;
 const MAX_NAME_LENGTH = 64;
+const BASE64_SECRET_PREFIX = "base64:";
+
+/** Decode an explicitly Base64-prefixed secret while preserving plain values. */
+function parseSecretEnv(raw: string | undefined): string | undefined {
+  const value = raw?.trim();
+  if (!value) return undefined;
+  if (!value.startsWith(BASE64_SECRET_PREFIX)) return value;
+
+  const encoded = value.slice(BASE64_SECRET_PREFIX.length).trim();
+  if (!encoded || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded) || encoded.length % 4 === 1) {
+    return undefined;
+  }
+
+  const decodedBytes = Buffer.from(encoded, "base64");
+  const canonicalInput = encoded.replace(/=+$/, "");
+  const canonicalDecoded = decodedBytes.toString("base64").replace(/=+$/, "");
+  if (canonicalDecoded !== canonicalInput) return undefined;
+
+  return decodedBytes.toString("utf8").trim() || undefined;
+}
 
 /**
  * Optional object-storage upload unit (RFC 0008). Enabled only when the four
@@ -164,18 +184,20 @@ export class CosService implements CosServiceApi {
 
 /**
  * Read the COS config from the environment, or return undefined when COS is not
- * configured. All four `PS_BRIDGE_COS_SECRET_ID/SECRET_KEY/BUCKET/REGION` must be
- * present and non-empty — a missing field means "not enabled", decided once at
- * startup rather than failing loudly on the first upload. The two tuning knobs
- * (`KEY_PREFIX`, `URL_EXPIRES`) fall back to their defaults.
+ * configured. Secret credentials prefixed with `base64:` are decoded before use;
+ * unprefixed values remain compatible. All four
+ * `PS_BRIDGE_COS_SECRET_ID/SECRET_KEY/BUCKET/REGION` fields must be present and
+ * non-empty — a missing field means "not enabled", decided once at startup rather
+ * than failing loudly on the first upload. The two tuning knobs (`KEY_PREFIX`,
+ * `URL_EXPIRES`) fall back to their defaults.
  *
  * This is the sole env-reading seam: it turns the `PS_BRIDGE_COS_*` secret layer
  * into a structured {@link CosConfig}, so {@link CosService} only ever depends on
  * config (injectable in tests) and never touches `process.env` itself.
  */
 export function parseCosEnv(): CosConfig | undefined {
-  const secretId = process.env.PS_BRIDGE_COS_SECRET_ID?.trim();
-  const secretKey = process.env.PS_BRIDGE_COS_SECRET_KEY?.trim();
+  const secretId = parseSecretEnv(process.env.PS_BRIDGE_COS_SECRET_ID);
+  const secretKey = parseSecretEnv(process.env.PS_BRIDGE_COS_SECRET_KEY);
   const bucket = process.env.PS_BRIDGE_COS_BUCKET?.trim();
   const region = process.env.PS_BRIDGE_COS_REGION?.trim();
   if (!secretId || !secretKey || !bucket || !region) return undefined;
