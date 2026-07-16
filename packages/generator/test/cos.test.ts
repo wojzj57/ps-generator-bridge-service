@@ -32,6 +32,7 @@ const CONFIG: CosConfig = {
 };
 
 const ENV_KEYS = [
+  "REZ_LIGHTBOX_PS_SERVICE_BASE",
   "PS_BRIDGE_COS_SECRET_ID",
   "PS_BRIDGE_COS_SECRET_KEY",
   "PS_BRIDGE_COS_BUCKET",
@@ -85,17 +86,26 @@ describe("parseCosEnv", () => {
     expect(parseCosEnv()).toEqual(CONFIG);
   });
 
-  it("decodes explicitly Base64-prefixed secret credentials", () => {
+  it("preserves secret credentials when REZ_LIGHTBOX_PS_SERVICE_BASE is absent", () => {
     setAllEnv();
-    process.env.PS_BRIDGE_COS_SECRET_ID = "base64:aWQ=";
-    process.env.PS_BRIDGE_COS_SECRET_KEY = "base64:a2V5";
+    process.env.PS_BRIDGE_COS_SECRET_ID = "aWQ=";
+    process.env.PS_BRIDGE_COS_SECRET_KEY = "a2V5";
+    expect(parseCosEnv()).toMatchObject({ secretId: "aWQ=", secretKey: "a2V5" });
+  });
+
+  it("decodes Base64 secret credentials when REZ_LIGHTBOX_PS_SERVICE_BASE is present", () => {
+    setAllEnv();
+    process.env.REZ_LIGHTBOX_PS_SERVICE_BASE = "https://lightbox.example.com";
+    process.env.PS_BRIDGE_COS_SECRET_ID = "aWQ=";
+    process.env.PS_BRIDGE_COS_SECRET_KEY = "a2V5";
     expect(parseCosEnv()).toEqual(CONFIG);
   });
 
-  it.each(["base64:", "base64:not-base64!", "base64:====", "base64:IA=="])(
+  it.each(["not-base64!", "====", "IA=="])(
     "treats an invalid or empty decoded Base64 secret as missing: %s",
     (secretId) => {
       setAllEnv();
+      process.env.REZ_LIGHTBOX_PS_SERVICE_BASE = "https://lightbox.example.com";
       process.env.PS_BRIDGE_COS_SECRET_ID = secretId;
       expect(parseCosEnv()).toBeUndefined();
     }
