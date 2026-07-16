@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { basename, delimiter, isAbsolute, join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { ErrorCode } from "@ps-generator-bridge/sdk";
 import {
@@ -11,6 +11,8 @@ import { isValidPluginId } from "./pluginManager";
 import type { Logger } from "@ps-generator-bridge/sdk/plugin";
 
 export interface LoadOptions {
+  /** Explicit plugin package directories loaded before the collection directory. */
+  pluginDirs?: readonly string[];
   /** Directory whose direct child folders are scanned as plugin packages. */
   pluginsDir: string;
   /**
@@ -47,29 +49,40 @@ export interface LoadResult {
   skipped: SkippedPlugin[];
 }
 
+/** Parse a platform-delimited list of explicit plugin package directories. */
+export function parsePluginPaths(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(delimiter)
+    .map((path) => path.trim())
+    .filter((path) => path.length > 0);
+}
+
 /**
- * Plugin loader. Scans the *direct* child folders and directory links of
- * `pluginsDir` (flat, one level — `node_modules` and dotfolders are ignored),
- * and treats each as an npm package: it reads the folder's `package.json`,
- * resolves the `main` entry, and loads it via dynamic `import()` with CJS
- * interop (`mod.default ?? mod`). The default export must be a `BasePlugin`
- * subclass with a legal, unique `static id`; it is constructed with `(id,
- * host)`.
+ * Plugin loader. Loads explicit `pluginDirs` in declaration order, then scans
+ * the *direct* child folders and directory links of `pluginsDir` (flat, one
+ * level — `node_modules` and dotfolders are ignored). Every candidate is
+ * treated as an npm package: the loader reads its `package.json`, resolves the
+ * `main` entry, and loads it via dynamic `import()` with CJS interop
+ * (`mod.default ?? mod`). The default export must be a `BasePlugin` subclass
+ * with a legal, unique `static id`; it is constructed with `(id, host)`.
  *
  * A plugin's own dependencies resolve from its own `node_modules` via Node's
  * native module resolution (the entry's requires walk up from the entry file),
  * so a plugin ships with its dependencies installed beside it — the loader adds
  * no resolution machinery of its own.
  *
- * Invalid or broken packages are skipped with a `log.warn` naming the folder
- * and reason — one bad package never stops the others or the host. A folder with
- * no `package.json`, or a `package.json` with no `main`, is skipped. A missing
- * `pluginsDir` is the default state (no plugins installed) and is a debug log.
- * `isBasePluginClass` (a global brand) makes validation work even when the
- * package bundles its own SDK copy.
+ * Explicit paths must be absolute directories and are deduplicated with all
+ * collection candidates by real path. Invalid or broken packages are skipped
+ * with a `log.warn` naming the folder and reason — one bad package never stops
+ * the others or the host. A folder with no `package.json`, or a `package.json`
+ * with no `main`, is skipped. A missing `pluginsDir` is the default state (no
+ * collection plugins installed) and is a debug log. `isBasePluginClass` (a
+ * global brand) makes validation work even when the package bundles its own SDK
+ * copy.
  */
 export async function loadPlugins(options: LoadOptions): Promise<LoadResult> {
-  const { pluginsDir, hostFor, knownIds, logger: log } = options;
+  const { pluginDirs = [], pluginsDir, hostFor, knownIds, logger: log } = options;
   const loaded: LoadedPlugin[] = [];
   const skipped: SkippedPlugin[] = [];
   // id -> the folder that already claimed it, so a later duplicate can name the
@@ -77,6 +90,46 @@ export async function loadPlugins(options: LoadOptions): Promise<LoadResult> {
   // (e.g. reserved built-ins), so their owner is labelled generically.
   const taken = new Map<string, string>();
   for (const id of knownIds) taken.set(id, "<reserved>");
+
+  const seenDirs = new Set<string>();
+  const loadCandidate = async (dir: string, label: string): Promise<void> => {
+    const outcome = await loadOne(dir, hostFor, taken);
+    if (outcome.kind === "loaded") {
+      loaded.push({ id: outcome.id, plugin: outcome.plugin, path: outcome.path });
+      taken.set(outcome.id, label);
+      log.info(`plugin loaded: ${label} (${outcome.id})`);
+      return;
+    }
+    skipped.push({
+      path: label,
+      id: outcome.id ?? diagnosticId(dir),
+      code: ErrorCode.PluginLoadFailed,
+      reason: outcome.reason,
+    });
+    log.warn(`plugin skipped: ${label} — ${outcome.reason}`);
+  };
+
+  for (const rawDir of pluginDirs) {
+    const dir = rawDir.trim();
+    if (!dir) continue;
+    const prepared = prepareExplicitPluginDir(dir);
+    if (prepared.kind === "invalid") {
+      skipped.push({
+        path: dir,
+        id: diagnosticId(dir),
+        code: ErrorCode.PluginLoadFailed,
+        reason: prepared.reason,
+      });
+      log.warn(`plugin skipped: ${dir} — ${prepared.reason}`);
+      continue;
+    }
+    if (seenDirs.has(prepared.key)) {
+      log.debug(`duplicate plugin path ignored: ${dir}`);
+      continue;
+    }
+    seenDirs.add(prepared.key);
+    await loadCandidate(dir, dir);
+  }
 
   let dirs: string[];
   try {
@@ -88,22 +141,59 @@ export async function loadPlugins(options: LoadOptions): Promise<LoadResult> {
 
   for (const name of dirs) {
     const dir = join(pluginsDir, name);
-    const outcome = await loadOne(dir, hostFor, taken);
-    if (outcome.kind === "loaded") {
-      loaded.push({ id: outcome.id, plugin: outcome.plugin, path: outcome.path });
-      taken.set(outcome.id, name);
-      log.info(`plugin loaded: ${name} (${outcome.id})`);
-    } else {
-      skipped.push({
-        path: name,
-        id: outcome.id ?? name,
-        code: ErrorCode.PluginLoadFailed,
-        reason: outcome.reason,
-      });
-      log.warn(`plugin skipped: ${name} — ${outcome.reason}`);
+    const key = canonicalPluginDirKey(dir);
+    if (key && seenDirs.has(key)) {
+      log.debug(`duplicate plugin path ignored: ${dir}`);
+      continue;
     }
+    if (key) seenDirs.add(key);
+    await loadCandidate(dir, name);
   }
   return { loaded, skipped };
+}
+
+type PreparedPluginDir = { kind: "valid"; key: string } | { kind: "invalid"; reason: string };
+
+function prepareExplicitPluginDir(dir: string): PreparedPluginDir {
+  if (!isAbsolute(dir)) {
+    return { kind: "invalid", reason: "plugin path must be absolute" };
+  }
+  let canonical: string;
+  try {
+    canonical = realpathSync(dir);
+  } catch (error) {
+    return {
+      kind: "invalid",
+      reason: `plugin path is unavailable: ${(error as Error).message}`,
+    };
+  }
+  try {
+    if (!statSync(canonical).isDirectory()) {
+      return { kind: "invalid", reason: "plugin path is not a directory" };
+    }
+  } catch (error) {
+    return {
+      kind: "invalid",
+      reason: `plugin path is unavailable: ${(error as Error).message}`,
+    };
+  }
+  return { kind: "valid", key: normalizeCanonicalPath(canonical) };
+}
+
+function canonicalPluginDirKey(dir: string): string | undefined {
+  try {
+    return normalizeCanonicalPath(realpathSync(dir));
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeCanonicalPath(path: string): string {
+  return process.platform === "win32" ? path.toLowerCase() : path;
+}
+
+function diagnosticId(dir: string): string {
+  return basename(dir) || dir;
 }
 
 type Outcome =

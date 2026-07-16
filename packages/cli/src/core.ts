@@ -9,7 +9,12 @@ import {
   generatorCoreDir,
 } from "./generatorCore";
 import { ensurePhotoshopRunning } from "./photoshop";
-import { cleanupPluginSource, preparePluginSource, scanPluginCandidates } from "./pluginDirs";
+import {
+  cleanupPluginSource,
+  countPluginCandidates,
+  parsePluginPaths,
+  preparePluginSource,
+} from "./pluginDirs";
 import { resolveRemotePassword } from "./remotePassword";
 import { ensureGeneratorRuntime } from "./runtimeManager";
 
@@ -66,7 +71,10 @@ async function withHarness(
   const port = options.port ?? DEFAULT_PORT;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const pluginSource = await preparePluginSource(options);
-  const expectedCount = scanPluginCandidates(pluginSource.pluginsDir).length;
+  const minimumExpectedCount = countPluginCandidates(
+    pluginSource.pluginsDir,
+    parsePluginPaths(process.env.PS_BRIDGE_PLUGINS)
+  );
   let child: ChildProcess | undefined;
 
   try {
@@ -78,7 +86,7 @@ async function withHarness(
     });
     await waitForHealth(port, timeoutMs);
     const plugins = await readPlugins(port);
-    assertPlugins({ plugins, expectedCount });
+    assertMinimumPlugins({ plugins, minimumExpectedCount });
     const info = await smokeServerInfo(port, timeoutMs, runtime.version);
     console.log(
       `Server info: ${info.name} ${info.version}${info.psVersion ? `, Photoshop ${info.psVersion}` : ""}`
@@ -180,10 +188,13 @@ export function sdkCompatibilityError(runtimeVersion: string, cause: unknown): E
   );
 }
 
-function assertPlugins(options: { plugins: PluginInfo[]; expectedCount: number }): void {
-  if (options.plugins.length !== options.expectedCount) {
+export function assertMinimumPlugins(options: {
+  plugins: PluginInfo[];
+  minimumExpectedCount: number;
+}): void {
+  if (options.plugins.length < options.minimumExpectedCount) {
     throw new Error(
-      `Expected ${options.expectedCount} plugin(s), but host loaded ${options.plugins.length}: ${formatPlugins(options.plugins)}`
+      `Expected at least ${options.minimumExpectedCount} plugin(s), but host loaded ${options.plugins.length}: ${formatPlugins(options.plugins)}`
     );
   }
 }

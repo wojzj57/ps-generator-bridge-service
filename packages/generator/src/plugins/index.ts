@@ -1,5 +1,6 @@
 export {
   loadPlugins,
+  parsePluginPaths,
   type LoadedPlugin,
   type LoadOptions,
   type LoadResult,

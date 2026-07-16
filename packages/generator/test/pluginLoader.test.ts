@@ -1,9 +1,9 @@
-import { mkdtemp, mkdir, writeFile, realpath } from "node:fs/promises";
+import { mkdtemp, mkdir, realpath, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { delimiter, join, resolve } from "node:path";
 import { describe, it, expect, afterEach } from "vitest";
 import WebSocket from "ws";
-import { loadPlugins, type LoadResult } from "../src/plugins";
+import { loadPlugins, parsePluginPaths, type LoadResult } from "../src/plugins";
 import { createServer, type PsBridgeServer } from "../src/server";
 import type { PluginHost } from "@ps-generator-bridge/sdk/plugin";
 import type { Logger } from "@ps-generator-bridge/sdk/plugin";
@@ -114,7 +114,129 @@ ws("good:ping")(GoodPlugin.prototype.ping, { name: "ping", metadata: meta });
 module.exports = GoodPlugin;
 `;
 
+async function writeStandalonePlugin(path: string, id: string): Promise<void> {
+  await mkdir(path, { recursive: true });
+  await writeFile(
+    join(path, "package.json"),
+    JSON.stringify({ name: `@fixture/${id}`, version: "0.0.0", main: "index.js" }),
+    "utf8"
+  );
+  await writeFile(join(path, "index.js"), klass(id), "utf8");
+}
+
 describe("loadPlugins", () => {
+  it("parses platform-delimited plugin paths, trimming and ignoring empty entries", () => {
+    const first = join(tmpdir(), "plugin one");
+    const second = join(tmpdir(), "plugin-two");
+
+    expect(parsePluginPaths(` ${first} ${delimiter}${delimiter} ${second} `)).toEqual([
+      first,
+      second,
+    ]);
+  });
+
+  it("loads explicit package paths before config paths and the collection", async () => {
+    const root = await newDir();
+    const envPlugin = join(root, "env-plugin");
+    const configPlugin = join(root, "config-plugin");
+    const collection = join(root, "collection");
+    await writeStandalonePlugin(envPlugin, "env");
+    await writeStandalonePlugin(configPlugin, "config");
+    await writeStandalonePlugin(join(collection, "base-plugin"), "base");
+
+    const res = await loadPlugins({
+      pluginDirs: [envPlugin, configPlugin],
+      pluginsDir: collection,
+      hostFor: () => fakeHost,
+      knownIds: new Set(),
+      logger: recordingLogger(),
+    });
+
+    expect(res.loaded.map((plugin) => plugin.id)).toEqual(["env", "config", "base"]);
+  });
+
+  it("rejects relative explicit paths without stopping later plugins", async () => {
+    const root = await newDir();
+    const validPlugin = join(root, "valid-plugin");
+    await writeStandalonePlugin(validPlugin, "valid");
+
+    const res = await loadPlugins({
+      pluginDirs: ["relative-plugin", validPlugin],
+      pluginsDir: join(root, "missing-collection"),
+      hostFor: () => fakeHost,
+      knownIds: new Set(),
+      logger: recordingLogger(),
+    });
+
+    expect(res.loaded.map((plugin) => plugin.id)).toEqual(["valid"]);
+    expect(res.skipped[0]).toMatchObject({
+      path: "relative-plugin",
+      reason: "plugin path must be absolute",
+    });
+  });
+
+  it("skips unavailable explicit paths and paths that are not directories", async () => {
+    const root = await newDir();
+    const missing = join(root, "missing-plugin");
+    const file = join(root, "plugin.js");
+    await writeFile(file, "module.exports = {};", "utf8");
+
+    const res = await loadPlugins({
+      pluginDirs: [missing, file],
+      pluginsDir: join(root, "missing-collection"),
+      hostFor: () => fakeHost,
+      knownIds: new Set(),
+      logger: recordingLogger(),
+    });
+
+    expect(res.loaded).toEqual([]);
+    expect(res.skipped.map((item) => item.reason)).toEqual([
+      expect.stringContaining("plugin path is unavailable"),
+      "plugin path is not a directory",
+    ]);
+  });
+
+  it("deduplicates explicit and collection candidates by real path", async () => {
+    const root = await newDir();
+    const plugin = join(root, "plugin");
+    const collection = join(root, "collection");
+    await writeStandalonePlugin(plugin, "once");
+    await mkdir(collection, { recursive: true });
+    const collectionLink = join(collection, "linked-plugin");
+    await symlink(plugin, collectionLink, process.platform === "win32" ? "junction" : "dir");
+
+    const res = await loadPlugins({
+      pluginDirs: [plugin, join(plugin, ".")],
+      pluginsDir: collection,
+      hostFor: () => fakeHost,
+      knownIds: new Set(),
+      logger: recordingLogger(),
+    });
+
+    expect(res.loaded.map((item) => item.id)).toEqual(["once"]);
+    expect(res.skipped).toEqual([]);
+  });
+
+  it("keeps the first plugin id claimant when a collection plugin duplicates it", async () => {
+    const root = await newDir();
+    const explicitPlugin = join(root, "explicit");
+    const collection = join(root, "collection");
+    await writeStandalonePlugin(explicitPlugin, "shared");
+    await writeStandalonePlugin(join(collection, "fallback"), "shared");
+
+    const res = await loadPlugins({
+      pluginDirs: [explicitPlugin],
+      pluginsDir: collection,
+      hostFor: () => fakeHost,
+      knownIds: new Set(),
+      logger: recordingLogger(),
+    });
+
+    expect(res.loaded).toHaveLength(1);
+    expect(res.loaded[0]?.path).toBe(join(explicitPlugin, "index.js"));
+    expect(res.skipped[0]?.reason).toContain(`already claimed by '${explicitPlugin}'`);
+  });
+
   it("loads a valid plugin via package.json main and reports no skips", async () => {
     const d = await newDir();
     await writePlugin("good", { "index.js": GOOD_SRC });

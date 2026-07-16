@@ -11,6 +11,7 @@ declare global {
       // `PS_BRIDGE_` prefix; structured run params (port/pluginsDir) come via
       // PluginConfig and these env vars only override.
       PS_BRIDGE_PORT: string;
+      PS_BRIDGE_PLUGINS: string;
       PS_BRIDGE_PLUGINS_DIR: string;
       PS_BRIDGE_LOG_DIR: string;
       PS_BRIDGE_SESSION_RESUME_TTL_MS: string;

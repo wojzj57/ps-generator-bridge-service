@@ -9,7 +9,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { basename, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, delimiter, isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { PLUGINS_MARKER, pluginsSnapshotDir } from "./appPaths";
 import type { PathEnvironment } from "./appPaths";
 
@@ -60,6 +60,44 @@ export function scanPluginCandidates(pluginsDir: string): string[] {
     .map((entry) => entry.name)
     .filter((name) => existsSync(join(pluginsDir, name, "package.json")))
     .sort();
+}
+
+/** Parse explicit plugin package paths from the platform-delimited env value. */
+export function parsePluginPaths(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(delimiter)
+    .map((path) => path.trim())
+    .filter((path) => path.length > 0);
+}
+
+/**
+ * Count distinct plugin candidates known to the CLI. Explicit paths are counted
+ * even when invalid so the smoke harness detects that the host skipped them.
+ */
+export function countPluginCandidates(pluginsDir: string, pluginPaths: readonly string[]): number {
+  const keys = [
+    ...pluginPaths.map(explicitPluginCandidateKey),
+    ...scanPluginCandidates(pluginsDir).map((name) => pluginCandidateKey(join(pluginsDir, name))),
+  ];
+  return new Set(keys).size;
+}
+
+function explicitPluginCandidateKey(path: string): string {
+  if (!isAbsolute(path)) return `raw:${normalizeForPlatform(normalize(path))}`;
+  return pluginCandidateKey(path);
+}
+
+function pluginCandidateKey(path: string): string {
+  try {
+    return `real:${normalizeForPlatform(realpathSync(path))}`;
+  } catch {
+    return `raw:${normalizeForPlatform(normalize(path))}`;
+  }
+}
+
+function normalizeForPlatform(path: string): string {
+  return process.platform === "win32" ? path.toLowerCase() : path;
 }
 
 function resetManagedSnapshot(paths: PathEnvironment): string {

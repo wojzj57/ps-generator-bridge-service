@@ -8,7 +8,7 @@ import {
   type Logger,
   type PluginHost,
 } from "@ps-generator-bridge/sdk/plugin";
-import { loadPlugins } from "./plugins";
+import { loadPlugins, parsePluginPaths } from "./plugins";
 import { JsxRunner } from "./utils/jsxRunner";
 import { EventManager, RuntimeEventManager, type PluginEvents } from "./utils/eventManager";
 import { MainEvent, type MainEventMap, type MainEventName } from "@ps-generator-bridge/sdk";
@@ -43,6 +43,8 @@ export { DEFAULT_PORT };
 /** Host config handed in by generator-core (self._config[name]). */
 export interface PluginConfig {
   port?: number;
+  /** Absolute plugin package directories loaded in array order. */
+  plugins?: string[];
   /**
    * Directory whose direct child folders are loaded as plugin packages
    * (each a `package.json` with a `main` entry; see the plugin loader).
@@ -194,26 +196,34 @@ export class PsBridgeHost implements PluginHost {
       sessionResumeTtlMs: sessionResumeTtlFromEnv() ?? this.config.sessionResumeTtlMs,
     });
     this.server = server;
-    // Plugins are loaded entirely from `pluginsDir`: scan its direct child
-    // folders for `package.json` packages, validate + construct each with its
-    // `static id` and this host. A missing dir is the default state (no plugins
-    // installed). Modules exist from construction so a plugin can read
-    // `this.plugin.modules.<key>` (ADR 0009).
-    // Resolution order: explicit `config.pluginsDir`, then the
-    // PS_BRIDGE_PLUGINS_DIR env override, else the package-local
-    // `plugins/` tree (__dirname is `dist`, so `../plugins`).
+    // Explicit package paths are prepended in env -> config order, followed by
+    // the collection directory. A missing collection is the default state (no
+    // collection plugins installed). Modules exist from construction so a
+    // plugin can read `this.plugin.modules.<key>` (ADR 0009).
+    // Collection resolution remains explicit config, then env override, then
+    // the package-local `plugins/` tree (__dirname is `dist`, so `../plugins`).
+    const pluginDirs = [
+      ...parsePluginPaths(process.env.PS_BRIDGE_PLUGINS),
+      ...(this.config.plugins ?? []),
+    ];
     const pluginsDir =
       this.config.pluginsDir ??
       process.env.PS_BRIDGE_PLUGINS_DIR ??
       join(__dirname, "..", "plugins");
     const { loaded, skipped } = await loadPlugins({
+      pluginDirs,
       pluginsDir,
       hostFor: (pluginDir, pluginId) => this.hostFor(pluginDir, pluginId),
       knownIds: new Set(),
       logger: log,
     });
+    const loadedIds = new Set(loaded.map((item) => item.id));
     for (const s of skipped) {
       log.warn(`plugin skipped: ${s.path} — ${s.reason}`);
+      // A later duplicate candidate is skipped under the winner's id. Keep the
+      // winner's constructor-time event subscriptions intact and let its
+      // registration determine health for that id.
+      if (loadedIds.has(s.id)) continue;
       this._runtimeEvents.disposePlugin(s.id);
       server.pluginManager.recordFailure({
         id: s.id,
