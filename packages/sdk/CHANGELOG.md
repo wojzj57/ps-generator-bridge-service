@@ -1,5 +1,13 @@
 # @ps-generator-bridge/sdk
 
+## 1.1.1
+
+### Patch Changes
+
+- Refactors
+
+  1. Package the Generator runtime with bundled sharp JavaScript and a flat native addon directory, removing the nested vendor dependency tree and the Generator module-whitelist workaround while preserving standalone PNG encoding.
+
 ## 1.1.0
 
 ### Minor Changes
