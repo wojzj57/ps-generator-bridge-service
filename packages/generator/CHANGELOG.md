@@ -1,5 +1,28 @@
 # @ps-generator-bridge/generator
 
+## 1.0.0
+
+### Major Changes
+
+- Breaking Changes
+
+  - External plugin packages must replace a default-exported `BasePlugin` class with a synchronous initializer; wrap existing classes with `definePlugin(id, (context) => new Plugin(context))`, register handlers during initialization, and keep `onConnect` and `onDisconnect` synchronous.
+  - Published generator runtimes now target Windows x64 and carry their JavaScript dependencies plus a package-private sharp vendor payload instead of relying on an external dependency installation.
+
+  Features
+
+  1. Load synchronous class-based or plain-object plugin initializers with staged WebSocket and HTTP handler registration and deterministic plugin identity resolution.
+  2. Add ordered explicit plugin sources through `PS_BRIDGE_PLUGINS` and `PluginConfig.plugins`, with absolute-path validation, real-path deduplication, and deterministic first-success plugin id ownership.
+  3. Ship `@ps-generator-bridge/generator` as a standalone Windows x64 runtime with bundled JavaScript dependencies and a complete package-private sharp vendor payload.
+
+  Fixes
+
+  1. Contain third-party plugin registration and lifecycle failures within the owning plugin, preserve healthy plugins and sessions, and expose protocol-safe diagnostics through `/plugins/{id}/health` with `PLUGIN_REGISTRATION_FAILED` and `PLUGIN_LIFECYCLE_FAILED` errors.
+
+  Documentation
+
+  1. Document standalone runtime requirements, explicit plugin source precedence, synchronous plugin initialization, lifecycle constraints, and plugin health diagnostics in the public English and Chinese guides.
+
 ## 0.6.1
 
 ### Patch Changes

@@ -1,5 +1,23 @@
 # @ps-generator-bridge/cli
 
+## 0.4.0
+
+### Minor Changes
+
+- Features
+
+  1. Install, validate, pin, and safely replace standalone Windows x64 generator runtime packages through the shared cache, rejecting legacy dependency-based or incomplete native caches before launch.
+  2. Include ordered `PS_BRIDGE_PLUGINS` candidates in `run` and `dev` smoke validation while allowing additional host-configured plugins.
+
+  Documentation
+
+  1. Document standalone runtime caching, version selection, offline fallback, and explicit plugin source validation in the public English and Chinese guides.
+
+### Patch Changes
+
+- Updated dependencies
+  - @ps-generator-bridge/sdk@1.0.0
+
 ## 0.3.0
 
 ### Minor Changes
