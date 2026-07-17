@@ -1,5 +1,13 @@
 # @ps-generator-bridge/generator
 
+## 1.2.0
+
+### Minor Changes
+
+- Fixes
+
+  1. Decode complete `PS_BRIDGE_COS_SECRET_ID` and `PS_BRIDGE_COS_SECRET_KEY` values only when `REZ_LIGHTBOX_PS_SERVICE_BASE` is present, while preserving configured credentials in other environments without relying on a `base64:` prefix.
+
 ## 1.1.1
 
 ### Patch Changes
@@ -12,7 +20,11 @@
 
 ### Minor Changes
 
-- Fixes
+- Features
+
+  1. Allow `PS_BRIDGE_COS_SECRET_ID` and `PS_BRIDGE_COS_SECRET_KEY` to use an explicit `base64:` prefix, decoding valid credentials before COS client creation while preserving unprefixed values.
+
+  Fixes
 
   1. Resolve package-private runtime dependencies such as `sharp` when the Generator package is installed through a symlink by adding the real plugin directory to Adobe Generator's module whitelist before bundle loading.
 
