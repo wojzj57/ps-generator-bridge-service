@@ -37,24 +37,6 @@ const DEFAULT_KEY_PREFIX = "ps-bridge/exports";
 const DEFAULT_URL_EXPIRES_SECONDS = 315360000;
 const MAX_NAME_LENGTH = 64;
 
-/** Decode a Base64 secret when the deployment environment requires it. */
-function parseSecretEnv(raw: string | undefined, decodeBase64: boolean): string | undefined {
-  const value = raw?.trim();
-  if (!value) return undefined;
-  if (!decodeBase64) return value;
-
-  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value) || value.length % 4 === 1) {
-    return undefined;
-  }
-
-  const decodedBytes = Buffer.from(value, "base64");
-  const canonicalInput = value.replace(/=+$/, "");
-  const canonicalDecoded = decodedBytes.toString("base64").replace(/=+$/, "");
-  if (canonicalDecoded !== canonicalInput) return undefined;
-
-  return decodedBytes.toString("utf8").trim() || undefined;
-}
-
 /**
  * Optional object-storage upload unit (RFC 0008). Enabled only when the four
  * `PS_BRIDGE_COS_*` env fields are present; otherwise the host leaves `plugin.cos`
@@ -182,9 +164,7 @@ export class CosService implements CosServiceApi {
 
 /**
  * Read the COS config from the environment, or return undefined when COS is not
- * configured. Secret credentials are decoded from Base64 when
- * `REZ_LIGHTBOX_PS_SERVICE_BASE` is present; otherwise they are preserved as-is.
- * All four
+ * configured. Secret credentials are used directly from the environment. All four
  * `PS_BRIDGE_COS_SECRET_ID/SECRET_KEY/BUCKET/REGION` fields must be present and
  * non-empty — a missing field means "not enabled", decided once at startup rather
  * than failing loudly on the first upload. The two tuning knobs (`KEY_PREFIX`,
@@ -195,9 +175,8 @@ export class CosService implements CosServiceApi {
  * config (injectable in tests) and never touches `process.env` itself.
  */
 export function parseCosEnv(): CosConfig | undefined {
-  const decodeSecrets = process.env.REZ_LIGHTBOX_PS_SERVICE_BASE !== undefined;
-  const secretId = parseSecretEnv(process.env.PS_BRIDGE_COS_SECRET_ID, decodeSecrets);
-  const secretKey = parseSecretEnv(process.env.PS_BRIDGE_COS_SECRET_KEY, decodeSecrets);
+  const secretId = process.env.PS_BRIDGE_COS_SECRET_ID?.trim();
+  const secretKey = process.env.PS_BRIDGE_COS_SECRET_KEY?.trim();
   const bucket = process.env.PS_BRIDGE_COS_BUCKET?.trim();
   const region = process.env.PS_BRIDGE_COS_REGION?.trim();
   if (!secretId || !secretKey || !bucket || !region) return undefined;

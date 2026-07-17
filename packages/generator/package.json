@@ -45,7 +45,8 @@
   },
   "files": [
     "main.js",
-    "dist",
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
     "jsx",
     "native",
     ".env.example",
