@@ -1,5 +1,17 @@
 # @ps-generator-bridge/sdk
 
+## 1.2.1
+
+### Patch Changes
+
+- Fixes
+
+  1. Use `PS_BRIDGE_COS_SECRET_ID` and `PS_BRIDGE_COS_SECRET_KEY` directly after trimming, removing deployment-specific marker and Base64 decoding behavior.
+
+  Maintenance
+
+  1. Exclude Generator source maps and the tsup metafile from published packages while retaining runtime JavaScript and TypeScript declarations.
+
 ## 1.2.0
 
 ### Minor Changes
